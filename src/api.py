@@ -7,7 +7,7 @@ API_URL = "http://localhost:1337"
 
 
 def get_last_import_at():
-    print("\n Get last import")
+    print("\nGet last import")
     imports, used_cache = get(f"{API_URL}/imports", {"_sort": "created_at:DESC"})
     if len(imports) > 0:
         last_import = imports[0]
@@ -19,16 +19,30 @@ def get_last_import_at():
         return None
 
 
-# TODO implement
 def get_repository_by_github_id(id):
-    print("get_repository_by_github_id")
-    return None
+    print(f"\nGet repository by github_id {id}")
+    repositories, used_cache = get(f"{API_URL}/repositories", {"github_id": id})
+    repository = repositories[0] if len(repositories) > 0 else None
+    return repository
 
 
-# TODO implement
-def insert_repository(repository):
-    print("insert_repository")
-    return {"id": 1}
+def get_owner_by_name(name):
+    print(f"\nGet owner by name {name}")
+    owners, used_cache = get(f"{API_URL}/owners", {"name": name})
+    owner = owners[0] if len(owners) > 0 else None
+    return owner
+
+
+def create_owner(owner_data):
+    print(f"\nCreate owner")
+    owner, used_cache = post(f"{API_URL}/owners", owner_data)
+    return owner
+
+
+def create_repository(repository_data):
+    print("\nCreate repository")
+    repository, used_cache = post(f"{API_URL}/repositories", repository_data)
+    return repository
 
 
 # TODO implement
