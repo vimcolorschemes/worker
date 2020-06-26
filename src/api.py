@@ -1,7 +1,7 @@
 import dateutil.parser as dparser
 from datetime import datetime
 
-from request_helper import get, post
+from request_helper import get, post, put
 
 API_URL = "http://localhost:1337"
 
@@ -45,10 +45,10 @@ def create_repository(repository_data):
     return repository
 
 
-# TODO implement
 def update_repository(id, repository):
-    print("update_repository")
-    return {"id": 1}
+    print("\nUpdate repository")
+    repository, used_cache = put(f"{API_URL}/repositories/{id}", repository)
+    return repository
 
 
 # TODO implement
