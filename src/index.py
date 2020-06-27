@@ -5,7 +5,7 @@ import time
 
 import api
 import file_helper
-import github_helper
+import github
 import printer
 
 MAX_IMAGE_COUNT = os.getenv("MAX_IMAGE_COUNT")
@@ -23,12 +23,12 @@ if __name__ == "__main__":
     printer.break_line()
     printer.break_line()
 
-    repositories = github_helper.search_repositories()
+    repositories = github.search_repositories()
 
     for repository in repositories:
         existing_repository = api.get_repository_by_github_id(repository["github_id"])
 
-        repository["last_commit_at"] = github_helper.get_last_commit_at(repository)
+        repository["last_commit_at"] = github.get_last_commit_at(repository)
         last_commit_at = dparser.parse(repository["last_commit_at"], fuzzy=True)
 
         refetch_images = (
@@ -57,9 +57,9 @@ if __name__ == "__main__":
 
         if refetch_images:
             readme_images = file_helper.find_images(
-                github_helper.get_readme_file(repository), MAX_IMAGE_COUNT
+                github.get_readme_file(repository), MAX_IMAGE_COUNT
             )
-            repository_images = github_helper.list_repository_images(
+            repository_images = github.list_repository_images(
                 repository, len(readme_images), MAX_IMAGE_COUNT
             )
             api.upload_repository_images(
