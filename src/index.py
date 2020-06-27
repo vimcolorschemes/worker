@@ -24,6 +24,12 @@ if __name__ == "__main__":
         repository["last_commit_at"] = github_helper.get_last_commit_at(repository)
         last_commit_at = dparser.parse(repository["last_commit_at"], fuzzy=True)
 
+        refetch_images = (
+            not last_import_at
+            or last_commit_at > last_import_at
+            or existing_repository is None
+        )
+
         new_repository = None
         if existing_repository is None:
             owner_name = repository["owner"]["name"]
@@ -32,16 +38,13 @@ if __name__ == "__main__":
                 owner = api.create_owner({"name": owner_name})
             new_repository = api.create_repository({**repository, "owner": owner["id"]})
         else:
+            if refetch_images:
+                api.delete_images(existing_repository["images"])
             new_repository = api.update_repository(
                 existing_repository["id"], repository
             )
 
-        if (
-            True
-            or not last_import_at
-            or last_commit_at > last_import_at
-            or existing_repository is None
-        ):
+        if refetch_images:
             readme_image_urls = file_helper.find_image_urls(
                 github_helper.get_readme_file(repository), MAX_IMAGE_COUNT
             )

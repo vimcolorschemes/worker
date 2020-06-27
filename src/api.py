@@ -1,7 +1,7 @@
 import dateutil.parser as dparser
 from datetime import datetime
 
-from request_helper import get, post, put, download
+from request_helper import get, post, put, download, delete
 
 API_URL = "http://localhost:1337"
 
@@ -49,6 +49,13 @@ def update_repository(id, repository):
     print("\nUpdate repository")
     repository, used_cache = put(f"{API_URL}/repositories/{id}", repository)
     return repository
+
+
+def delete_images(images):
+    print(f"\nDelete images")
+
+    for image in images:
+        delete(f"{API_URL}/upload/files/{image['id']}")
 
 
 def upload_images(repository_id, image_urls):
