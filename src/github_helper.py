@@ -124,7 +124,7 @@ def search_repositories():
 # Keeps only the stuff we need for the app
 def map_response_item_to_repository(response_item):
     return {
-        "id": response_item["id"],
+        "github_id": response_item["id"],
         "name": response_item["name"],
         "description": response_item["description"],
         "default_branch": response_item["default_branch"],
@@ -132,7 +132,7 @@ def map_response_item_to_repository(response_item):
         "homepage_url": response_item["homepage"],
         "stargazers_count": response_item["stargazers_count"],
         "pushed_at": response_item["pushed_at"],
-        "created_at": response_item["created_at"],
+        "github_created_at": response_item["created_at"],
         "owner": {
             "name": response_item["owner"]["login"],
             "avatar_url": response_item["owner"]["avatar_url"],
@@ -140,27 +140,27 @@ def map_response_item_to_repository(response_item):
     }
 
 
-def get_latest_commit_at(repository):
+def get_last_commit_at(repository):
     owner_name = repository["owner"]["name"]
     name = repository["name"]
 
     commits_path = f"repos/{owner_name}/{name}/commits"
 
     commits = github_core_get(
-        f"{BASE_URL}/{commits_path}", call_name=f"{owner_name}/{name} latest commit at"
+        f"{BASE_URL}/{commits_path}", call_name=f"{owner_name}/{name} last commit at"
     )
 
     if not commits or len(commits) == 0:
         return None
 
-    latest_commit_data = commits[0]
+    last_commit_data = commits[0]
 
     if (
-        "commit" in latest_commit_data
-        and "author" in latest_commit_data["commit"]
-        and "date" in latest_commit_data["commit"]["author"]
+        "commit" in last_commit_data
+        and "author" in last_commit_data["commit"]
+        and "date" in last_commit_data["commit"]["author"]
     ):
-        return latest_commit_data["commit"]["author"]["date"]
+        return last_commit_data["commit"]["author"]["date"]
 
     return None
 
