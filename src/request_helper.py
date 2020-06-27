@@ -23,10 +23,15 @@ if USE_CACHE:
     )
 
 
-def get(url, params={}, auth=None, is_json=True):
+def request(verb, url, params=None, data=None, files=None, auth=None, is_json=True):
     used_cache = False
     try:
-        response = requests.get(url, params=params, timeout=TIMEOUT, auth=auth)
+        action = getattr(requests, verb, None)
+        if not action:
+            print(f"{colors.ERROR}Error:{colors.NORMAL} Wrong verb")
+            return None, used_cache
+
+        response = action(url=url, params=params, data=data, files=files, auth=auth, timeout=TIMEOUT)
         response.raise_for_status()
         if USE_CACHE:
             used_cache = response.from_cache
@@ -48,90 +53,24 @@ def get(url, params={}, auth=None, is_json=True):
     except Exception as e:
         print(f"{colors.ERROR}Unexpected error{colors.NORMAL}:", e)
     return None, used_cache
+
+
+def get(url, params={}, auth=None, is_json=True):
+    return request(verb="get", url=url, params=params, auth=auth, is_json=is_json)
 
 
 def post(url, data=None, files=None, auth=None, is_json=True):
-    used_cache = False
-    try:
-        response = requests.post(
-            url, data=data, files=files, timeout=TIMEOUT, auth=auth
-        )
-        response.raise_for_status()
-        if USE_CACHE:
-            used_cache = response.from_cache
-        data = response.json() if is_json else response
-        return data, used_cache
-    except requests.exceptions.HTTPError as errh:
-        if response.status_code == 404:
-            print(f"{colors.WARNING}Warning: 404 Not found for {url}{colors.NORMAL}")
-            return None, used_cache
-        print(f"{colors.ERROR}Http Error:{colors.NORMAL}", errh)
-    except requests.exceptions.ConnectionError as errc:
-        print(f"{colors.ERROR}Error Connecting:{colors.NORMAL}", errc)
-    except requests.exceptions.Timeout as errt:
-        print(f"{colors.ERROR}Timeout Error:{colors.NORMAL}", errt)
-    except requests.exceptions.RequestException as err:
-        print(f"{colors.ERROR}Request error:{colors.NORMAL}", err)
-    except ValueError as errv:
-        print(f"{colors.ERROR}Error decoding JSON response:{colors.NORMAL}", errv)
-    except Exception as e:
-        print(f"{colors.ERROR}Unexpected error{colors.NORMAL}:", e)
-    return None, used_cache
+    return request(
+        verb="post", url=url, data=data, files=files, auth=auth, is_json=is_json
+    )
 
 
 def put(url, data={}, auth=None, is_json=True):
-    used_cache = False
-    try:
-        response = requests.put(url, data=data, timeout=TIMEOUT, auth=auth)
-        response.raise_for_status()
-        if USE_CACHE:
-            used_cache = response.from_cache
-        data = response.json() if is_json else response
-        return data, used_cache
-    except requests.exceptions.HTTPError as errh:
-        if response.status_code == 404:
-            print(f"{colors.WARNING}Warning: 404 Not found for {url}{colors.NORMAL}")
-            return None, used_cache
-        print(f"{colors.ERROR}Http Error:{colors.NORMAL}", errh)
-    except requests.exceptions.ConnectionError as errc:
-        print(f"{colors.ERROR}Error Connecting:{colors.NORMAL}", errc)
-    except requests.exceptions.Timeout as errt:
-        print(f"{colors.ERROR}Timeout Error:{colors.NORMAL}", errt)
-    except requests.exceptions.RequestException as err:
-        print(f"{colors.ERROR}Request error:{colors.NORMAL}", err)
-    except ValueError as errv:
-        print(f"{colors.ERROR}Error decoding JSON response:{colors.NORMAL}", errv)
-    except Exception as e:
-        print(f"{colors.ERROR}Unexpected error{colors.NORMAL}:", e)
-    return None, used_cache
+    return request(verb="put", url=url, data=data, auth=auth, is_json=is_json)
 
 
-def delete(url, auth=None, is_json=True):
-    used_cache = False
-    try:
-        response = requests.delete(url, timeout=TIMEOUT, auth=auth)
-        response.raise_for_status()
-        if USE_CACHE:
-            used_cache = response.from_cache
-        data = response.json() if is_json else response
-        return data, used_cache
-    except requests.exceptions.HTTPError as errh:
-        if response.status_code == 404:
-            print(f"{colors.WARNING}Warning: 404 Not found for {url}{colors.NORMAL}")
-            return None, used_cache
-        print(f"{colors.ERROR}Http Error:{colors.NORMAL}", errh)
-    except requests.exceptions.ConnectionError as errc:
-        print(f"{colors.ERROR}Error Connecting:{colors.NORMAL}", errc)
-    except requests.exceptions.Timeout as errt:
-        print(f"{colors.ERROR}Timeout Error:{colors.NORMAL}", errt)
-    except requests.exceptions.RequestException as err:
-        print(f"{colors.ERROR}Request error:{colors.NORMAL}", err)
-    except ValueError as errv:
-        print(f"{colors.ERROR}Error decoding JSON response:{colors.NORMAL}", errv)
-    except Exception as e:
-        print(f"{colors.ERROR}Unexpected error{colors.NORMAL}:", e)
-    return None, used_cache
-
+def delete(url, auth=None):
+    return request(verb="delete", url=url, auth=auth, is_json=False)
 
 def download_image(url):
     response, used_cache = get(url, is_json=False)
