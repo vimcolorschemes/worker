@@ -133,4 +133,4 @@ def delete(url, auth=None, is_json=True):
 
 def download(url):
     data, used_cache = get(url, is_json=False)
-    return data.content
+    return data.content, data.headers["Content-Type"]

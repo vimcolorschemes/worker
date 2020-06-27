@@ -52,8 +52,8 @@ if __name__ == "__main__":
                 repository, len(readme_image_urls), MAX_IMAGE_COUNT
             )
 
-            api.upload_images(
-                new_repository["id"], readme_image_urls + repository_image_urls
+            api.upload_repository_images(
+                new_repository, readme_image_urls + repository_image_urls
             )
 
     end = time.time()

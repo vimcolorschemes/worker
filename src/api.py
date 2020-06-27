@@ -1,4 +1,5 @@
 import dateutil.parser as dparser
+import mimetypes
 from datetime import datetime
 
 from request_helper import get, post, put, download, delete
@@ -58,16 +59,32 @@ def delete_images(images):
         delete(f"{API_URL}/upload/files/{image['id']}")
 
 
-def upload_images(repository_id, image_urls):
+def upload_repository_images(repository, image_urls):
     print(f"\nUpload images")
 
-    for image_url in image_urls:
+    for index, image_url in enumerate(image_urls):
         print(f"\nUploading {image_url}")
-        file = download(image_url)
+        file_content, content_type = download(image_url)
+        repository_key = (
+            f"{repository['owner']['name']}-{repository['name']}"
+            if repository is not None and repository["owner"] is not None
+            else "image"
+        )
+        file_extension = mimetypes.guess_extension(content_type)
+        print(image_url)
+        print(file_extension)
+        if file_extension is None:
+            file_extension = ".png"
         post(
             f"{API_URL}/upload",
-            files={"files": ("test.png", file, "image/png"),},
-            data={"ref": "repository", "field": "images", "refId": repository_id,},
+            files={
+                "files": (
+                    f"{repository_key}-{str(index + 1)}{file_extension}",
+                    file_content,
+                    content_type,
+                ),
+            },
+            data={"ref": "repository", "field": "images", "refId": repository["id"],},
         )
 
 
