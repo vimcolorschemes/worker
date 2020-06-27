@@ -8,7 +8,7 @@ from requests.auth import HTTPBasicAuth
 
 import request
 import printer
-from file_helper import decode_file_content
+import file_helper
 
 GITHUB_USERNAME = os.getenv("GITHUB_USERNAME")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -292,4 +292,4 @@ def get_readme_file(repository):
     if not readme_data:
         return ""
 
-    return decode_file_content(readme_data["content"])
+    return file_helper.decode_file_content(readme_data["content"])
