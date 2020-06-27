@@ -6,10 +6,9 @@ import time
 
 from requests.auth import HTTPBasicAuth
 
-import api
+import request
 from file_helper import decode_file_content
 from print_helper import start_sleeping, colors
-from request_helper import get
 
 GITHUB_USERNAME = os.getenv("GITHUB_USERNAME")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -37,7 +36,7 @@ this.github_api_rate_limit_reset = None
 
 
 def get_rate_limit():
-    data, used_cache = get(f"{BASE_URL}/rate_limit", auth=GITHUB_BASIC_AUTH)
+    data, used_cache = request.get(f"{BASE_URL}/rate_limit", auth=GITHUB_BASIC_AUTH)
     print(f"\n{colors.INFO}GET{colors.NORMAL} rate limit (used_cache={used_cache})")
     this.remaining_github_api_calls = data["resources"]["core"]["remaining"]
     this.github_api_rate_limit_reset = data["resources"]["core"]["reset"]
@@ -68,7 +67,7 @@ def github_core_get(url, params=None, call_name=None):
     if this.remaining_github_api_calls <= 1:
         sleep_until_reset()
 
-    data, used_cache = get(url=url, params=params, auth=GITHUB_BASIC_AUTH)
+    data, used_cache = request.get(url=url, params=params, auth=GITHUB_BASIC_AUTH)
     if call_name:
         print(f"{colors.INFO}GET{colors.NORMAL} {call_name} (used_cache={used_cache})")
     if not used_cache:
@@ -186,7 +185,7 @@ def find_images_in_tree_objects(tree_objects, repository, image_count_to_find):
         basic_image_regex = r"^.*\.(png|jpe?g|webp)$"
         if re.match(basic_image_regex, tree_object["path"]):
             image_url = get_raw_github_image_url(tree_object, repository)
-            image = api.download_image(image_url)
+            image = request.download_image(image_url)
             if image is not None:
                 images.append(image)
                 if len(images) == image_count_to_find:

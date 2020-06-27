@@ -25,8 +25,7 @@ if __name__ == "__main__":
         last_commit_at = dparser.parse(repository["last_commit_at"], fuzzy=True)
 
         refetch_images = (
-            True
-            or not last_import_at
+            not last_import_at
             or last_commit_at > last_import_at
             or existing_repository is None
         )

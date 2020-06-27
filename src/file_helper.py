@@ -2,8 +2,8 @@ import base64
 import os
 import re
 
+import request
 from print_helper import colors
-from request_helper import get, download_image
 
 
 def decode_file_content(data):
@@ -28,7 +28,7 @@ def find_images(file_content, max_image_count):
 
     while len(valid_images) < max_image_count and index < len(image_urls):
         image_url = image_urls[index]
-        image = download_image(image_url)
+        image = request.download_image(image_url)
         if image is not None:
             valid_images.append(image)
         index = index + 1
