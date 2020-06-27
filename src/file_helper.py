@@ -3,7 +3,6 @@ import os
 import re
 
 import request
-from print_helper import colors
 
 
 def decode_file_content(data):

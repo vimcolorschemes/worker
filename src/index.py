@@ -4,8 +4,9 @@ import os
 import time
 
 import api
-import github_helper
 import file_helper
+import github_helper
+import printer
 
 MAX_IMAGE_COUNT = os.getenv("MAX_IMAGE_COUNT")
 MAX_IMAGE_COUNT = int(MAX_IMAGE_COUNT) if MAX_IMAGE_COUNT is not None else 5
@@ -14,7 +15,13 @@ MAX_IMAGE_COUNT = int(MAX_IMAGE_COUNT) if MAX_IMAGE_COUNT is not None else 5
 if __name__ == "__main__":
     start = time.time()
 
+    printer.break_line()
+    printer.break_line()
+
     last_import_at = api.get_last_import_at()
+
+    printer.break_line()
+    printer.break_line()
 
     repositories = github_helper.search_repositories()
 
@@ -25,9 +32,13 @@ if __name__ == "__main__":
         last_commit_at = dparser.parse(repository["last_commit_at"], fuzzy=True)
 
         refetch_images = (
-            not last_import_at
+            last_import_at is None
             or last_commit_at > last_import_at
             or existing_repository is None
+        )
+
+        printer.info(
+            "Images will be fetched" if refetch_images else "Image fetching skipped"
         )
 
         new_repository = None
@@ -54,6 +65,11 @@ if __name__ == "__main__":
             api.upload_repository_images(
                 new_repository, readme_images + repository_images
             )
+            printer.info(f"{len(readme_images)} images found in readme")
+            printer.info(f"{len(repository_images)} images found in files")
+
+        printer.break_line()
+        printer.break_line()
 
     end = time.time()
 
