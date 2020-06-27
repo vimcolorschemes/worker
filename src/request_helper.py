@@ -11,6 +11,8 @@ TIMEOUT = 5
 USE_CACHE = os.getenv("USE_CACHE")
 CACHE_EXPIRE_AFTER = os.getenv("CACHE_EXPIRE_AFTER")
 
+VALID_IMAGE_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"]
+
 if USE_CACHE:
     requests_cache.install_cache(
         "github_cache",
@@ -131,6 +133,16 @@ def delete(url, auth=None, is_json=True):
     return None, used_cache
 
 
-def download(url):
-    data, used_cache = get(url, is_json=False)
-    return data.content, data.headers["Content-Type"]
+def download_image(url):
+    response, used_cache = get(url, is_json=False)
+    print(
+        f"{colors.INFO}GET{colors.NORMAL} image at url={url} (used_cache={used_cache})"
+    )
+    content_type = response.headers["Content-Type"]
+    if response is not None and content_type in VALID_IMAGE_CONTENT_TYPES:
+        return {
+            "file_content": response.content,
+            "content_type": content_type,
+            "url": url,
+        }
+    return None

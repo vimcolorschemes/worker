@@ -6,7 +6,8 @@ import time
 
 from requests.auth import HTTPBasicAuth
 
-from file_helper import decode_file_content, image_url_is_valid
+import api
+from file_helper import decode_file_content
 from print_helper import start_sleeping, colors
 from request_helper import get
 
@@ -179,17 +180,18 @@ def get_raw_github_image_url(tree_object, repository):
     return f"https://raw.githubusercontent.com/{repository['owner']['name']}/{repository['name']}/{repository['default_branch']}/{image_path}"
 
 
-def find_image_urls_in_tree_objects(tree_objects, repository, image_count_to_find):
-    image_urls = []
+def find_images_in_tree_objects(tree_objects, repository, image_count_to_find):
+    images = []
     for tree_object in tree_objects:
         basic_image_regex = r"^.*\.(png|jpe?g|webp)$"
         if re.match(basic_image_regex, tree_object["path"]):
             image_url = get_raw_github_image_url(tree_object, repository)
-            if image_url_is_valid(image_url):
-                image_urls.append(image_url)
-                if len(image_urls) == image_count_to_find:
+            image = api.download_image(image_url)
+            if image is not None:
+                images.append(image)
+                if len(images) == image_count_to_find:
                     break
-    return image_urls
+    return images
 
 
 def list_objects_of_tree(repository, tree_sha, path):
@@ -215,23 +217,23 @@ def get_tree_path(tree_object):
     return path
 
 
-def list_repository_image_urls(repository, current_image_count, max_image_count):
+def list_repository_images(repository, current_image_count, max_image_count):
     image_count_to_find = max_image_count - current_image_count
 
     if image_count_to_find <= 0:
         return []
 
-    image_urls = []
+    images = []
 
     tree_objects = list_objects_of_tree(
         repository, repository["default_branch"], repository["default_branch"]
     )
 
-    image_urls.extend(
-        find_image_urls_in_tree_objects(tree_objects, repository, image_count_to_find)
+    images.extend(
+        find_images_in_tree_objects(tree_objects, repository, image_count_to_find)
     )
 
-    image_count_to_find = image_count_to_find - len(image_urls)
+    image_count_to_find = image_count_to_find - len(images)
 
     for tree_object in tree_objects:
         if image_count_to_find <= 0:
@@ -252,15 +254,15 @@ def list_repository_image_urls(repository, current_image_count, max_image_count)
                 )
             )
 
-            image_urls.extend(
-                find_image_urls_in_tree_objects(
+            images.extend(
+                find_images_in_tree_objects(
                     tree_objects_of_tree, repository, image_count_to_find
                 )
             )
 
-            image_count_to_find = image_count_to_find - len(image_urls)
+            image_count_to_find = image_count_to_find - len(images)
 
-    return image_urls
+    return images
 
 
 def get_readme_file(repository):

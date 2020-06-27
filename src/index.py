@@ -25,7 +25,8 @@ if __name__ == "__main__":
         last_commit_at = dparser.parse(repository["last_commit_at"], fuzzy=True)
 
         refetch_images = (
-            not last_import_at
+            True
+            or not last_import_at
             or last_commit_at > last_import_at
             or existing_repository is None
         )
@@ -45,15 +46,14 @@ if __name__ == "__main__":
             )
 
         if refetch_images:
-            readme_image_urls = file_helper.find_image_urls(
+            readme_images = file_helper.find_images(
                 github_helper.get_readme_file(repository), MAX_IMAGE_COUNT
             )
-            repository_image_urls = github_helper.list_repository_image_urls(
-                repository, len(readme_image_urls), MAX_IMAGE_COUNT
+            repository_images = github_helper.list_repository_images(
+                repository, len(readme_images), MAX_IMAGE_COUNT
             )
-
             api.upload_repository_images(
-                new_repository, readme_image_urls + repository_image_urls
+                new_repository, readme_images + repository_images
             )
 
     end = time.time()
