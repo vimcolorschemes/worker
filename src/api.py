@@ -1,7 +1,7 @@
 import dateutil.parser as dparser
 from datetime import datetime
 
-from request_helper import get, post, put
+from request_helper import get, post, put, download
 
 API_URL = "http://localhost:1337"
 
@@ -51,9 +51,17 @@ def update_repository(id, repository):
     return repository
 
 
-# TODO implement
 def upload_images(repository_id, image_urls):
     print(f"\nUpload images")
+
+    for image_url in image_urls:
+        print(f"\nUploading {image_url}")
+        file = download(image_url)
+        post(
+            f"{API_URL}/upload",
+            files={"files": ("test.png", file, "image/png"),},
+            data={"ref": "repository", "field": "images", "refId": repository_id,},
+        )
 
 
 def create_import(import_data):
