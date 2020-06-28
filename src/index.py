@@ -47,15 +47,15 @@ if __name__ == "__main__":
         if owner is None:
             printer.info(f"owner {owner_name} does not exist")
             owner = api.create_owner({"name": owner_name})
-        repository = {**repository, "owner": owner["id"]}
 
+        repository_to_upsert = {**repository, "owner": owner["id"]}
         if existing_repository is None:
-            new_repository = api.create_repository(repository)
+            new_repository = api.create_repository(repository_to_upsert)
         else:
             if fetch_images:
                 api.delete_images(existing_repository["images"])
             new_repository = api.update_repository(
-                existing_repository["id"], repository
+                existing_repository["id"], repository_to_upsert
             )
 
         if fetch_images:

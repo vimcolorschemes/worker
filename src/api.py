@@ -47,7 +47,7 @@ def get_owner_by_name(name):
 
 
 def create_owner(owner_data):
-    printer.info(f"CREATE owner {owner_name}")
+    printer.info(f"CREATE owner {owner_data['name']}")
     owner = request.post(f"{API_URL}/owners", owner_data)
     return owner
 
