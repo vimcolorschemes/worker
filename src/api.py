@@ -88,7 +88,12 @@ def upload_repository_images(repository, images):
                     image["content_type"],
                 ),
             },
-            data={"ref": "repository", "field": "images", "refId": repository["id"],},
+            data={
+                "ref": "repository",
+                "field": "images",
+                "refId": repository["id"],
+                "path": "upload",
+            },
         )
 
 
