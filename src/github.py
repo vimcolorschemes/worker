@@ -6,9 +6,9 @@ import time
 
 from requests.auth import HTTPBasicAuth
 
-from file_helper import decode_file_content, image_url_is_valid
-from print_helper import start_sleeping, colors
-from request_helper import get
+import request
+import printer
+import file_helper
 
 GITHUB_USERNAME = os.getenv("GITHUB_USERNAME")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -36,11 +36,16 @@ this.github_api_rate_limit_reset = None
 
 
 def get_rate_limit():
-    data, used_cache = get(f"{BASE_URL}/rate_limit", auth=GITHUB_BASIC_AUTH)
-    print(f"\n{colors.INFO}GET{colors.NORMAL} rate limit (used_cache={used_cache})")
+    printer.info("GET GitHub API rate limit")
+
+    data = request.get(f"{BASE_URL}/rate_limit", auth=GITHUB_BASIC_AUTH)
+
     this.remaining_github_api_calls = data["resources"]["core"]["remaining"]
     this.github_api_rate_limit_reset = data["resources"]["core"]["reset"]
-    print(f"{this.remaining_github_api_calls} remaining calls for Github API\n")
+
+    printer.info(f"{this.remaining_github_api_calls} remaining calls for GitHub API")
+    printer.break_line()
+    printer.break_line()
 
 
 def sleep_until_reset():
@@ -49,15 +54,17 @@ def sleep_until_reset():
         time_until_reset = max(0, this.github_api_rate_limit_reset - now)
         safety_buffer = 100
         sleep_time = time_until_reset + safety_buffer
-        print(
-            f"\n{colors.WARNING}Github API's rate limit reached. Sleeping until for {sleep_time} seconds.{colors.NORMAL}"
+
+        printer.warning(
+            f"Github API's rate limit reached. Need to sleep for {sleep_time} seconds"
         )
+
         start_sleeping(sleep_time)
         get_rate_limit()
 
 
 # This calls the basic request helper's function get, but also handles the Github API's rate limit check
-def github_core_get(url, params=None, call_name=None):
+def github_core_get(url, params=None, log=None):
     if (
         this.remaining_github_api_calls is None
         or this.github_api_rate_limit_reset is None
@@ -67,11 +74,10 @@ def github_core_get(url, params=None, call_name=None):
     if this.remaining_github_api_calls <= 1:
         sleep_until_reset()
 
-    data, used_cache = get(url=url, params=params, auth=GITHUB_BASIC_AUTH)
-    if call_name:
-        print(f"{colors.INFO}GET{colors.NORMAL} {call_name} (used_cache={used_cache})")
-    if not used_cache:
-        this.remaining_github_api_calls = this.remaining_github_api_calls - 1
+    if log is not None:
+        printer.info(log)
+
+    data = request.get(url=url, params=params, auth=GITHUB_BASIC_AUTH)
 
     return data
 
@@ -88,7 +94,7 @@ def list_repositories_of_page(query=VIM_COLOR_SCHEME_QUERY, page=1):
     data = github_core_get(
         url=f"{BASE_URL}/{search_path}",
         params={"q": query, "page": page, **base_search_params},
-        call_name=f"repository list page {page}",
+        log=f"GET repositories (page: {page})"
     )
 
     repositories = list(map(map_response_item_to_repository, data["items"]))
@@ -110,7 +116,10 @@ def search_repositories():
         if REPOSITORY_LIMIT is not None
         else total_count
     )
-    print(f"\nMaximum {fetched_repository_count} repositories will be fetched\n")
+
+    printer.info(f"Maximum {fetched_repository_count} repositories will be fetched")
+    printer.break_line()
+    printer.break_line()
 
     page_count = math.ceil(fetched_repository_count / ITEMS_PER_PAGE)
 
@@ -124,7 +133,7 @@ def search_repositories():
 # Keeps only the stuff we need for the app
 def map_response_item_to_repository(response_item):
     return {
-        "id": response_item["id"],
+        "github_id": response_item["id"],
         "name": response_item["name"],
         "description": response_item["description"],
         "default_branch": response_item["default_branch"],
@@ -132,7 +141,7 @@ def map_response_item_to_repository(response_item):
         "homepage_url": response_item["homepage"],
         "stargazers_count": response_item["stargazers_count"],
         "pushed_at": response_item["pushed_at"],
-        "created_at": response_item["created_at"],
+        "github_created_at": response_item["created_at"],
         "owner": {
             "name": response_item["owner"]["login"],
             "avatar_url": response_item["owner"]["avatar_url"],
@@ -140,27 +149,27 @@ def map_response_item_to_repository(response_item):
     }
 
 
-def get_latest_commit_at(repository):
+def get_last_commit_at(repository):
     owner_name = repository["owner"]["name"]
     name = repository["name"]
 
     commits_path = f"repos/{owner_name}/{name}/commits"
 
     commits = github_core_get(
-        f"{BASE_URL}/{commits_path}", call_name=f"{owner_name}/{name} latest commit at"
+        f"{BASE_URL}/{commits_path}", log=f"GET {owner_name}/{name} last commit at"
     )
 
     if not commits or len(commits) == 0:
         return None
 
-    latest_commit_data = commits[0]
+    last_commit_data = commits[0]
 
     if (
-        "commit" in latest_commit_data
-        and "author" in latest_commit_data["commit"]
-        and "date" in latest_commit_data["commit"]["author"]
+        "commit" in last_commit_data
+        and "author" in last_commit_data["commit"]
+        and "date" in last_commit_data["commit"]["author"]
     ):
-        return latest_commit_data["commit"]["author"]["date"]
+        return last_commit_data["commit"]["author"]["date"]
 
     return None
 
@@ -179,17 +188,18 @@ def get_raw_github_image_url(tree_object, repository):
     return f"https://raw.githubusercontent.com/{repository['owner']['name']}/{repository['name']}/{repository['default_branch']}/{image_path}"
 
 
-def find_image_urls_in_tree_objects(tree_objects, repository, image_count_to_find):
-    image_urls = []
+def find_images_in_tree_objects(tree_objects, repository, image_count_to_find):
+    images = []
     for tree_object in tree_objects:
         basic_image_regex = r"^.*\.(png|jpe?g|webp)$"
         if re.match(basic_image_regex, tree_object["path"]):
             image_url = get_raw_github_image_url(tree_object, repository)
-            if image_url_is_valid(image_url):
-                image_urls.append(image_url)
-                if len(image_urls) == image_count_to_find:
+            image = request.download_image(image_url)
+            if image is not None:
+                images.append(image)
+                if len(images) == image_count_to_find:
                     break
-    return image_urls
+    return images
 
 
 def list_objects_of_tree(repository, tree_sha, path):
@@ -201,7 +211,7 @@ def list_objects_of_tree(repository, tree_sha, path):
     )
     data = github_core_get(
         f"{BASE_URL}/{tree_path}",
-        call_name=f"{owner_name}/{name} objects of tree {path}",
+        log=f"GET {owner_name}/{name} objects of tree {path}",
     )
     return data["tree"]
 
@@ -215,23 +225,23 @@ def get_tree_path(tree_object):
     return path
 
 
-def list_repository_image_urls(repository, current_image_count, max_image_count):
+def list_repository_images(repository, current_image_count, max_image_count):
     image_count_to_find = max_image_count - current_image_count
 
     if image_count_to_find <= 0:
         return []
 
-    image_urls = []
+    images = []
 
     tree_objects = list_objects_of_tree(
         repository, repository["default_branch"], repository["default_branch"]
     )
 
-    image_urls.extend(
-        find_image_urls_in_tree_objects(tree_objects, repository, image_count_to_find)
+    images.extend(
+        find_images_in_tree_objects(tree_objects, repository, image_count_to_find)
     )
 
-    image_count_to_find = image_count_to_find - len(image_urls)
+    image_count_to_find = image_count_to_find - len(images)
 
     for tree_object in tree_objects:
         if image_count_to_find <= 0:
@@ -252,15 +262,15 @@ def list_repository_image_urls(repository, current_image_count, max_image_count)
                 )
             )
 
-            image_urls.extend(
-                find_image_urls_in_tree_objects(
+            images.extend(
+                find_images_in_tree_objects(
                     tree_objects_of_tree, repository, image_count_to_find
                 )
             )
 
-            image_count_to_find = image_count_to_find - len(image_urls)
+            image_count_to_find = image_count_to_find - len(images)
 
-    return image_urls
+    return images
 
 
 def get_readme_file(repository):
@@ -273,10 +283,10 @@ def get_readme_file(repository):
     get_readme_path = f"repos/{owner_name}/{name}/readme"
 
     readme_data = github_core_get(
-        f"{BASE_URL}/{get_readme_path}", call_name=f"{owner_name}/{name} readme"
+        f"{BASE_URL}/{get_readme_path}", log=f"GET {owner_name}/{name} readme"
     )
 
     if not readme_data:
         return ""
 
-    return decode_file_content(readme_data["content"])
+    return file_helper.decode_file_content(readme_data["content"])

@@ -59,12 +59,6 @@ export GITHUB_TOKEN
 
 REPOSITORY_LIMIT=25
 export REPOSITORY_LIMIT
-
-USE_CACHE=1
-export USE_CACHE
-
-CACHE_EXPIRE_AFTER=3600
-export CACHE_EXPIRE_AFTER
 ```
 >Note: The non-Github stuff is a set of recommended values to make development effective. They can be altered with.
 
