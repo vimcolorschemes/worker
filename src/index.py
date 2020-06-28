@@ -45,6 +45,7 @@ if __name__ == "__main__":
         owner_name = repository["owner"]["name"]
         owner = api.get_owner_by_name(owner_name)
         if owner is None:
+            printer.info(f"owner {owner_name} does not exist")
             owner = api.create_owner({"name": owner_name})
         repository = {**repository, "owner": owner["id"]}
 

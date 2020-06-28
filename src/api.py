@@ -40,12 +40,14 @@ def get_repository_by_github_id(id):
 
 
 def get_owner_by_name(name):
+    printer.info(f"GET owner {name}")
     owners = request.get(f"{API_URL}/owners", {"name": name})
     owner = owners[0] if len(owners) > 0 else None
     return owner
 
 
 def create_owner(owner_data):
+    printer.info(f"CREATE owner {owner_name}")
     owner = request.post(f"{API_URL}/owners", owner_data)
     return owner
 
