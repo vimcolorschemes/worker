@@ -4,7 +4,7 @@ import requests
 
 import printer
 
-TIMEOUT = 5
+TIMEOUT = 15
 
 VALID_IMAGE_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"]
 
