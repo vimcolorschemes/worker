@@ -38,7 +38,7 @@ this.github_api_rate_limit_reset = None
 def get_rate_limit():
     printer.info("GET GitHub API rate limit")
 
-    data, used_cache = request.get(f"{BASE_URL}/rate_limit", auth=GITHUB_BASIC_AUTH)
+    data = request.get(f"{BASE_URL}/rate_limit", auth=GITHUB_BASIC_AUTH)
 
     this.remaining_github_api_calls = data["resources"]["core"]["remaining"]
     this.github_api_rate_limit_reset = data["resources"]["core"]["reset"]
@@ -77,10 +77,7 @@ def github_core_get(url, params=None, log=None):
     if log is not None:
         printer.info(log)
 
-    data, used_cache = request.get(url=url, params=params, auth=GITHUB_BASIC_AUTH)
-
-    if not used_cache:
-        this.remaining_github_api_calls = this.remaining_github_api_calls - 1
+    data = request.get(url=url, params=params, auth=GITHUB_BASIC_AUTH)
 
     return data
 

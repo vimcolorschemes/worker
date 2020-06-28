@@ -31,31 +31,33 @@ if __name__ == "__main__":
         repository["last_commit_at"] = github.get_last_commit_at(repository)
         last_commit_at = dparser.parse(repository["last_commit_at"], fuzzy=True)
 
-        refetch_images = (
+        fetch_images = (
             last_import_at is None
             or last_commit_at > last_import_at
             or existing_repository is None
         )
 
         printer.info(
-            "Images will be fetched" if refetch_images else "Image fetching skipped"
+            "Images will be fetched" if fetch_images else "Image fetching skipped"
         )
 
         new_repository = None
+        owner_name = repository["owner"]["name"]
+        owner = api.get_owner_by_name(owner_name)
+        if owner is None:
+            owner = api.create_owner({"name": owner_name})
+        repository = {**repository, "owner": owner["id"]}
+
         if existing_repository is None:
-            owner_name = repository["owner"]["name"]
-            owner = api.get_owner_by_name(owner_name)
-            if owner is None:
-                owner = api.create_owner({"name": owner_name})
-            new_repository = api.create_repository({**repository, "owner": owner["id"]})
+            new_repository = api.create_repository(repository)
         else:
-            if refetch_images:
+            if fetch_images:
                 api.delete_images(existing_repository["images"])
             new_repository = api.update_repository(
                 existing_repository["id"], repository
             )
 
-        if refetch_images:
+        if fetch_images:
             readme_images = file_helper.find_images(
                 github.get_readme_file(repository), MAX_IMAGE_COUNT
             )

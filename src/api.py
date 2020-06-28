@@ -1,17 +1,17 @@
 import dateutil.parser as dparser
 import mimetypes
-from datetime import datetime
+import os
 
 import printer
 import request
 
-API_URL = "http://localhost:1337"
+API_URL = os.getenv("API_URL")
 
 
 def get_last_import_at():
     printer.info("GET last import")
 
-    imports, used_cache = request.get(f"{API_URL}/imports", {"_sort": "created_at:DESC"})
+    imports = request.get(f"{API_URL}/imports", {"_sort": "created_at:DESC"})
     if len(imports) > 0:
         last_import = imports[0]
         last_import_at = last_import["created_at"]
@@ -28,35 +28,36 @@ def get_last_import_at():
 def get_repository_by_github_id(id):
     printer.info(f"GET repository with GitHub id: {id}")
 
-    repositories, used_cache = request.get(f"{API_URL}/repositories", {"github_id": id})
+    repositories = request.get(f"{API_URL}/repositories", {"github_id": id})
 
     repository = repositories[0] if len(repositories) > 0 else None
 
-    printer.info("Repository exists" if repository is not None else "Repository does not exist")
+    printer.info(
+        "Repository exists" if repository is not None else "Repository does not exist"
+    )
 
     return repository
 
 
-
 def get_owner_by_name(name):
-    owners, used_cache = request.get(f"{API_URL}/owners", {"name": name})
+    owners = request.get(f"{API_URL}/owners", {"name": name})
     owner = owners[0] if len(owners) > 0 else None
     return owner
 
 
 def create_owner(owner_data):
-    owner, used_cache = request.post(f"{API_URL}/owners", owner_data)
+    owner = request.post(f"{API_URL}/owners", owner_data)
     return owner
 
 
 def create_repository(repository_data):
-    repository, used_cache = request.post(f"{API_URL}/repositories", repository_data)
+    repository = request.post(f"{API_URL}/repositories", repository_data)
     return repository
 
 
 def update_repository(id, repository):
     printer.info("UPDATE repository")
-    repository, used_cache = request.put(f"{API_URL}/repositories/{id}", repository)
+    repository = request.put(f"{API_URL}/repositories/{id}", repository)
     return repository
 
 
