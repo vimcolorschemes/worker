@@ -1,3 +1,4 @@
+import base64
 import math
 import os
 import re
@@ -8,7 +9,6 @@ from requests.auth import HTTPBasicAuth
 
 import request
 import printer
-import file_helper
 
 GITHUB_USERNAME = os.getenv("GITHUB_USERNAME")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -94,7 +94,7 @@ def list_repositories_of_page(query=VIM_COLOR_SCHEME_QUERY, page=1):
     data = github_core_get(
         url=f"{BASE_URL}/{search_path}",
         params={"q": query, "page": page, **base_search_params},
-        log=f"GET repositories (page: {page})"
+        log=f"GET repositories (page: {page})",
     )
 
     repositories = list(map(map_response_item_to_repository, data["items"]))
@@ -189,17 +189,16 @@ def get_raw_github_image_url(tree_object, repository):
 
 
 def find_images_in_tree_objects(tree_objects, repository, image_count_to_find):
-    images = []
+    image_urls = []
     for tree_object in tree_objects:
         basic_image_regex = r"^.*\.(png|jpe?g|webp)$"
         if re.match(basic_image_regex, tree_object["path"]):
             image_url = get_raw_github_image_url(tree_object, repository)
-            image = request.download_image(image_url)
-            if image is not None:
-                images.append(image)
-                if len(images) == image_count_to_find:
+            if request.is_image_url_valid(image_url):
+                image_urls.append(image_url)
+                if len(image_urls) == image_count_to_find:
                     break
-    return images
+    return image_urls
 
 
 def list_objects_of_tree(repository, tree_sha, path):
@@ -289,4 +288,7 @@ def get_readme_file(repository):
     if not readme_data:
         return ""
 
-    return file_helper.decode_file_content(readme_data["content"])
+    file_data = readme_data["content"]
+    base64_bytes = file_data.encode("utf-8")
+    bytes = base64.b64decode(base64_bytes)
+    return bytes.decode("utf-8")

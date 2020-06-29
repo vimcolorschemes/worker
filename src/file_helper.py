@@ -5,12 +5,6 @@ import re
 import request
 
 
-def decode_file_content(data):
-    base64_bytes = data.encode("utf-8")
-    bytes = base64.b64decode(base64_bytes)
-    return bytes.decode("utf-8")
-
-
 def find_images(file_content, max_image_count):
     image_url_regex = r"\b(https?:\/\/\S+(?:png|jpe?g|webp))\b"
     standard_image_urls = re.findall(image_url_regex, file_content)
@@ -22,17 +16,16 @@ def find_images(file_content, max_image_count):
 
     image_urls = standard_image_urls + github_camo_urls
 
-    valid_images = []
+    valid_image_urls = []
     index = 0
 
-    while len(valid_images) < max_image_count and index < len(image_urls):
+    while len(valid_image_urls) < max_image_count and index < len(image_urls):
         image_url = image_urls[index]
-        image = request.download_image(image_url)
-        if image is not None:
-            valid_images.append(image)
+        if request.is_image_url_valid(image_url):
+            valid_image_urls.append(image_url)
         index = index + 1
 
-    return valid_images
+    return valid_image_urls
 
 
 def read_file(path):
