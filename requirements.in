@@ -4,3 +4,4 @@ pip-tools
 requests
 requests-cache
 pymongo
+dnspython

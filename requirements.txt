@@ -12,6 +12,7 @@ botocore==1.16.9          # via boto3, s3transfer
 certifi==2020.4.5.1       # via requests
 chardet==3.0.4            # via requests
 click==7.1.2              # via black, pip-tools
+dnspython==1.16.0         # via -r requirements.in
 docutils==0.15.2          # via botocore
 idna==2.9                 # via requests
 jmespath==0.10.0          # via boto3, botocore

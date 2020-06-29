@@ -4,7 +4,11 @@ from bson.codec_options import CodecOptions
 
 import printer
 
-client = pymongo.MongoClient("localhost", 27017)
+DATABASE_CONNECTION_STRING = os.getenv("DATABASE_CONNECTION_STRING")
+if DATABASE_CONNECTION_STRING is None:
+    DATABASE_CONNECTION_STRING = "mongodb://localhost:27017/"
+
+client = pymongo.MongoClient(DATABASE_CONNECTION_STRING)
 database = client["vimcs"]
 owner_collection = database["owners"]
 repository_collection = database["repositories"]
