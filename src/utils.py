@@ -1,11 +1,9 @@
-import base64
-import os
 import re
 
 import request
 
 
-def find_images(file_content, max_image_count):
+def find_image_urls(file_content, max_image_count):
     image_url_regex = r"\b(https?:\/\/\S+(?:png|jpe?g|webp))\b"
     standard_image_urls = re.findall(image_url_regex, file_content)
 
@@ -28,10 +26,5 @@ def find_images(file_content, max_image_count):
     return valid_image_urls
 
 
-def read_file(path):
-    return open(path, "r").read()
-
-
-def write_file(path, data):
-    with open(path, "w") as file:
-        file.write(data)
+def urlify(in_string):
+    return "%20".join(in_string.split())

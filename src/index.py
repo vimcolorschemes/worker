@@ -4,7 +4,7 @@ import os
 import time
 
 import db_service
-import file_helper
+import utils
 import github
 import printer
 
@@ -29,7 +29,6 @@ if __name__ == "__main__":
         owner_name = repository["owner"]["name"]
         name = repository["name"]
 
-        db_service.upsert_owner(repository["owner"])
         is_new_repository = db_service.is_repository_new(owner_name, name)
 
         repository["last_commit_at"] = github.get_last_commit_at(repository)
@@ -50,17 +49,19 @@ if __name__ == "__main__":
         )
 
         if fetch_images:
-            readme_images = file_helper.find_images(
+            readme_image_urls = utils.find_image_urls(
                 github.get_readme_file(repository), MAX_IMAGE_COUNT
             )
-            repository_images = github.list_repository_images(
-                repository, len(readme_images), MAX_IMAGE_COUNT
+            repository_image_urls = github.list_repository_image_urls(
+                repository, len(readme_image_urls), MAX_IMAGE_COUNT
             )
 
-            repository["image_urls"] = readme_images + repository_images
+            repository["image_urls"] = list(
+                map(utils.urlify, readme_image_urls + repository_image_urls)
+            )
 
-            printer.info(f"{len(readme_images)} images found in readme")
-            printer.info(f"{len(repository_images)} images found in files")
+            printer.info(f"{len(readme_image_urls)} images found in readme")
+            printer.info(f"{len(repository_image_urls)} images found in files")
 
         db_service.upsert_repository(repository)
 

@@ -188,7 +188,7 @@ def get_raw_github_image_url(tree_object, repository):
     return f"https://raw.githubusercontent.com/{repository['owner']['name']}/{repository['name']}/{repository['default_branch']}/{image_path}"
 
 
-def find_images_in_tree_objects(tree_objects, repository, image_count_to_find):
+def find_image_urls_in_tree_objects(tree_objects, repository, image_count_to_find):
     image_urls = []
     for tree_object in tree_objects:
         basic_image_regex = r"^.*\.(png|jpe?g|webp)$"
@@ -224,23 +224,23 @@ def get_tree_path(tree_object):
     return path
 
 
-def list_repository_images(repository, current_image_count, max_image_count):
+def list_repository_image_urls(repository, current_image_count, max_image_count):
     image_count_to_find = max_image_count - current_image_count
 
     if image_count_to_find <= 0:
         return []
 
-    images = []
+    image_urls = []
 
     tree_objects = list_objects_of_tree(
         repository, repository["default_branch"], repository["default_branch"]
     )
 
-    images.extend(
-        find_images_in_tree_objects(tree_objects, repository, image_count_to_find)
+    image_urls.extend(
+        find_image_urls_in_tree_objects(tree_objects, repository, image_count_to_find)
     )
 
-    image_count_to_find = image_count_to_find - len(images)
+    image_count_to_find = image_count_to_find - len(image_urls)
 
     for tree_object in tree_objects:
         if image_count_to_find <= 0:
@@ -261,15 +261,15 @@ def list_repository_images(repository, current_image_count, max_image_count):
                 )
             )
 
-            images.extend(
-                find_images_in_tree_objects(
+            image_urls.extend(
+                find_image_urls_in_tree_objects(
                     tree_objects_of_tree, repository, image_count_to_find
                 )
             )
 
-            image_count_to_find = image_count_to_find - len(images)
+            image_count_to_find = image_count_to_find - len(image_urls)
 
-    return images
+    return image_urls
 
 
 def get_readme_file(repository):
