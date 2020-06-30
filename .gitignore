@@ -105,6 +105,7 @@ celerybeat.pid
 *.env
 .env
 !.template.env
+!.docker.template.env
 .venv
 env/
 venv/
