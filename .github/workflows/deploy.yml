@@ -4,12 +4,12 @@ jobs:
   deploy:
     name: deploy lambda function
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v2
       - name: Zip source
         run: cd src && zip -r ../release.zip ./* && cd ..
       - name: AWS Lambda Deploy
-        if: github.ref == 'refs/heads/master'
         uses: appleboy/lambda-action@master
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
