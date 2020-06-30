@@ -7,9 +7,12 @@ import db_service
 import utils
 import github
 import printer
+import request
 
 MAX_IMAGE_COUNT = os.getenv("MAX_IMAGE_COUNT")
 MAX_IMAGE_COUNT = int(MAX_IMAGE_COUNT) if MAX_IMAGE_COUNT is not None else 5
+
+BUILD_WEBHOOK = os.getenv("BUILD_WEBHOOK")
 
 
 def handler(event, context):
@@ -79,7 +82,18 @@ def handler(event, context):
 
     db_service.create_import(import_data)
 
+    if BUILD_WEBHOOK is not None:
+        printer.break_line()
+        printer.info("Starting website build")
+        response = request.post(
+            ***REMOVED***,
+            is_json=False,
+        )
+        printer.info(f"Response: {response}")
+        printer.break_line()
+
     return {"statusCode": 200, "body": f"Elapsed time: {elapsed_time}"}
+
 
 if __name__ == "__main__":
     handler(None, None)
