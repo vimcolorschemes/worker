@@ -1,6 +1,5 @@
 import sys
 import time
-import logging
 
 
 class colors:
@@ -12,28 +11,28 @@ class colors:
 
 
 def info(message):
-    logging.info(f"{colors.INFO}INFO: {colors.NORMAL}{message}")
+    print(f"{colors.INFO}INFO: {colors.NORMAL}{message}")
 
 
 def error(message, prefix=""):
     prefix = f"{prefix} " if prefix != "" else ""
-    logging.error(f"{colors.ERROR}{prefix}ERROR: {message}{colors.NORMAL}")
+    print(f"{colors.ERROR}{prefix}ERROR: {message}{colors.NORMAL}")
 
 
 def success(message):
-    logging.info(f"{colors.SUCCESS}SUCCESS: {message}{colors.NORMAL}")
+    print(f"{colors.SUCCESS}SUCCESS: {message}{colors.NORMAL}")
 
 
 def warning(message):
-    logging.warning(f"{colors.WARNING}WARNING: {message}{colors.NORMAL}")
+    print(f"{colors.WARNING}WARNING: {message}{colors.NORMAL}")
 
 
 def log(message):
-    logging.log(f"LOG: {message}")
+    print(f"LOG: {message}")
 
 
 def break_line():
-    logging.info("")
+    print("")
 
 
 def start_sleeping(sleep_time):
