@@ -59,7 +59,7 @@ def sleep_until_reset():
             f"Github API's rate limit reached. Need to sleep for {sleep_time} seconds"
         )
 
-        start_sleeping(sleep_time)
+        printer.start_sleeping(sleep_time)
         get_rate_limit()
 
 

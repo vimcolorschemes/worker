@@ -80,3 +80,6 @@ def handler(event, context):
     db_service.create_import(import_data)
 
     return {"statusCode": 200, "body": f"Elapsed time: {elapsed_time}"}
+
+if __name__ == "__main__":
+    handler(None, None)

@@ -41,3 +41,4 @@ def start_sleeping(sleep_time):
         sys.stdout.write("\033[F")
         time.sleep(1)
     break_line()
+    break_line()
