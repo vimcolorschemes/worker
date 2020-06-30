@@ -1,3 +1,4 @@
+import base64
 import math
 import os
 import re
@@ -8,7 +9,6 @@ from requests.auth import HTTPBasicAuth
 
 import request
 import printer
-import file_helper
 
 GITHUB_USERNAME = os.getenv("GITHUB_USERNAME")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -94,7 +94,7 @@ def list_repositories_of_page(query=VIM_COLOR_SCHEME_QUERY, page=1):
     data = github_core_get(
         url=f"{BASE_URL}/{search_path}",
         params={"q": query, "page": page, **base_search_params},
-        log=f"GET repositories (page: {page})"
+        log=f"GET repositories (page: {page})",
     )
 
     repositories = list(map(map_response_item_to_repository, data["items"]))
@@ -188,18 +188,17 @@ def get_raw_github_image_url(tree_object, repository):
     return f"https://raw.githubusercontent.com/{repository['owner']['name']}/{repository['name']}/{repository['default_branch']}/{image_path}"
 
 
-def find_images_in_tree_objects(tree_objects, repository, image_count_to_find):
-    images = []
+def find_image_urls_in_tree_objects(tree_objects, repository, image_count_to_find):
+    image_urls = []
     for tree_object in tree_objects:
         basic_image_regex = r"^.*\.(png|jpe?g|webp)$"
         if re.match(basic_image_regex, tree_object["path"]):
             image_url = get_raw_github_image_url(tree_object, repository)
-            image = request.download_image(image_url)
-            if image is not None:
-                images.append(image)
-                if len(images) == image_count_to_find:
+            if request.is_image_url_valid(image_url):
+                image_urls.append(image_url)
+                if len(image_urls) == image_count_to_find:
                     break
-    return images
+    return image_urls
 
 
 def list_objects_of_tree(repository, tree_sha, path):
@@ -225,23 +224,23 @@ def get_tree_path(tree_object):
     return path
 
 
-def list_repository_images(repository, current_image_count, max_image_count):
+def list_repository_image_urls(repository, current_image_count, max_image_count):
     image_count_to_find = max_image_count - current_image_count
 
     if image_count_to_find <= 0:
         return []
 
-    images = []
+    image_urls = []
 
     tree_objects = list_objects_of_tree(
         repository, repository["default_branch"], repository["default_branch"]
     )
 
-    images.extend(
-        find_images_in_tree_objects(tree_objects, repository, image_count_to_find)
+    image_urls.extend(
+        find_image_urls_in_tree_objects(tree_objects, repository, image_count_to_find)
     )
 
-    image_count_to_find = image_count_to_find - len(images)
+    image_count_to_find = image_count_to_find - len(image_urls)
 
     for tree_object in tree_objects:
         if image_count_to_find <= 0:
@@ -262,15 +261,15 @@ def list_repository_images(repository, current_image_count, max_image_count):
                 )
             )
 
-            images.extend(
-                find_images_in_tree_objects(
+            image_urls.extend(
+                find_image_urls_in_tree_objects(
                     tree_objects_of_tree, repository, image_count_to_find
                 )
             )
 
-            image_count_to_find = image_count_to_find - len(images)
+            image_count_to_find = image_count_to_find - len(image_urls)
 
-    return images
+    return image_urls
 
 
 def get_readme_file(repository):
@@ -289,4 +288,7 @@ def get_readme_file(repository):
     if not readme_data:
         return ""
 
-    return file_helper.decode_file_content(readme_data["content"])
+    file_data = readme_data["content"]
+    base64_bytes = file_data.encode("utf-8")
+    bytes = base64.b64decode(base64_bytes)
+    return bytes.decode("utf-8")
