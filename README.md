@@ -51,3 +51,25 @@ source .env
 ```
 
 Start the script with `python3 src/index.py`
+
+## Deployment to Lambda
+
+### Environment
+
+A Lambda Layer is used to hold all the script dependencies.
+
+When a new dependency is added, or one needs to be updating, the script needs to be ran to build the layer.
+The layer then needs to be updloaded to the configured Lambda Layer.
+
+To run the script:
+
+```bash
+# at project root
+sh create_lambda_layer.sh
+```
+
+### Script
+
+A Github Action is set up to zip the content of the source directory, and deploy it to AWS Lambda.
+
+All this is done on push to `master`.

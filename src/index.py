@@ -12,7 +12,7 @@ MAX_IMAGE_COUNT = os.getenv("MAX_IMAGE_COUNT")
 MAX_IMAGE_COUNT = int(MAX_IMAGE_COUNT) if MAX_IMAGE_COUNT is not None else 5
 
 
-if __name__ == "__main__":
+def handler(event, context):
     start = time.time()
 
     printer.break_line()
@@ -70,9 +70,13 @@ if __name__ == "__main__":
 
     end = time.time()
 
-    db_service.create_import(
-        {
-            "elapsed_time": end - start,
-            "import_at": datetime.datetime.now(datetime.timezone.utc),
-        }
-    )
+    elapsed_time = end - start
+
+    import_data = {
+        "elapsed_time": elapsed_time,
+        "import_at": datetime.datetime.now(datetime.timezone.utc),
+    }
+
+    db_service.create_import(import_data)
+
+    return {"statusCode": 200, "body": f"Elapsed time: {elapsed_time}"}

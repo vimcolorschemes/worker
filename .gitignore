@@ -137,3 +137,4 @@ github_cache.sqlite
 # Data files
 data/**/*.json
 tmp/*
+vimcslayer.zip
