@@ -32,7 +32,9 @@ def handler(event, context):
         owner_name = repository["owner"]["name"]
         name = repository["name"]
 
-        is_new_repository = db_service.is_repository_new(owner_name, name)
+        is_new_repository, old_repository = db_service.is_repository_new(
+            owner_name, name
+        )
 
         repository["last_commit_at"] = github.get_last_commit_at(repository)
         last_commit_at = (
@@ -52,16 +54,41 @@ def handler(event, context):
         )
 
         if fetch_images:
-            readme_image_urls = utils.find_image_urls(
-                github.get_readme_file(repository), MAX_IMAGE_COUNT
-            )
-            repository_image_urls = github.list_repository_image_urls(
-                repository, len(readme_image_urls), MAX_IMAGE_COUNT
+            image_urls = (
+                list(
+                    filter(
+                        lambda url: request.is_image_url_valid(url),
+                        old_repository["image_urls"],
+                    )
+                )
+                if old_repository is not None
+                else []
             )
 
-            repository["image_urls"] = list(
-                map(utils.urlify, readme_image_urls + repository_image_urls)
+            image_count_to_find = MAX_IMAGE_COUNT - len(image_urls)
+
+            readme_image_urls = (
+                utils.find_image_urls(
+                    github.get_readme_file(repository), image_count_to_find, image_urls
+                )
+                if image_count_to_find > 0
+                else []
             )
+
+            image_urls = image_urls + readme_image_urls
+            image_count_to_find = MAX_IMAGE_COUNT - len(image_urls)
+
+            repository_image_urls = (
+                github.list_repository_image_urls(
+                    repository, image_count_to_find, image_urls
+                )
+                if image_count_to_find > 0
+                else []
+            )
+
+            image_urls = image_urls + repository_image_urls
+
+            repository["image_urls"] = list(map(utils.urlify, image_urls))
 
             printer.info(f"{len(readme_image_urls)} images found in readme")
             printer.info(f"{len(repository_image_urls)} images found in files")

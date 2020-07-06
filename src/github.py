@@ -188,13 +188,17 @@ def get_raw_github_image_url(tree_object, repository):
     return f"https://raw.githubusercontent.com/{repository['owner']['name']}/{repository['name']}/{repository['default_branch']}/{image_path}"
 
 
-def find_image_urls_in_tree_objects(tree_objects, repository, image_count_to_find):
+def find_image_urls_in_tree_objects(
+    tree_objects, repository, image_count_to_find, current_image_urls
+):
     image_urls = []
     for tree_object in tree_objects:
         basic_image_regex = r"^.*\.(png|jpe?g|webp)$"
         if re.match(basic_image_regex, tree_object["path"]):
             image_url = get_raw_github_image_url(tree_object, repository)
-            if request.is_image_url_valid(image_url):
+            if image_url not in current_image_urls and request.is_image_url_valid(
+                image_url
+            ):
                 image_urls.append(image_url)
                 if len(image_urls) == image_count_to_find:
                     break
@@ -224,9 +228,7 @@ def get_tree_path(tree_object):
     return path
 
 
-def list_repository_image_urls(repository, current_image_count, max_image_count):
-    image_count_to_find = max_image_count - current_image_count
-
+def list_repository_image_urls(repository, image_count_to_find, current_image_urls):
     if image_count_to_find <= 0:
         return []
 
@@ -237,7 +239,9 @@ def list_repository_image_urls(repository, current_image_count, max_image_count)
     )
 
     image_urls.extend(
-        find_image_urls_in_tree_objects(tree_objects, repository, image_count_to_find)
+        find_image_urls_in_tree_objects(
+            tree_objects, repository, image_count_to_find, current_image_urls
+        )
     )
 
     image_count_to_find = image_count_to_find - len(image_urls)
@@ -263,7 +267,10 @@ def list_repository_image_urls(repository, current_image_count, max_image_count)
 
             image_urls.extend(
                 find_image_urls_in_tree_objects(
-                    tree_objects_of_tree, repository, image_count_to_find
+                    tree_objects_of_tree,
+                    repository,
+                    image_count_to_find,
+                    current_image_urls,
                 )
             )
 

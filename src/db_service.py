@@ -31,11 +31,14 @@ def create_import(import_data):
 
 
 def is_repository_new(owner_name, name):
-    result = repository_collection.find_one({"owner.name": owner_name, "name": name})
-    return result == None
+    repository = repository_collection.find_one({"owner.name": owner_name, "name": name})
+    return repository == None, repository
 
 
 def upsert_repository(repository_data):
+    # TODO: When updating images, check that the repository's featured image is
+    # still in the image set, if not: set it to null
+
     owner_name = repository_data["owner"]["name"]
     name = repository_data["name"]
 
