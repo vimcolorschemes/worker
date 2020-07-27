@@ -166,10 +166,10 @@ def get_last_commit_at(repository):
 
     if (
         "commit" in last_commit_data
-        and "author" in last_commit_data["commit"]
-        and "date" in last_commit_data["commit"]["author"]
+        and "committer" in last_commit_data["commit"]
+        and "date" in last_commit_data["commit"]["committer"]
     ):
-        return last_commit_data["commit"]["author"]["date"]
+        return last_commit_data["commit"]["committer"]["date"]
 
     return None
 
