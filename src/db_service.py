@@ -18,7 +18,10 @@ import_collection = database["imports"].with_options(
 
 
 def get_last_import_at():
+    printer.break_line(2)
     printer.info("GET last import")
+    printer.break_line(2)
+
     result = import_collection.find_one(sort=[("import_at", pymongo.DESCENDING)])
     last_import_at = result["import_at"] if result is not None else None
     return last_import_at
@@ -49,3 +52,4 @@ def upsert_repository(repository_data):
     )
     inserted = "updatedExisting" not in result or result["updatedExisting"] == False
     printer.info(f"Repository was {'inserted' if inserted else 'updated'}")
+    printer.break_line()

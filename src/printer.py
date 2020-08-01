@@ -31,8 +31,9 @@ def log(message):
     print(f"LOG: {message}")
 
 
-def break_line():
-    print("")
+def break_line(n = 1):
+    for i in range(0, n):
+        print("")
 
 
 def start_sleeping(sleep_time):
