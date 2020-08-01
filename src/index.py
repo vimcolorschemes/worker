@@ -109,13 +109,10 @@ def handler(event, context):
 
     db_service.create_import(import_data)
 
-    if BUILD_WEBHOOK is not None:
+    if BUILD_WEBHOOK is not None or BUILD_WEBHOOK != "":
         printer.break_line()
         printer.info("Starting website build")
-        response = request.post(
-            ***REMOVED***,
-            is_json=False,
-        )
+        response = request.post(BUILD_WEBHOOK, is_json=False,)
         printer.info(f"Response: {response}")
         printer.break_line()
 
