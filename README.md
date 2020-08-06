@@ -1,6 +1,10 @@
-# colorschemes worker
+<h1 align="center">
+  <img alt="colorschemes.dev" src="media/logo_background.png" />
+</h1>
+<p align="center" style="border:none">
+  I fetch color schemes repositories, and store them. That's about it
+</p>
 
-Python cron job updating data for colorschemes
 
 ## Getting started
 
