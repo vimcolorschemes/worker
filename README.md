@@ -1,29 +1,35 @@
 <h1 align="center">
-  <img alt="colorschemes.dev" src="media/logo_background.png" />
+  <img alt="colorschemes.dev worker" src="media/logo.png" width="400" />
 </h1>
 <p align="center" style="border:none">
   I fetch color schemes repositories, and store them. That's about it
 </p>
 
 
+
 ## Getting started
 
-The import script queries Github repositories matching some criterias, and stores them in a mongoDB database.
+The import script queries Github repositories matching a query, and stores them in a mongoDB database.
 
-The database is then queried by the Gatsby App to build the website.
+This is the data source of [colorschemes.dev](https://github.com/reobin/colorschemes.dev)
 
 ### Requirements:
 
-- python3
-  `curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py`
+- [python3](https://installpython3.com/)
+- [pip](https://pip.pypa.io/en/stable/installing/)
+- [mongodb-community](https://docs.mongodb.com/manual/installation/#mongodb-community-edition-installation-tutorials) running at port 27017
 
-When your machine is ready, you need to create your virtual environment at the project root:
+### Prepare your environment
+
+#### Create the python virtual environment
+
+Create your virtual environment at the project root:
 
 ```shell
 python3 -m venv env
 ```
 
-Then source your virtual env:
+Then source it:
 
 ```shell
 source env/bin/activate
@@ -35,18 +41,20 @@ Install all project dependencies:
 pip install -r requirements.txt
 ```
 
-You should be good to go to run the script, but there's a couple things left to talk about.
+#### Get your Github Personnal Access Token
 
-Github API has a quite short rate limit for unauthenticated calls (60 for core API calls).
+Since GitHub's API has a quite short rate limit for unauthenticated calls (60 for core API calls).
 I highly recommend setting up authentication (5000 calls for core API calls) to avoid wait times when you reach the limit.
 
 To do that, you first need to create your personal access token with permissions to read public repositories. Follow instructions on how to do that [here](https://help.github.com/en/github/authenticating-to-github/creating-a-personal-access-token-for-the-command-line).
 
-The last thing you need to do is setup your environment variables.
+####  Set up the environment variables
 
-Copy the template environment file using `cp .template.env .env`, and then update the values to your needs
+A template dotenv file (`.template.env`) is available at root.
 
-> Note: The non-Github stuff is a set of recommended values to make development effective. They can be altered with.
+Copy it using `cp .template.env .env` and update the values to your needs (read the comments).
+
+> TIP: Read the comments on the template dotenv file.
 
 Then source it:
 
@@ -58,11 +66,11 @@ Start the script with `python3 src/index.py`
 
 ## Deployment to Lambda
 
-### Environment
+### The environment layer
 
 A Lambda Layer is used to hold all the script dependencies.
 
-When a new dependency is added, or one needs to be updating, the script needs to be ran to build the layer.
+When a new dependency is added, or one needs to be updated, the script should be run to build the layer.
 The layer then needs to be updloaded to the configured Lambda Layer.
 
 To run the script:
@@ -72,7 +80,7 @@ To run the script:
 sh create_lambda_layer.sh
 ```
 
-### Script
+### The actual script
 
 A Github Action is set up to zip the content of the source directory, and deploy it to AWS Lambda.
 
