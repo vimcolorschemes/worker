@@ -12,12 +12,10 @@ import printer
 
 GITHUB_USERNAME = os.getenv("GITHUB_USERNAME")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+COLOR_SCHEME_QUERY = os.getenv("COLOR_SCHEME_QUERY")
 
 ITEMS_PER_PAGE = 100
 BASE_URL = "https://api.github.com"
-
-VIM_COLOR_SCHEME_QUERY = "colorscheme OR scheme OR colors language:vim sort:stars"
-
 
 GITHUB_BASIC_AUTH = (
     HTTPBasicAuth(GITHUB_USERNAME, GITHUB_TOKEN)
@@ -82,7 +80,7 @@ def github_core_get(url, params=None, log=None):
     return data
 
 
-def list_repositories_of_page(query=VIM_COLOR_SCHEME_QUERY, page=1):
+def list_repositories_of_page(query=COLOR_SCHEME_QUERY, page=1):
     items_per_page = (
         min(REPOSITORY_LIMIT, ITEMS_PER_PAGE)
         if REPOSITORY_LIMIT is not None

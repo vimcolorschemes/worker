@@ -9,7 +9,7 @@ if DATABASE_CONNECTION_STRING is None:
     DATABASE_CONNECTION_STRING = "mongodb://localhost:27017/"
 
 client = pymongo.MongoClient(DATABASE_CONNECTION_STRING)
-database = client["vimcs"]
+database = client["colorschemes"]
 owner_collection = database["owners"]
 repository_collection = database["repositories"]
 import_collection = database["imports"].with_options(

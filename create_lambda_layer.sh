@@ -12,6 +12,6 @@ pip install -r requirements.in --no-deps -t $PY_DIR
 
 echo "Zip build"
 cd build
-zip -r ../vimcslayer.zip .
+zip -r ../colorschemeslayer.zip .
 cd ..
 rm -r build

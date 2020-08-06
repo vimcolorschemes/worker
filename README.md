@@ -1,6 +1,6 @@
-# vimcolorschemes worker
+# colorschemes worker
 
-Python cron job updating data for vimcolorschemes
+Python cron job updating data for colorschemes
 
 ## Getting started
 
