@@ -30,7 +30,7 @@ class Worker:
         if self.should_fetch_images(
             repository["last_commit_at"], last_import_at, is_repository_new
         ):
-            repository = fetch_images(repository, old_repository)
+            repository = self.fetch_images(repository, old_repository)
 
         self.database_instance.upsert_repository(repository)
 
