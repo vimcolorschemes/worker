@@ -5,6 +5,8 @@ from database import Database
 from worker import Worker
 import github
 
+COLOR_SCHEME_QUERY = os.getenv("COLOR_SCHEME_QUERY")
+
 DATABASE_HOST = os.getenv("DATABASE_HOST")
 DATABASE_USERNAME = os.getenv("DATABASE_USERNAME")
 DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD")
@@ -21,11 +23,11 @@ if DATABASE_PASSWORD is not None and DATABASE_PASSWORD != "":
 def handler(event, context):
     start = time.time()
 
-    if "host" in event["host"]:
+    if "host" in event:
         connection["host"] = event["host"]
-    if "username" in event["username"]:
+    if "username" in event:
         connection["username"] = event["username"]
-    if "password" in event["password"]:
+    if "password" in event:
         connection["password"] = event["password"]
 
     database_instance = Database(**connection)
@@ -33,7 +35,8 @@ def handler(event, context):
 
     last_import_at = worker_instance.get_last_import_at()
 
-    repositories = github.search_repositories()
+    query = event["query"] if "query" in event else COLOR_SCHEME_QUERY
+    repositories = github.search_repositories(query)
     for repository in repositories:
         worker_instance.update_repository(repository, last_import_at)
 
@@ -47,6 +50,5 @@ def handler(event, context):
 
     return {"statusCode": 200, "body": f"Elapsed time: {elapsed_time}"}
 
-
 if __name__ == "__main__":
-    handler(None, None)
+    handler({}, None)

@@ -12,7 +12,6 @@ import printer
 
 GITHUB_USERNAME = os.getenv("GITHUB_USERNAME")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-COLOR_SCHEME_QUERY = os.getenv("COLOR_SCHEME_QUERY")
 
 ITEMS_PER_PAGE = 100
 BASE_URL = "https://api.github.com"
@@ -80,7 +79,7 @@ def github_core_get(url, params=None, log=None):
     return data
 
 
-def list_repositories_of_page(query=COLOR_SCHEME_QUERY, page=1):
+def list_repositories_of_page(query, page=1):
     items_per_page = (
         min(REPOSITORY_LIMIT, ITEMS_PER_PAGE)
         if REPOSITORY_LIMIT is not None
@@ -103,10 +102,10 @@ def list_repositories_of_page(query=COLOR_SCHEME_QUERY, page=1):
 
 # Fetches github repositories with a defined query.
 # If more than 100 repositories, it will search all pages one by one.
-def search_repositories():
+def search_repositories(query):
     repositories = []
 
-    first_page_repositories, total_count = list_repositories_of_page()
+    first_page_repositories, total_count = list_repositories_of_page(query)
     repositories.extend(first_page_repositories)
 
     fetched_repository_count = (
@@ -122,7 +121,7 @@ def search_repositories():
     page_count = math.ceil(fetched_repository_count / ITEMS_PER_PAGE)
 
     for page in range(2, page_count + 1):
-        current_page_repositories, _total_count = list_repositories_of_page(page=page)
+        current_page_repositories, _total_count = list_repositories_of_page(query, page)
         repositories.extend(current_page_repositories)
 
     return repositories
