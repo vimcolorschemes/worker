@@ -15,6 +15,7 @@ idna==2.10                # via requests
 pathspec==0.8.0           # via black
 pip-tools==5.2.1          # via -r requirements.in
 pymongo==3.10.1           # via -r requirements.in
+pytz==2020.1              # via -r requirements.in
 regex==2020.6.8           # via black
 requests==2.24.0          # via -r requirements.in
 six==1.15.0               # via pip-tools

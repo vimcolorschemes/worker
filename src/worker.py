@@ -1,5 +1,4 @@
 import datetime
-import dateutil.parser as dparser
 import os
 
 import github
@@ -35,11 +34,6 @@ class Worker:
         self.database_instance.upsert_repository(repository)
 
     def should_fetch_images(self, last_commit_at, last_import_at, is_repository_new):
-        last_commit_at = (
-            dparser.parse(last_commit_at, fuzzy=True)
-            if last_commit_at is not None
-            else None
-        )
         images_will_be_fetched = (
             is_repository_new
             or last_import_at is None

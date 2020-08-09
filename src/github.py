@@ -1,6 +1,8 @@
 import base64
+import datetime
 import math
 import os
+import pytz
 import re
 import sys
 import time
@@ -30,6 +32,13 @@ REPOSITORY_LIMIT = min(GITHUB_API_HARD_LIMIT, REPOSITORY_LIMIT)
 this = sys.modules[__name__]
 this.remaining_github_api_calls = None
 this.github_api_rate_limit_reset = None
+
+
+def convert_github_string_datetime(d):
+    # GitHub format: 2020-07-16T19:23:44Z
+    unaware = datetime.datetime.strptime(d, "%Y-%m-%dT%H:%M:%SZ")
+    aware = unaware.replace(tzinfo=pytz.UTC)
+    return aware
 
 
 def get_rate_limit():
@@ -137,8 +146,8 @@ def map_response_item_to_repository(response_item):
         "github_url": response_item["html_url"],
         "homepage_url": response_item["homepage"],
         "stargazers_count": response_item["stargazers_count"],
-        "pushed_at": response_item["pushed_at"],
-        "github_created_at": response_item["created_at"],
+        "pushed_at": convert_github_string_datetime(response_item["pushed_at"]),
+        "github_created_at": convert_github_string_datetime(response_item["created_at"]),
         "owner": {
             "name": response_item["owner"]["login"],
             "avatar_url": response_item["owner"]["avatar_url"],
@@ -166,7 +175,8 @@ def get_last_commit_at(repository):
         and "committer" in last_commit_data["commit"]
         and "date" in last_commit_data["commit"]["committer"]
     ):
-        return last_commit_data["commit"]["committer"]["date"]
+        string_datetime = last_commit_data["commit"]["committer"]["date"]
+        return convert_github_string_datetime(string_datetime)
 
     return None
 
