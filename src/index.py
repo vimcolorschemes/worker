@@ -1,9 +1,11 @@
-import time
 import os
+import sys
+import time
 
 from database import Database
 from worker import Worker
 import github
+import printer
 
 COLOR_SCHEME_QUERY = os.getenv("COLOR_SCHEME_QUERY")
 
@@ -21,6 +23,8 @@ if DATABASE_PASSWORD is not None and DATABASE_PASSWORD != "":
 
 
 def run_import(event, worker_instance):
+    start = time.time()
+
     last_import_at = worker_instance.get_last_import_at()
 
     query = event["query"] if "query" in event else COLOR_SCHEME_QUERY
@@ -36,18 +40,30 @@ def run_import(event, worker_instance):
 
     worker_instance.call_build_webhook()
 
+    printer.success("Import finished.")
+    printer.info(f"Elapsed time: {elapsed_time}")
+
     return {"statusCode": 200, "elapsed_time": elapsed_time}
 
 
 def run_clean(worker_instance):
+    start = time.time()
     image_removed_count = worker_instance.clean_repositories()
-    print(image_removed_count)
-    return {"statusCode": 200, "image_removed_count": image_removed_count}
+    end = time.time()
+    elapsed_time = end - start
+
+    printer.success("Cleanup finished.")
+    printer.info(f"Images removed: {image_removed_count}")
+    printer.info(f"Elapsed time: {elapsed_time}")
+
+    return {
+        "statusCode": 200,
+        "image_removed_count": image_removed_count,
+        "elapsed_time": elapsed_time,
+    }
 
 
 def handler(event, context):
-    start = time.time()
-
     if "host" in event:
         connection["host"] = event["host"]
     if "username" in event:
@@ -65,4 +81,5 @@ def handler(event, context):
 
 
 if __name__ == "__main__":
-    handler({"work": "clean"}, None)
+    work = sys.argv[1] if len(sys.argv) > 1 else "import"
+    handler({"work": work}, None)

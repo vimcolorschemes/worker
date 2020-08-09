@@ -109,7 +109,7 @@ class Worker:
 
     def clean_repositories(self):
         repositories = self.database_instance.get_repositories()
-        image_removed_count = 0
+        total_image_removed_count = 0
         for repository in repositories:
             printer.info(f"Cleaning {repository['owner']['name']}/{repository['name']}")
 
@@ -145,9 +145,13 @@ class Worker:
             repository["image_urls"] = image_urls
             repository["featured_image_url"] = featured_image_url
 
-            self.database_instance.upsert_repository(repository)
+            image_removed_count = final_count - initial_count
+            total_image_removed_count += image_removed_count
 
-            image_removed_count += final_count - initial_count
+            if image_removed_count > 0:
+                self.database_instance.upsert_repository(repository)
+            else:
+                printer.info("Repository not updated")
+                printer.break_line()
 
-        # TODO check count
-        return image_removed_count
+        return total_image_removed_count
