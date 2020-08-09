@@ -53,3 +53,7 @@ class Database:
         inserted = "updatedExisting" not in result or result["updatedExisting"] == False
         printer.info(f"Repository was {'inserted' if inserted else 'updated'}")
         printer.break_line()
+
+    def get_repositories(self):
+        result = self.repository_collection.find()
+        return list(result)

@@ -20,19 +20,7 @@ if DATABASE_PASSWORD is not None and DATABASE_PASSWORD != "":
     connection["password"] = DATABASE_PASSWORD
 
 
-def handler(event, context):
-    start = time.time()
-
-    if "host" in event:
-        connection["host"] = event["host"]
-    if "username" in event:
-        connection["username"] = event["username"]
-    if "password" in event:
-        connection["password"] = event["password"]
-
-    database_instance = Database(**connection)
-    worker_instance = Worker(database_instance)
-
+def run_import(event, worker_instance):
     last_import_at = worker_instance.get_last_import_at()
 
     query = event["query"] if "query" in event else COLOR_SCHEME_QUERY
@@ -48,7 +36,33 @@ def handler(event, context):
 
     worker_instance.call_build_webhook()
 
-    return {"statusCode": 200, "body": f"Elapsed time: {elapsed_time}"}
+    return {"statusCode": 200, "elapsed_time": elapsed_time}
+
+
+def run_clean(worker_instance):
+    image_removed_count = worker_instance.clean_repositories()
+    print(image_removed_count)
+    return {"statusCode": 200, "image_removed_count": image_removed_count}
+
+
+def handler(event, context):
+    start = time.time()
+
+    if "host" in event:
+        connection["host"] = event["host"]
+    if "username" in event:
+        connection["username"] = event["username"]
+    if "password" in event:
+        connection["password"] = event["password"]
+
+    database_instance = Database(**connection)
+    worker_instance = Worker(database_instance)
+
+    if "work" in event and event["work"] == "clean":
+        return run_clean(worker_instance)
+    else:
+        return run_import(event, worker_instance)
+
 
 if __name__ == "__main__":
-    handler({}, None)
+    handler({"work": "clean"}, None)
