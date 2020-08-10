@@ -1,17 +1,15 @@
 <h1 align="center">
-  <img alt="colorschemes.dev worker" src="media/logo.png" width="400" />
+  <img alt="vimcolorschemes worker" src="media/logo.png" width="400" />
 </h1>
 <p align="center" style="border:none">
   I fetch color schemes repositories, and store them. That's about it
 </p>
 
-
-
 ## Getting started
 
 The import script queries Github repositories matching a query, and stores them in a mongoDB database.
 
-This is the data source of [colorschemes.dev](https://github.com/reobin/colorschemes.dev)
+This is the data source of [vimcolorschemes](https://github.com/reobin/vimcolorschemes)
 
 ### Requirements:
 
@@ -48,7 +46,7 @@ I highly recommend setting up authentication (5000 calls for core API calls) to 
 
 To do that, you first need to create your personal access token with permissions to read public repositories. Follow instructions on how to do that [here](https://help.github.com/en/github/authenticating-to-github/creating-a-personal-access-token-for-the-command-line).
 
-####  Set up the environment variables
+#### Set up the environment variables
 
 A template dotenv file (`.template.env`) is available at root.
 
