@@ -36,7 +36,3 @@ def find_image_urls(file_content):
         index = index + 1
 
     return valid_image_urls
-
-
-def urlify(in_string):
-    return "%20".join(in_string.split())

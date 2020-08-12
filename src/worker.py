@@ -1,5 +1,6 @@
 import datetime
 import os
+import re
 
 import github
 import printer
@@ -11,147 +12,106 @@ MAX_IMAGE_COUNT = int(MAX_IMAGE_COUNT) if MAX_IMAGE_COUNT is not None else 5
 
 BUILD_WEBHOOK = os.getenv("BUILD_WEBHOOK")
 
+IMAGE_PATH_REGEX = r"^.*\.(png|jpe?g|webp)$"
+POTENTIAL_VIM_COLOR_SCHEME_PATH_REGEX = r"^.*\.(vim|erb)$"
+
+VIM_COLLECTION_THRESHOLD = 20
+
 
 class Worker:
-    def __init__(self, database_instance):
-        self.database_instance = database_instance
+    def __init__(self, database):
+        self.database = database
+        self.last_import_at = self.database.get_last_import_at()
 
-    def update_repository(self, repository, last_import_at):
-        owner_name = repository["owner"]["name"]
-        name = repository["name"]
+    # Search for repositories, validate, store
+    def run_import(self):
+        repositories = github.search_repositories()
 
-        is_repository_new, old_repository = self.database_instance.is_repository_new(
-            owner_name, name
-        )
-
-        repository["last_commit_at"] = github.get_last_commit_at(repository)
-
-        if self.should_fetch_images(
-            repository["last_commit_at"], last_import_at, is_repository_new
-        ):
-            repository = self.fetch_images(repository, old_repository)
-
-        self.database_instance.upsert_repository(repository)
-
-    def should_fetch_images(self, last_commit_at, last_import_at, is_repository_new):
-        images_will_be_fetched = (
-            is_repository_new
-            or last_import_at is None
-            or last_commit_at > last_import_at
-        )
-        printer.info(
-            "Images will be fetched"
-            if images_will_be_fetched
-            else "Image fetching skipped"
-        )
-        return images_will_be_fetched
-
-    def fetch_images(self, repository, old_repository):
-        image_urls = (
-            list(
-                filter(
-                    lambda url: request.is_image_url_valid(url),
-                    old_repository["image_urls"],
-                )
-            )
-            if old_repository is not None
-            else []
-        )
-
-        image_count_to_find = MAX_IMAGE_COUNT - len(image_urls)
-
-        readme_image_urls = (
-            utils.find_image_urls(
-                github.get_readme_file(repository), image_count_to_find, image_urls
-            )
-            if image_count_to_find > 0
-            else []
-        )
-
-        image_urls = image_urls + readme_image_urls
-        image_count_to_find = MAX_IMAGE_COUNT - len(image_urls)
-
-        repository_image_urls = (
-            github.list_repository_image_urls(
-                repository, image_count_to_find, image_urls
-            )
-            if image_count_to_find > 0
-            else []
-        )
-
-        image_urls = image_urls + repository_image_urls
-
-        repository["image_urls"] = list(map(utils.urlify, image_urls))
-
-        printer.info(f"{len(readme_image_urls)} images found in readme")
-        printer.info(f"{len(repository_image_urls)} images found in files")
-
-        return repository
-
-    def create_import(self, elapsed_time):
-        import_data = {
-            "elapsed_time": elapsed_time,
-            "import_at": datetime.datetime.now(datetime.timezone.utc),
-        }
-
-        self.database_instance.create_import(import_data)
-
-    def call_build_webhook(self):
-        if BUILD_WEBHOOK is not None and BUILD_WEBHOOK != "":
-            printer.break_line()
-            printer.info("Starting website build")
-            response = request.post(BUILD_WEBHOOK, is_json=False,)
-            printer.info(f"Response: {response}")
-            printer.break_line()
-
-    def get_last_import_at(self):
-        return self.database_instance.get_last_import_at()
-
-    def clean_repositories(self):
-        repositories = self.database_instance.get_repositories()
-        total_image_removed_count = 0
         for repository in repositories:
-            printer.info(f"Cleaning {repository['owner']['name']}/{repository['name']}")
+            owner_name = repository["owner"]["name"]
+            name = repository["name"]
 
-            image_urls = repository["image_urls"]
-            if image_urls is None:
-                image_urls = []
-            initial_count = len(image_urls)
-            printer.info(f"Initial image count: {initial_count}")
+            printer.info(repository["github_url"])
 
-            # remove duplicates
-            printer.info("Removing duplicates")
-            image_urls = list(dict.fromkeys(image_urls))
+            repository["last_commit_at"] = github.get_last_commit_at(owner_name, name)
 
-            # remove no-longer valid urls
-            printer.info("Removing invalid urls")
-            image_urls = list(
+            old_repository = self.database.get_repository(owner_name, name)
+            if self.is_update_due(old_repository, repository["last_commit_at"]) or True:
+                printer.info("Update is due")
+                files = github.get_repository_files(repository)
+                repository[
+                    "vim_color_scheme_file_paths"
+                ] = self.get_vim_color_scheme_file_paths(owner_name, name, files)
+                repository["valid"] = len(repository["vim_color_scheme_file_paths"]) > 0
+                if repository["valid"]:
+                    repository["image_urls"] = self.get_image_urls(owner_name, name, files)
+
+            self.database.upsert_repository(repository)
+
+    def get_image_urls(self, owner_name, name, files):
+        readme_file = github.get_readme_file(owner_name, name)
+        image_urls = utils.find_image_urls(readme_file)
+        image_files = list(
+            filter(lambda file: re.match(IMAGE_PATH_REGEX, file["path"]), files)
+        )
+        image_urls = image_urls + list(
+            map(
+                lambda file: f"https://raw.githubusercontent.com/{owner_name}/{name}/{file['path']}",
+                image_files,
+            )
+        )
+        return image_urls
+
+    def get_vim_color_scheme_file_paths(self, owner_name, name, files):
+        vim_files = list(
+            filter(
+                lambda file: re.match(
+                    POTENTIAL_VIM_COLOR_SCHEME_PATH_REGEX, file["path"]
+                ),
+                files,
+            )
+        )
+
+        if len(vim_files) < VIM_COLLECTION_THRESHOLD:
+            vim_color_scheme_files = list(
                 filter(
-                    lambda image_url: request.is_image_url_valid(image_url), image_urls
+                    lambda file: self.is_vim_color_scheme(owner_name, name, file),
+                    vim_files,
                 )
             )
+            return list(map(lambda file: file["path"], vim_color_scheme_files))
 
-            final_count = len(image_urls)
-            printer.info(f"Final image count: {final_count}")
+        return []
 
-            featured_image_url = (
-                repository["featured_image_url"]
-                if "featured_image_url" in repository
-                else None
-            )
-            if featured_image_url not in image_urls:
-                featured_image_url = None
+    def is_vim_color_scheme(self, owner_name, name, file):
+        url = f"https://raw.githubusercontent.com/{owner_name}/{name}/{file['path']}"
+        response = request.get(url, is_json=False)
+        file_content = response.text if response is not None else ""
+        return "colors_name" in file_content
 
-            repository["image_urls"] = image_urls
-            repository["featured_image_url"] = featured_image_url
+    def is_update_due(self, old_repository, last_commit_at):
+        # if the repository is new, update
+        if old_repository is None:
+            return True
 
-            image_removed_count = final_count - initial_count
-            total_image_removed_count += image_removed_count
+        # if the repository was deemed invalid before, don't update
+        if "valid" in old_repository and old_repository["valid"] == False:
+            return False
 
-            if image_removed_count > 0:
-                self.database_instance.upsert_repository(repository)
-            else:
-                printer.info("Repository not updated")
-                printer.break_line()
+        # update if the repository was updated after last import
+        return last_commit_at > self.last_import_at
 
-        return total_image_removed_count
+    # Clean out image URLs that are not valid anymore
+    def run_clean(self):
+        repositories = []
+        for repository in repositories:
+            print("")
+            # validate image URLs
+
+    # Salvage or update repositories not handled anymore by the import
+    def run_salvage(self):
+        repositories = []
+        for repository in repositories:
+            print("")
+            # valid, image_urls = search file tree
+            # upsert

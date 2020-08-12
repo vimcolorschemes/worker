@@ -124,7 +124,7 @@ def search_repositories():
     repositories = []
 
     for query in queries:
-        query = f"{query} sort:stars stars:>1"
+        query = f"{query} NOT dotfiles sort:stars stars:>1"
 
         first_page_repositories, total_count = list_repositories_of_page(query)
         repositories.extend(first_page_repositories)
@@ -196,37 +196,6 @@ def get_last_commit_at(owner_name, name):
     return None
 
 
-def get_raw_github_image_url(tree_object, repository):
-    parent_path = ""
-    if (
-        "parent_tree_object" in tree_object
-        and "path" in tree_object["parent_tree_object"]
-    ):
-        parent_path = f"{tree_object['parent_tree_object']['path']}/"
-    image_path = f"{parent_path}{tree_object['path']}"
-
-    # TODO Investigate a better way to come up with this url
-    # without making an additional call
-    return f"https://raw.githubusercontent.com/{repository['owner']['name']}/{repository['name']}/{repository['default_branch']}/{image_path}"
-
-
-def find_image_urls_in_tree_objects(
-    tree_objects, repository, image_count_to_find, current_image_urls
-):
-    image_urls = []
-    for tree_object in tree_objects:
-        basic_image_regex = r"^.*\.(png|jpe?g|webp)$"
-        if re.match(basic_image_regex, tree_object["path"]):
-            image_url = get_raw_github_image_url(tree_object, repository)
-            if image_url not in current_image_urls and request.is_image_url_valid(
-                image_url
-            ):
-                image_urls.append(image_url)
-                if len(image_urls) == image_count_to_find:
-                    break
-    return image_urls
-
-
 def list_objects_of_tree(owner_name, name, tree_sha):
     tree_path = f"repos/{owner_name}/{name}/git/trees/{tree_sha}"
     data = github_core_get(
@@ -243,57 +212,6 @@ def get_tree_path(tree_object):
         current_tree = current_tree["parent_tree_object"]
         path = f"{current_tree['path']}/{path}"
     return path
-
-
-def list_repository_image_urls(repository, image_count_to_find, current_image_urls):
-    if image_count_to_find <= 0:
-        return []
-
-    image_urls = []
-
-    tree_objects = list_objects_of_tree(
-        repository, repository["default_branch"], repository["default_branch"]
-    )
-
-    image_urls.extend(
-        find_image_urls_in_tree_objects(
-            tree_objects, repository, image_count_to_find, current_image_urls
-        )
-    )
-
-    image_count_to_find = image_count_to_find - len(image_urls)
-
-    for tree_object in tree_objects:
-        if image_count_to_find <= 0:
-            break
-
-        if tree_object["type"] == "tree":
-            tree_objects_of_tree = list_objects_of_tree(
-                repository, tree_object["sha"], get_tree_path(tree_object)
-            )
-
-            tree_objects_of_tree = list(
-                map(
-                    lambda child_object: {
-                        **child_object,
-                        "parent_tree_object": tree_object,
-                    },
-                    tree_objects_of_tree,
-                )
-            )
-
-            image_urls.extend(
-                find_image_urls_in_tree_objects(
-                    tree_objects_of_tree,
-                    repository,
-                    image_count_to_find,
-                    current_image_urls,
-                )
-            )
-
-            image_count_to_find = image_count_to_find - len(image_urls)
-
-    return image_urls
 
 
 def get_files_of_tree(owner_name, name, tree_sha, tree_path):

@@ -32,12 +32,6 @@ class Database:
         self.import_collection.insert_one(import_data)
         printer.break_line()
 
-    def is_repository_new(self, owner_name, name):
-        repository = self.repository_collection.find_one(
-            {"owner.name": owner_name, "name": name}
-        )
-        return repository == None, repository
-
     def upsert_repository(self, repository_data):
         # TODO: When updating images, check that the repository's featured image is
         # still in the image set, if not: set it to null
