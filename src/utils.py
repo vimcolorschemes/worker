@@ -16,7 +16,7 @@ def decode_base64(data):
         return ""
 
 
-def find_image_urls(file_content):
+def find_image_urls(file_content, max_image_count):
     image_url_regex = r"\b(https?:\/\/\S+(?:png|jpe?g|webp))\b"
     standard_image_urls = re.findall(image_url_regex, file_content)
 
@@ -30,7 +30,7 @@ def find_image_urls(file_content):
     valid_image_urls = []
     index = 0
 
-    while index < len(image_urls):
+    while len(valid_image_urls) < max_image_count and index < len(image_urls):
         image_url = image_urls[index]
         if request.is_image_url_valid(image_url):
             valid_image_urls.append(image_url)

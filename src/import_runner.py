@@ -70,10 +70,17 @@ def is_update_due(old_repository, last_commit_at, last_import_at):
 
 def get_repository_image_urls(owner_name, name, files):
     readme_file = github.get_readme_file(owner_name, name)
-    image_urls = utils.find_image_urls(readme_file)
+    image_urls = utils.find_image_urls(readme_file, MAX_IMAGE_COUNT)
+
+    if len(image_urls) >= MAX_IMAGE_COUNT:
+        return image_urls
+
+    max_image_count_left = MAX_IMAGE_COUNT - len(image_urls)
+
     image_files = list(
         filter(lambda file: re.match(IMAGE_PATH_REGEX, file["path"]), files)
-    )
+    )[0:max_image_count_left]
+
     image_urls = image_urls + list(
         map(
             lambda file: utils.build_raw_blog_github_url(
