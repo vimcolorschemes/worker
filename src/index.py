@@ -55,6 +55,8 @@ def handler(event, context):
     end = time.time()
     elapsed_time = end - start
 
+    worker_instance.store_report(job, elapsed_time)
+
     printer.success(f"{job} finished.")
     printer.info(f"Elapsed time: {elapsed_time}")
 

@@ -1,5 +1,6 @@
 import os
 import pymongo
+import datetime
 from bson.codec_options import CodecOptions
 
 import printer
@@ -12,7 +13,7 @@ class Database:
         )
         self.database = self.client["colorschemes"]
         self.repository_collection = self.database["repositories"]
-        self.import_collection = self.database["imports"].with_options(
+        self.report_collection = self.database["reports"].with_options(
             codec_options=CodecOptions(tz_aware=True)
         )
 
@@ -21,15 +22,17 @@ class Database:
         printer.info("GET last import")
         printer.break_line(2)
 
-        result = self.import_collection.find_one(
-            sort=[("import_at", pymongo.DESCENDING)]
+        result = self.report_collection.find_one(
+            {"job": "import"}, sort=[("created_at", pymongo.DESCENDING)]
         )
-        last_import_at = result["import_at"] if result is not None else None
+        last_import_at = result["created_at"] if result is not None else None
         return last_import_at
 
-    def create_import(self, import_data):
-        printer.info("CREATE import")
-        self.import_collection.insert_one(import_data)
+    def create_report(self, report_data):
+        printer.info("CREATE report")
+        self.report_collection.insert_one(
+            {**report_data, "created_at": datetime.datetime.now()}
+        )
         printer.break_line()
 
     def upsert_repository(self, repository_data):

@@ -70,6 +70,9 @@ class Worker:
             # valid, image_urls = search file tree
             # upsert
 
+    def store_report(self, job, elapsed_time):
+        self.database.create_report({"job": job, "elapsed_time": elapsed_time})
+
 
 def is_update_due(old_repository, last_commit_at, last_import_at):
     # if the repository is new, update
@@ -79,6 +82,10 @@ def is_update_due(old_repository, last_commit_at, last_import_at):
     # if the repository was deemed invalid before, don't update
     if "valid" in old_repository and old_repository["valid"] == False:
         return False
+
+    # if no prior import, update
+    if last_import_at is None:
+        return True
 
     # update if the repository was updated after last import
     return last_commit_at > last_import_at
