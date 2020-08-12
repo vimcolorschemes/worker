@@ -91,11 +91,7 @@ def github_core_get(url, params=None, log=None):
 
 
 def list_repositories_of_page(query, page=1):
-    items_per_page = (
-        min(REPOSITORY_LIMIT, ITEMS_PER_PAGE)
-        if REPOSITORY_LIMIT is not None
-        else ITEMS_PER_PAGE
-    )
+    items_per_page = min(REPOSITORY_LIMIT, ITEMS_PER_PAGE)
     search_path = "search/repositories"
     base_search_params = {"per_page": items_per_page}
 
@@ -135,11 +131,7 @@ def search_repositories():
             else total_count
         )
 
-        printer.info(
-            f"Maximum {fetched_repository_count} repositories will be fetched for query {query}"
-        )
-        printer.break_line()
-        printer.break_line()
+        printer.info(f"{fetched_repository_count} fetched for query {query}")
 
         page_count = math.ceil(fetched_repository_count / ITEMS_PER_PAGE)
 
@@ -148,6 +140,10 @@ def search_repositories():
                 query, page
             )
             repositories.extend(current_page_repositories)
+
+    printer.info(f"{len(repositories)} repositories will be processed")
+    printer.break_line()
+    printer.break_line()
 
     return repositories
 
