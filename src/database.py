@@ -54,6 +54,11 @@ class Database:
         printer.info(f"Repository was {'inserted' if inserted else 'updated'}")
         printer.break_line()
 
+    def get_repository(self, owner_name, name):
+        return self.repository_collection.find_one(
+            {"owner.name": owner_name, "name": name}
+        )
+
     def get_repositories(self):
         result = self.repository_collection.find()
         return list(result)
