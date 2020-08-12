@@ -4,7 +4,7 @@ import time
 from enum import Enum
 
 from database import Database
-from worker import Worker
+from import_runner import ImportRunner
 import github
 import printer
 
@@ -39,23 +39,24 @@ def handler(event, context):
         connection["password"] = event["password"]
 
     database_instance = Database(**connection)
-    worker_instance = Worker(database_instance)
 
     job = event["job"] if "job" in event else None
 
     start = time.time()
 
     if job == Job.CLEAN:
-        worker_instance.run_clean()
+        runner = ImportRunner(database_instance)
     elif job == Job.SALVAGE:
-        worker_instance.run_salvage()
+        runner = ImportRunner(database_instance)
     else:
-        worker_instance.run_import()
+        runner = ImportRunner(database_instance)
+
+    runner.run()
 
     end = time.time()
     elapsed_time = end - start
 
-    worker_instance.store_report(job, elapsed_time)
+    runner.store_report(job, elapsed_time)
 
     printer.success(f"{job} finished.")
     printer.info(f"Elapsed time: {elapsed_time}")
