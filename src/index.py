@@ -42,8 +42,6 @@ def handler(event, context):
 
     if job == "clean":
         runner = CleanRunner(database_instance)
-    elif job == "salvage":
-        runner = ImportRunner(database_instance)
     else:
         runner = ImportRunner(database_instance)
 
