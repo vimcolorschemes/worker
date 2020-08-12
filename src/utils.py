@@ -3,6 +3,7 @@ import base64
 
 import request
 import printer
+import github
 
 
 def decode_base64(data):
@@ -36,3 +37,15 @@ def find_image_urls(file_content):
         index = index + 1
 
     return valid_image_urls
+
+
+def build_raw_blog_github_url(owner_name, name, path):
+    return f"https://raw.githubusercontent.com/{owner_name}/{name}/{path}"
+
+
+def is_vim_color_scheme(owner_name, name, file):
+    response = request.get(
+        build_raw_blog_github_url(owner_name, name, file["path"]), is_json=False
+    )
+    file_content = response.text if response is not None else ""
+    return "colors_name" in file_content
