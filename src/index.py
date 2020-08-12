@@ -4,15 +4,11 @@ import time
 from enum import Enum
 
 from database import Database
-from import_runner import ImportRunner
 import github
 import printer
 
-
-class Job(Enum):
-    IMPORT = "import"
-    CLEAN = "clean"
-    SALVAGE = "salvage"
+from import_runner import ImportRunner
+from clean_runner import CleanRunner
 
 
 DATABASE_HOST = os.getenv("DATABASE_HOST")
@@ -44,9 +40,9 @@ def handler(event, context):
 
     start = time.time()
 
-    if job == Job.CLEAN:
-        runner = ImportRunner(database_instance)
-    elif job == Job.SALVAGE:
+    if job == "clean":
+        runner = CleanRunner(database_instance)
+    elif job == "salvage":
         runner = ImportRunner(database_instance)
     else:
         runner = ImportRunner(database_instance)
