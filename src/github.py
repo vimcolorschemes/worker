@@ -11,6 +11,7 @@ from requests.auth import HTTPBasicAuth
 
 import request
 import printer
+import utils
 
 GITHUB_USERNAME = os.getenv("GITHUB_USERNAME")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -32,6 +33,7 @@ REPOSITORY_LIMIT = min(GITHUB_API_HARD_LIMIT, REPOSITORY_LIMIT)
 this = sys.modules[__name__]
 this.remaining_github_api_calls = None
 this.github_api_rate_limit_reset = None
+this.file_tree_requests_left = 20
 
 
 def convert_github_string_datetime(d):
@@ -89,11 +91,7 @@ def github_core_get(url, params=None, log=None):
 
 
 def list_repositories_of_page(query, page=1):
-    items_per_page = (
-        min(REPOSITORY_LIMIT, ITEMS_PER_PAGE)
-        if REPOSITORY_LIMIT is not None
-        else ITEMS_PER_PAGE
-    )
+    items_per_page = min(REPOSITORY_LIMIT, ITEMS_PER_PAGE)
     search_path = "search/repositories"
     base_search_params = {"per_page": items_per_page}
 
@@ -109,29 +107,43 @@ def list_repositories_of_page(query, page=1):
     return repositories, total_count
 
 
-# Fetches github repositories with a defined query.
+# Fetches github repositories with defined queries.
 # If more than 100 repositories, it will search all pages one by one.
-def search_repositories(query):
+def search_repositories():
+    queries = [
+        "vim color scheme",
+        "vim colorscheme",
+        "vim colour scheme",
+        "vim colourscheme",
+    ]
+
     repositories = []
 
-    first_page_repositories, total_count = list_repositories_of_page(query)
-    repositories.extend(first_page_repositories)
+    for query in queries:
+        query = f"{query} NOT dotfiles sort:stars stars:>=5"
 
-    fetched_repository_count = (
-        min(REPOSITORY_LIMIT, total_count)
-        if REPOSITORY_LIMIT is not None
-        else total_count
-    )
+        first_page_repositories, total_count = list_repositories_of_page(query)
+        repositories.extend(first_page_repositories)
 
-    printer.info(f"Maximum {fetched_repository_count} repositories will be fetched")
+        fetched_repository_count = (
+            min(REPOSITORY_LIMIT, total_count)
+            if REPOSITORY_LIMIT is not None
+            else total_count
+        )
+
+        printer.info(f"{fetched_repository_count} fetched for query {query}")
+
+        page_count = math.ceil(fetched_repository_count / ITEMS_PER_PAGE)
+
+        for page in range(2, page_count + 1):
+            current_page_repositories, _total_count = list_repositories_of_page(
+                query, page
+            )
+            repositories.extend(current_page_repositories)
+
+    printer.info(f"{len(repositories)} repositories will be processed")
     printer.break_line()
     printer.break_line()
-
-    page_count = math.ceil(fetched_repository_count / ITEMS_PER_PAGE)
-
-    for page in range(2, page_count + 1):
-        current_page_repositories, _total_count = list_repositories_of_page(query, page)
-        repositories.extend(current_page_repositories)
 
     return repositories
 
@@ -147,7 +159,9 @@ def map_response_item_to_repository(response_item):
         "homepage_url": response_item["homepage"],
         "stargazers_count": response_item["stargazers_count"],
         "pushed_at": convert_github_string_datetime(response_item["pushed_at"]),
-        "github_created_at": convert_github_string_datetime(response_item["created_at"]),
+        "github_created_at": convert_github_string_datetime(
+            response_item["created_at"]
+        ),
         "owner": {
             "name": response_item["owner"]["login"],
             "avatar_url": response_item["owner"]["avatar_url"],
@@ -155,10 +169,7 @@ def map_response_item_to_repository(response_item):
     }
 
 
-def get_last_commit_at(repository):
-    owner_name = repository["owner"]["name"]
-    name = repository["name"]
-
+def get_last_commit_at(owner_name, name):
     commits_path = f"repos/{owner_name}/{name}/commits"
 
     commits = github_core_get(
@@ -181,49 +192,13 @@ def get_last_commit_at(repository):
     return None
 
 
-def get_raw_github_image_url(tree_object, repository):
-    parent_path = ""
-    if (
-        "parent_tree_object" in tree_object
-        and "path" in tree_object["parent_tree_object"]
-    ):
-        parent_path = f"{tree_object['parent_tree_object']['path']}/"
-    image_path = f"{parent_path}{tree_object['path']}"
-
-    # TODO Investigate a better way to come up with this url
-    # without making an additional call
-    return f"https://raw.githubusercontent.com/{repository['owner']['name']}/{repository['name']}/{repository['default_branch']}/{image_path}"
-
-
-def find_image_urls_in_tree_objects(
-    tree_objects, repository, image_count_to_find, current_image_urls
-):
-    image_urls = []
-    for tree_object in tree_objects:
-        basic_image_regex = r"^.*\.(png|jpe?g|webp)$"
-        if re.match(basic_image_regex, tree_object["path"]):
-            image_url = get_raw_github_image_url(tree_object, repository)
-            if image_url not in current_image_urls and request.is_image_url_valid(
-                image_url
-            ):
-                image_urls.append(image_url)
-                if len(image_urls) == image_count_to_find:
-                    break
-    return image_urls
-
-
-def list_objects_of_tree(repository, tree_sha, path):
-    owner_name = repository["owner"]["name"]
-    name = repository["name"]
-
-    tree_path = (
-        f"repos/{repository['owner']['name']}/{repository['name']}/git/trees/{tree_sha}"
-    )
+def list_objects_of_tree(owner_name, name, tree_sha):
+    tree_path = f"repos/{owner_name}/{name}/git/trees/{tree_sha}"
     data = github_core_get(
         f"{BASE_URL}/{tree_path}",
-        log=f"GET {owner_name}/{name} objects of tree {path}",
+        log=f"GET {owner_name}/{name} objects of tree {tree_path}",
     )
-    return data["tree"]
+    return data["tree"] if data is not None and "tree" in data else []
 
 
 def get_tree_path(tree_object):
@@ -235,62 +210,42 @@ def get_tree_path(tree_object):
     return path
 
 
-def list_repository_image_urls(repository, image_count_to_find, current_image_urls):
-    if image_count_to_find <= 0:
+def get_files_of_tree(owner_name, name, tree_sha, tree_path):
+    if this.file_tree_requests_left <= 0:
         return []
 
-    image_urls = []
+    tree_objects = list_objects_of_tree(owner_name, name, tree_sha)
+    this.file_tree_requests_left -= 1
 
-    tree_objects = list_objects_of_tree(
-        repository, repository["default_branch"], repository["default_branch"]
-    )
+    files = [obj for obj in tree_objects if obj["type"] == "blob"]
+    trees = [obj for obj in tree_objects if obj["type"] == "tree"]
 
-    image_urls.extend(
-        find_image_urls_in_tree_objects(
-            tree_objects, repository, image_count_to_find, current_image_urls
+    tree_files = []
+    for tree in trees:
+        tree_files = tree_files + get_files_of_tree(
+            owner_name, name, tree["sha"], f"{tree_path}/{tree['path']}"
         )
-    )
 
-    image_count_to_find = image_count_to_find - len(image_urls)
-
-    for tree_object in tree_objects:
-        if image_count_to_find <= 0:
-            break
-
-        if tree_object["type"] == "tree":
-            tree_objects_of_tree = list_objects_of_tree(
-                repository, tree_object["sha"], get_tree_path(tree_object)
-            )
-
-            tree_objects_of_tree = list(
-                map(
-                    lambda child_object: {
-                        **child_object,
-                        "parent_tree_object": tree_object,
-                    },
-                    tree_objects_of_tree,
-                )
-            )
-
-            image_urls.extend(
-                find_image_urls_in_tree_objects(
-                    tree_objects_of_tree,
-                    repository,
-                    image_count_to_find,
-                    current_image_urls,
-                )
-            )
-
-            image_count_to_find = image_count_to_find - len(image_urls)
-
-    return image_urls
+    return [
+        {**file, "path": f"{tree_path}/{file['path']}"} for file in files
+    ] + tree_files
 
 
-def get_readme_file(repository):
+def get_repository_files(repository):
     owner_name = repository["owner"]["name"]
     name = repository["name"]
 
-    if not owner_name or not name:
+    printer.info(f"Getting files for {owner_name}/{name}")
+
+    this.file_tree_requests_left = 20
+
+    return get_files_of_tree(
+        owner_name, name, repository["default_branch"], repository["default_branch"]
+    )
+
+
+def get_readme_file(owner_name, name):
+    if owner_name is None or name is None:
         return ""
 
     get_readme_path = f"repos/{owner_name}/{name}/readme"
@@ -299,10 +254,7 @@ def get_readme_file(repository):
         f"{BASE_URL}/{get_readme_path}", log=f"GET {owner_name}/{name} readme"
     )
 
-    if not readme_data:
+    if readme_data is None:
         return ""
 
-    file_data = readme_data["content"]
-    base64_bytes = file_data.encode("utf-8")
-    bytes = base64.b64decode(base64_bytes)
-    return bytes.decode("utf-8")
+    return utils.decode_base64(readme_data["content"])

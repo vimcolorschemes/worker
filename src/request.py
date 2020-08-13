@@ -60,10 +60,14 @@ VALID_IMAGE_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"]
 
 
 def is_image_url_valid(url):
-    printer.info(f"HEAD image at url {url}")
-    response = requests.head(url, allow_redirects=True)
-    if response.status_code == 200:
-        content_type = response.headers["Content-Type"]
-        if content_type in VALID_IMAGE_CONTENT_TYPES:
-            return True
-    return False
+    try:
+        printer.info(f"HEAD image at url {url}")
+        response = requests.head(url, allow_redirects=True)
+        if response.status_code == 200:
+            content_type = response.headers["Content-Type"]
+            if content_type in VALID_IMAGE_CONTENT_TYPES:
+                return True
+        return False
+    except Exception as e:
+        printer.error(e)
+        return False

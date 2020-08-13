@@ -1,13 +1,15 @@
 import os
 import sys
 import time
+from enum import Enum
 
 from database import Database
-from worker import Worker
 import github
 import printer
 
-COLOR_SCHEME_QUERY = os.getenv("COLOR_SCHEME_QUERY")
+from import_runner import ImportRunner
+from clean_runner import CleanRunner
+
 
 DATABASE_HOST = os.getenv("DATABASE_HOST")
 DATABASE_USERNAME = os.getenv("DATABASE_USERNAME")
@@ -22,48 +24,9 @@ if DATABASE_PASSWORD is not None and DATABASE_PASSWORD != "":
     connection["password"] = DATABASE_PASSWORD
 
 
-def run_import(event, worker_instance):
-    start = time.time()
-
-    last_import_at = worker_instance.get_last_import_at()
-
-    query = event["query"] if "query" in event else COLOR_SCHEME_QUERY
-    repositories = github.search_repositories(query)
-    for repository in repositories:
-        worker_instance.update_repository(repository, last_import_at)
-
-    end = time.time()
-
-    elapsed_time = end - start
-
-    worker_instance.create_import(elapsed_time)
-
-    worker_instance.call_build_webhook()
-
-    printer.success("Import finished.")
-    printer.info(f"Elapsed time: {elapsed_time}")
-
-    return {"statusCode": 200, "elapsed_time": elapsed_time}
-
-
-def run_clean(worker_instance):
-    start = time.time()
-    image_removed_count = worker_instance.clean_repositories()
-    end = time.time()
-    elapsed_time = end - start
-
-    printer.success("Cleanup finished.")
-    printer.info(f"Images removed: {image_removed_count}")
-    printer.info(f"Elapsed time: {elapsed_time}")
-
-    return {
-        "statusCode": 200,
-        "image_removed_count": image_removed_count,
-        "elapsed_time": elapsed_time,
-    }
-
-
 def handler(event, context):
+    start = time.time()
+
     if "host" in event:
         connection["host"] = event["host"]
     if "username" in event:
@@ -72,14 +35,27 @@ def handler(event, context):
         connection["password"] = event["password"]
 
     database_instance = Database(**connection)
-    worker_instance = Worker(database_instance)
 
-    if "work" in event and event["work"] == "clean":
-        return run_clean(worker_instance)
+    job = event["job"] if "job" in event else None
+
+    start = time.time()
+
+    if job == "clean":
+        runner = CleanRunner(database_instance)
     else:
-        return run_import(event, worker_instance)
+        runner = ImportRunner(database_instance)
+
+    runner.run()
+
+    end = time.time()
+    elapsed_time = end - start
+
+    runner.store_report(job, elapsed_time)
+
+    printer.success(f"{job} finished.")
+    printer.info(f"Elapsed time: {elapsed_time}")
 
 
 if __name__ == "__main__":
     work = sys.argv[1] if len(sys.argv) > 1 else "import"
-    handler({"work": work}, None)
+    handler({"job": work}, None)
