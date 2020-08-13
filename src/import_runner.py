@@ -52,6 +52,17 @@ class ImportRunner(Runner):
 
             self.database.upsert_repository(repository)
 
+        call_build_webhook()
+
+
+def call_build_webhook():
+    if BUILD_WEBHOOK is not None and BUILD_WEBHOOK != "":
+        printer.break_line()
+        printer.info("Starting website build")
+        response = request.post(BUILD_WEBHOOK, is_json=False,)
+        printer.info(f"Response: {response}")
+        printer.break_line()
+
 
 def is_update_due(old_repository, last_commit_at, last_import_at):
     # if the repository is new, update
