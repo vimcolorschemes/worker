@@ -31,10 +31,8 @@ class ImportRunner(Runner):
             repository["last_commit_at"] = github.get_last_commit_at(owner_name, name)
 
             old_repository = self.database.get_repository(owner_name, name)
-            if (
-                is_update_due(
-                    old_repository, repository["last_commit_at"], self.last_import_at
-                )
+            if is_update_due(
+                old_repository, repository["last_commit_at"], self.last_import_at
             ):
                 printer.info("Update is due")
                 files = github.get_repository_files(repository)
@@ -46,6 +44,10 @@ class ImportRunner(Runner):
                     repository["image_urls"] = get_repository_image_urls(
                         owner_name, name, files
                     )
+                else:
+                    printer.info("Repository is not a valid vim color scheme")
+            else:
+                printer.info("Repository is due for a content update")
 
             self.database.upsert_repository(repository)
 
