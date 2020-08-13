@@ -35,7 +35,6 @@ class ImportRunner(Runner):
                 is_update_due(
                     old_repository, repository["last_commit_at"], self.last_import_at
                 )
-                or True
             ):
                 printer.info("Update is due")
                 files = github.get_repository_files(repository)
