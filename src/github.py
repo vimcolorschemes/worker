@@ -198,7 +198,7 @@ def list_objects_of_tree(owner_name, name, tree_sha):
         f"{BASE_URL}/{tree_path}",
         log=f"GET {owner_name}/{name} objects of tree {tree_path}",
     )
-    return data["tree"]
+    return data["tree"] if data is not None and "tree" in data else []
 
 
 def get_tree_path(tree_object):
