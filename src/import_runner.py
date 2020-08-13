@@ -41,14 +41,19 @@ class ImportRunner(Runner):
                 ] = get_repository_vim_color_scheme_file_paths(owner_name, name, files)
                 repository["valid"] = len(repository["vim_color_scheme_file_paths"]) > 0
                 if repository["valid"]:
+                    old_repository_image_urls = (
+                        old_repository["image_urls"]
+                        if old_repository is not None and "image_urls" in old_repository
+                        else []
+                    )
                     repository["image_urls"] = get_repository_image_urls(
-                        owner_name, name, files
+                        owner_name, name, files, old_repository_image_urls
                     )
                 else:
                     repository["image_urls"] = []
                     printer.info("Repository is not a valid vim color scheme")
             else:
-                printer.info("Repository is due for a content update")
+                printer.info("Repository is not due for a content update")
 
             self.database.upsert_repository(repository)
 
@@ -81,14 +86,19 @@ def is_update_due(old_repository, last_commit_at, last_import_at):
     return last_commit_at > last_import_at
 
 
-def get_repository_image_urls(owner_name, name, files):
+def get_repository_image_urls(owner_name, name, files, old_image_urls):
+    max_image_count_left = MAX_IMAGE_COUNT - len(old_image_urls)
+
+    if max_image_count_left <= 0:
+        return old_image_urls
+
     readme_file = github.get_readme_file(owner_name, name)
-    image_urls = utils.find_image_urls(readme_file, MAX_IMAGE_COUNT)
+    image_urls = utils.find_image_urls(readme_file, max_image_count_left)
 
-    if len(image_urls) >= MAX_IMAGE_COUNT:
+    max_image_count_left -= len(image_urls)
+
+    if max_image_count_left <= 0:
         return image_urls
-
-    max_image_count_left = MAX_IMAGE_COUNT - len(image_urls)
 
     image_files = list(
         filter(lambda file: re.match(IMAGE_PATH_REGEX, file["path"]), files)
