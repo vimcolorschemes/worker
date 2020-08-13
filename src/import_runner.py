@@ -45,6 +45,7 @@ class ImportRunner(Runner):
                         owner_name, name, files
                     )
                 else:
+                    repository["image_urls"] = []
                     printer.info("Repository is not a valid vim color scheme")
             else:
                 printer.info("Repository is due for a content update")
