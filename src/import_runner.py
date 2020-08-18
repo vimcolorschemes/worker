@@ -4,6 +4,7 @@ import re
 import github
 import printer
 import utils
+import request
 from runner import Runner
 
 MAX_IMAGE_COUNT = os.getenv("MAX_IMAGE_COUNT")
