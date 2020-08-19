@@ -120,7 +120,7 @@ def search_repositories():
     repositories = []
 
     for query in queries:
-        query = f"{query} NOT dotfiles sort:stars stars:>=5"
+        query = f"{query} NOT dotfiles sort:stars stars:>=0"
 
         first_page_repositories, total_count = list_repositories_of_page(query)
         repositories.extend(first_page_repositories)
