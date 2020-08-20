@@ -41,9 +41,9 @@ def handler(event, context):
     start = time.time()
 
     if job == "clean":
-        runner = CleanRunner(database_instance)
+        runner = CleanRunner(database_instance, "clean")
     else:
-        runner = ImportRunner(database_instance)
+        runner = ImportRunner(database_instance, "import")
 
     runner.run()
 

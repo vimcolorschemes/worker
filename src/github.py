@@ -37,6 +37,9 @@ this.file_tree_requests_left = 20
 
 
 def convert_github_string_datetime(d):
+    if d is None:
+        return None
+
     # GitHub format: 2020-07-16T19:23:44Z
     unaware = datetime.datetime.strptime(d, "%Y-%m-%dT%H:%M:%SZ")
     aware = unaware.replace(tzinfo=pytz.UTC)
