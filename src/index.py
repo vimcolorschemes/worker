@@ -37,7 +37,7 @@ def handler(event, context):
 
     database_instance = Database(**connection)
 
-    job = event["job"] if "job" in event else None
+    job = event["job"] if "job" in event else "import"
 
     start = time.time()
 
