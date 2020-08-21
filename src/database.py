@@ -17,16 +17,16 @@ class Database:
             codec_options=CodecOptions(tz_aware=True)
         )
 
-    def get_last_import_at(self):
+    def get_last_job_at(self, job):
         printer.break_line(2)
         printer.info("GET last import")
-        printer.break_line(2)
+        printer.break_line()
 
         result = self.report_collection.find_one(
-            {"job": "import"}, sort=[("created_at", pymongo.DESCENDING)]
+            {"job": job}, sort=[("created_at", pymongo.DESCENDING)]
         )
-        last_import_at = result["created_at"] if result is not None else None
-        return last_import_at
+        last_job_at = result["created_at"] if result is not None else None
+        return last_job_at
 
     def create_report(self, report_data):
         printer.info("CREATE report")
