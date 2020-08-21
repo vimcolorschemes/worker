@@ -60,7 +60,15 @@ Then source it:
 source .env
 ```
 
-Start the script with `python3 src/index.py`
+### Run the script
+
+To run the script using the default event (`import`), run `python3 src/index.py`.
+
+2 other events are supported: `update` and `clean`. To run them, pass the name of the event as an argument to the python script. Ex.: `python3 src/index.py update`.
+
+To have data ready to use on the app, you should run both `import` and `update` in that order.
+
+[Read more on the events](https://github.com/reobin/vimcolorschemes/wiki/The-Worker)
 
 ## Deployment to Lambda
 
