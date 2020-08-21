@@ -9,6 +9,7 @@ import printer
 
 from import_runner import ImportRunner
 from clean_runner import CleanRunner
+from update_runner import UpdateRunner
 
 
 DATABASE_HOST = os.getenv("DATABASE_HOST")
@@ -42,6 +43,8 @@ def handler(event, context):
 
     if job == "clean":
         runner = CleanRunner(database_instance, "clean")
+    elif job == "update":
+        runner = UpdateRunner(database_instance, "update")
     else:
         runner = ImportRunner(database_instance, "import")
 

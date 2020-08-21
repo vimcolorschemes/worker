@@ -20,7 +20,10 @@ VIM_COLLECTION_THRESHOLD = 20
 
 class UpdateRunner(Runner):
     def run(self):
-        repositories = database.get_repositories()
+        repositories = self.database.get_repositories()
+
+        printer.info(f"Running import on {len(repositories)} repositories")
+        printer.break_line()
 
         for repository in repositories:
             owner_name = repository["owner"]["name"]
