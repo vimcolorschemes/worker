@@ -1,3 +1,4 @@
+import datetime
 import os
 import re
 
@@ -55,6 +56,7 @@ class UpdateRunner(Runner):
                 else:
                     repository["image_urls"] = []
                     printer.info("Repository is not a valid vim color scheme")
+                repository["fetched_at"] = datetime.datetime.now()
             else:
                 printer.info("Repository is not due for a content fetch")
 
@@ -73,8 +75,8 @@ def call_build_webhook():
 
 
 def is_fetch_due(old_repository, last_commit_at, last_job_at):
-    # if the repository is new, fetch
-    if old_repository is None:
+    # if the repository is new or has never been updated before, fetch
+    if old_repository is None or "fetched_at" not in old_repository:
         return True
 
     # if the repository was deemed invalid before, don't fetch
