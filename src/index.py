@@ -25,21 +25,10 @@ if DATABASE_PASSWORD is not None and DATABASE_PASSWORD != "":
     connection["password"] = DATABASE_PASSWORD
 
 
-def handler(event, context):
+def start(job):
     start = time.time()
-
-    if "host" in event:
-        connection["host"] = event["host"]
-    if "username" in event:
-        connection["username"] = event["username"]
-    if "password" in event:
-        connection["password"] = event["password"]
 
     database_instance = Database(**connection)
-
-    job = event["job"] if "job" in event else "import"
-
-    start = time.time()
 
     if job == "clean":
         runner = CleanRunner(database_instance, "clean")
@@ -48,17 +37,22 @@ def handler(event, context):
     else:
         runner = ImportRunner(database_instance, "import")
 
-    runner.run()
+    result = runner.run()
+    if result is None:
+        result = {}
 
     end = time.time()
     elapsed_time = end - start
 
-    runner.store_report(job, elapsed_time)
+    runner.store_report(job, elapsed_time, result)
 
-    printer.success(f"{job} finished.")
-    printer.info(f"Elapsed time: {elapsed_time}")
+
+# AWS Lambda
+def handler(event, context):
+    job = event["job"] if "job" in event else "import"
+    start(job)
 
 
 if __name__ == "__main__":
-    work = sys.argv[1] if len(sys.argv) > 1 else "import"
-    handler({"job": work}, None)
+    job = sys.argv[1] if len(sys.argv) > 1 else "import"
+    start(job)
