@@ -48,7 +48,7 @@ def get_clean_image_urls(repository):
         filter(lambda image_url: request.is_image_url_valid(image_url), image_urls)
     )
 
-    image_removed_count = len(image_urls) - initial_count
+    image_removed_count = initial_count - len(image_urls)
     printer.info(f"Removed {image_removed_count} images")
 
     return image_urls, image_removed_count
