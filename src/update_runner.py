@@ -37,8 +37,11 @@ class UpdateRunner(Runner):
             repository["last_commit_at"] = github.get_last_commit_at(owner_name, name)
 
             old_repository = self.database.get_repository(owner_name, name)
-            if is_fetch_due(
-                old_repository, repository["last_commit_at"], self.last_job_at
+            if (
+                is_fetch_due(
+                    old_repository, repository["last_commit_at"], self.last_job_at
+                )
+                or True
             ):
                 printer.info("Fetch is due")
                 files = github.get_repository_files(repository)
@@ -65,6 +68,8 @@ class UpdateRunner(Runner):
             self.database.upsert_repository(repository)
 
         call_build_webhook()
+
+        return {"repository_count": len(repositories)}
 
 
 def call_build_webhook():
@@ -94,30 +99,51 @@ def is_fetch_due(old_repository, last_commit_at, last_job_at):
 
 
 def get_repository_image_urls(owner_name, name, files, old_image_urls):
-    max_image_count_left = MAX_IMAGE_COUNT - len(old_image_urls)
+    image_urls = old_image_urls
+    max_image_count_left = MAX_IMAGE_COUNT - len(image_urls)
 
-    if max_image_count_left <= 0:
-        return old_image_urls
-
-    readme_file = github.get_readme_file(owner_name, name)
-    image_urls = utils.find_image_urls(readme_file, max_image_count_left)
-
-    max_image_count_left -= len(image_urls)
-
-    if max_image_count_left <= 0:
-        return image_urls
-
-    image_files = list(
-        filter(lambda file: re.match(IMAGE_PATH_REGEX, file["path"]), files)
-    )[0:max_image_count_left]
-
-    image_urls = image_urls + list(
-        map(
-            lambda file: utils.build_raw_blog_github_url(
-                owner_name, name, file["path"]
-            ),
-            image_files,
+    # search readme
+    if max_image_count_left > 0:
+        image_urls.extend(
+            get_image_urls_from_readme(
+                owner_name, name, old_image_urls, max_image_count_left
+            )
         )
+        max_image_count_left -= len(image_urls)
+
+    # search file tree
+    if max_image_count_left > 0:
+        image_files = list(
+            filter(lambda file: re.match(IMAGE_PATH_REGEX, file["path"]), files)
+        )
+        file_tree_image_urls = get_new_image_urls(
+            list(
+                map(
+                    lambda file: utils.build_raw_blog_github_url(
+                        owner_name, name, file["path"]
+                    ),
+                    image_files,
+                )
+            ),
+            image_urls,
+        )[0:max_image_count_left]
+        image_urls.extend(file_tree_image_urls)
+
+    return utils.remove_duplicates(image_urls)
+
+
+def get_new_image_urls(potentially_new_image_urls, old_image_urls):
+    return [
+        image_url
+        for image_url in potentially_new_image_urls
+        if image_url not in old_image_urls
+    ]
+
+
+def get_image_urls_from_readme(owner_name, name, old_image_urls, max_image_count_left):
+    readme_file = github.get_readme_file(owner_name, name)
+    image_urls = utils.find_image_urls(
+        readme_file, old_image_urls, max_image_count_left
     )
     return image_urls
 

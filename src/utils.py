@@ -16,7 +16,7 @@ def decode_base64(data):
         return ""
 
 
-def find_image_urls(file_content, max_image_count):
+def find_image_urls(file_content, old_image_urls=[], max_image_count=None):
     image_url_regex = r"\b(https?:\/\/\S+(?:png|jpe?g|webp))\b"
     standard_image_urls = re.findall(image_url_regex, file_content)
 
@@ -30,9 +30,11 @@ def find_image_urls(file_content, max_image_count):
     valid_image_urls = []
     index = 0
 
-    while len(valid_image_urls) < max_image_count and index < len(image_urls):
+    while (
+        max_image_count is None or len(valid_image_urls) < max_image_count
+    ) and index < len(image_urls):
         image_url = image_urls[index]
-        if request.is_image_url_valid(image_url):
+        if image_url not in old_image_urls and request.is_image_url_valid(image_url):
             valid_image_urls.append(image_url)
         index = index + 1
 
@@ -49,3 +51,7 @@ def is_vim_color_scheme(owner_name, name, file):
     )
     file_content = response.text if response is not None else ""
     return "colors_name" in file_content
+
+
+def remove_duplicates(item_list):
+    return list(dict.fromkeys(item_list))
