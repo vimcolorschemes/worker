@@ -43,9 +43,9 @@ class UpdateRunner(Runner):
                 printer.info("Fetch is due")
                 files = github.get_repository_files(repository)
                 repository[
-                    "vim_color_scheme_file_paths"
-                ] = get_repository_vim_color_scheme_file_paths(owner_name, name, files)
-                repository["valid"] = len(repository["vim_color_scheme_file_paths"]) > 0
+                    "vim_color_scheme_names"
+                ] = get_repository_vim_color_scheme_names(owner_name, name, files)
+                repository["valid"] = len(repository["vim_color_scheme_names"]) > 0
                 if repository["valid"]:
                     old_repository_image_urls = (
                         old_repository["image_urls"]
@@ -122,7 +122,7 @@ def get_repository_image_urls(owner_name, name, files, old_image_urls):
     return image_urls
 
 
-def get_repository_vim_color_scheme_file_paths(owner_name, name, files):
+def get_repository_vim_color_scheme_names(owner_name, name, files):
     vim_files = list(
         filter(
             lambda file: re.match(POTENTIAL_VIM_COLOR_SCHEME_PATH_REGEX, file["path"]),
@@ -131,12 +131,12 @@ def get_repository_vim_color_scheme_file_paths(owner_name, name, files):
     )
 
     if len(vim_files) < VIM_COLLECTION_THRESHOLD:
-        vim_color_scheme_files = list(
+        vim_color_scheme_names = list(
             filter(
-                lambda file: utils.is_vim_color_scheme(owner_name, name, file),
+                lambda file: utils.get_vim_color_scheme_name(owner_name, name, file),
                 vim_files,
             )
         )
-        return list(map(lambda file: file["path"], vim_color_scheme_files))
+        return vim_color_scheme_names
 
     return []
