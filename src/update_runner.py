@@ -26,6 +26,8 @@ class UpdateRunner(Runner):
         printer.info(f"Running import on {len(repositories)} repositories")
         printer.break_line()
 
+        github.get_rate_limit()
+
         for repository in repositories:
             owner_name = repository["owner"]["name"]
             name = repository["name"]
