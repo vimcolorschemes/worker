@@ -37,11 +37,8 @@ class UpdateRunner(Runner):
             repository["last_commit_at"] = github.get_last_commit_at(owner_name, name)
 
             old_repository = self.database.get_repository(owner_name, name)
-            if (
-                is_fetch_due(
-                    old_repository, repository["last_commit_at"], self.last_job_at
-                )
-                or True
+            if is_fetch_due(
+                old_repository, repository["last_commit_at"], self.last_job_at
             ):
                 printer.info("Fetch is due")
                 files = github.get_repository_files(repository)
