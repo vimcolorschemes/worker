@@ -18,6 +18,8 @@ POTENTIAL_VIM_COLOR_SCHEME_PATH_REGEX = r"^.*\.(vim|erb)$"
 
 VIM_COLLECTION_THRESHOLD = 20
 
+DAYS_IN_MONTH = 30
+
 
 class UpdateRunner(Runner):
     def run(self):
@@ -35,6 +37,10 @@ class UpdateRunner(Runner):
             printer.info(repository["github_url"])
 
             repository["last_commit_at"] = github.get_last_commit_at(owner_name, name)
+
+            repository["stargazers_count_history"] = update_stargazers_count_history(
+                repository
+            )
 
             old_repository = self.database.get_repository(owner_name, name)
             if is_fetch_due(
@@ -163,3 +169,34 @@ def get_repository_vim_color_scheme_file_paths(owner_name, name, files):
         return list(map(lambda file: file["path"], vim_color_scheme_files))
 
     return []
+
+
+def update_stargazers_count_history(repository):
+    history = (
+        repository["stargazers_count_history"]
+        if "stargazers_count_history" in repository
+        else []
+    )
+    if history is None:
+        history = []
+
+    if len(history) > 0:
+        history.sort(key=lambda entry: entry["date"])
+
+    today = datetime.date.today().isoformat()
+
+    matching_indexes = [
+        index if entry["date"] == today else -1 for index, entry in enumerate(history)
+    ]
+    matching_indexes.sort(reverse=True)
+    for index in list(filter(lambda index: index != -1, matching_indexes)):
+        del history[index]
+
+    if len(history) >= DAYS_IN_MONTH:
+        history.pop()
+
+    history.append(
+        {"date": today, "stargazers_count": repository["stargazers_count"],}
+    )
+
+    return history
