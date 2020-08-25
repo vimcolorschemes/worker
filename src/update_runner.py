@@ -132,7 +132,7 @@ def get_repository_vim_color_scheme_names(owner_name, name, files):
 
     if len(vim_files) < VIM_COLLECTION_THRESHOLD:
         vim_color_scheme_names = list(
-            filter(
+            map(
                 lambda file: utils.get_vim_color_scheme_name(owner_name, name, file),
                 vim_files,
             )
