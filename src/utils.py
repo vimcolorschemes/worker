@@ -41,18 +41,3 @@ def find_image_urls(file_content, max_image_count):
 
 def build_raw_blog_github_url(owner_name, name, path):
     return f"https://raw.githubusercontent.com/{owner_name}/{name}/{path}"
-
-
-def get_vim_color_scheme_name(owner_name, name, file):
-    vim_color_scheme_name = None
-    response = request.get(
-        build_raw_blog_github_url(owner_name, name, file["path"]), is_json=False
-    )
-    file_content = response.text if response is not None else ""
-
-    match = re.search(r"let (g:)?colors?_name ?= ?('|\")([a-zA-Z-_0-9]+)('|\")", file_content)
-    if match is not None:
-        vim_color_scheme_name = match.group(3)
-        printer.info(f"{name} vim color scheme name is {vim_color_scheme_name}")
-
-    return vim_color_scheme_name

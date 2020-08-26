@@ -1,4 +1,5 @@
 import datetime
+import functools
 import os
 import re
 
@@ -132,11 +133,39 @@ def get_repository_vim_color_scheme_names(owner_name, name, files):
 
     if len(vim_files) < VIM_COLLECTION_THRESHOLD:
         vim_color_scheme_names = list(
-            map(
-                lambda file: utils.get_vim_color_scheme_name(owner_name, name, file),
+            functools.reduce(
+                lambda acc, file_data: add_vim_color_scheme_name(
+                    owner_name, name, acc, file_data
+                ),
                 vim_files,
+                [],
             )
         )
         return vim_color_scheme_names
 
     return []
+
+
+def add_vim_color_scheme_name(owner_name, name, vim_color_scheme_names, file_data):
+    value = get_vim_color_scheme_name(owner_name, name, file_data)
+    if value is not None and value != "":
+        return vim_color_scheme_names + [value]
+    return vim_color_scheme_names
+
+
+def get_vim_color_scheme_name(owner_name, name, file_data):
+    vim_color_scheme_name = None
+    response = request.get(
+        utils.build_raw_blog_github_url(owner_name, name, file_data["path"]),
+        is_json=False,
+    )
+    file_content = response.text if response is not None else ""
+
+    match = re.search(
+        r"let (g:)?colors?_name ?= ?('|\")([a-zA-Z-_0-9]+)('|\")", file_content
+    )
+    if match is not None:
+        vim_color_scheme_name = match.group(3)
+        printer.info(f"{name} vim color scheme name is {vim_color_scheme_name}")
+
+    return vim_color_scheme_name
