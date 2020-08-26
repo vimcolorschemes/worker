@@ -1,4 +1,5 @@
 import datetime
+import functools
 import os
 import re
 
@@ -49,9 +50,9 @@ class UpdateRunner(Runner):
                 printer.info("Fetch is due")
                 files = github.get_repository_files(repository)
                 repository[
-                    "vim_color_scheme_file_paths"
-                ] = get_repository_vim_color_scheme_file_paths(owner_name, name, files)
-                repository["valid"] = len(repository["vim_color_scheme_file_paths"]) > 0
+                    "vim_color_scheme_names"
+                ] = get_repository_vim_color_scheme_names(owner_name, name, files)
+                repository["valid"] = len(repository["vim_color_scheme_names"]) > 0
                 if repository["valid"]:
                     old_repository_image_urls = (
                         old_repository["image_urls"]
@@ -151,7 +152,7 @@ def get_image_urls_from_readme(owner_name, name, old_image_urls, max_image_count
     return image_urls
 
 
-def get_repository_vim_color_scheme_file_paths(owner_name, name, files):
+def get_repository_vim_color_scheme_names(owner_name, name, files):
     vim_files = list(
         filter(
             lambda file: re.match(POTENTIAL_VIM_COLOR_SCHEME_PATH_REGEX, file["path"]),
@@ -160,13 +161,16 @@ def get_repository_vim_color_scheme_file_paths(owner_name, name, files):
     )
 
     if len(vim_files) < VIM_COLLECTION_THRESHOLD:
-        vim_color_scheme_files = list(
-            filter(
-                lambda file: utils.is_vim_color_scheme(owner_name, name, file),
+        vim_color_scheme_names = list(
+            functools.reduce(
+                lambda acc, file_data: add_vim_color_scheme_name(
+                    owner_name, name, acc, file_data
+                ),
                 vim_files,
+                [],
             )
         )
-        return list(map(lambda file: file["path"], vim_color_scheme_files))
+        return vim_color_scheme_names
 
     return []
 
@@ -200,3 +204,28 @@ def update_stargazers_count_history(repository):
     )
 
     return history
+
+
+def add_vim_color_scheme_name(owner_name, name, vim_color_scheme_names, file_data):
+    value = get_vim_color_scheme_name(owner_name, name, file_data)
+    if value is not None and value != "":
+        return vim_color_scheme_names + [value]
+    return vim_color_scheme_names
+
+
+def get_vim_color_scheme_name(owner_name, name, file_data):
+    vim_color_scheme_name = None
+    response = request.get(
+        utils.build_raw_blog_github_url(owner_name, name, file_data["path"]),
+        is_json=False,
+    )
+    file_content = response.text if response is not None else ""
+
+    match = re.search(
+        r"let (g:)?colors?_name ?= ?('|\")([a-zA-Z-_0-9]+)('|\")", file_content
+    )
+    if match is not None:
+        vim_color_scheme_name = match.group(3)
+        printer.info(f"{name} vim color scheme name is {vim_color_scheme_name}")
+
+    return vim_color_scheme_name
