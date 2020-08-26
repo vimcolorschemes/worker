@@ -43,3 +43,7 @@ def find_image_urls(file_content, old_image_urls=[], max_image_count=None):
 
 def build_raw_blog_github_url(owner_name, name, path):
     return f"https://raw.githubusercontent.com/{owner_name}/{name}/{path}"
+
+
+def remove_duplicates(item_list):
+    return list(dict.fromkeys(item_list))
