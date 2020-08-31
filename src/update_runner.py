@@ -44,16 +44,33 @@ class UpdateRunner(Runner):
             )
 
             old_repository = self.database.get_repository(owner_name, name)
-            if is_fetch_due(
+            is_fetch_due = compute_is_fetch_due(
                 old_repository, repository["last_commit_at"], self.last_job_at
+            )
+            cleaned_recently = (
+                "cleaned_recently" in old_repository
+                and old_repository["cleaned_recently"] is True
+            )
+
+            if is_fetch_due or (
+                "valid" in repository
+                and repository["valid"] is True
+                and cleaned_recently
             ):
-                printer.info("Fetch is due")
                 files = github.get_repository_files(repository)
-                repository[
-                    "vim_color_scheme_names"
-                ] = get_repository_vim_color_scheme_names(owner_name, name, files)
-                repository["valid"] = len(repository["vim_color_scheme_names"]) > 0
-                if repository["valid"]:
+
+                if is_fetch_due:
+                    printer.info("vim fetch due")
+                    repository[
+                        "vim_color_scheme_names"
+                    ] = get_repository_vim_color_scheme_names(owner_name, name, files)
+                    repository["valid"] = len(repository["vim_color_scheme_names"]) > 0
+                    repository["vim_fetched_at"] = datetime.datetime.now()
+                else:
+                    printer.info("vim fetch not due")
+
+                if repository["valid"] is True:
+                    printer.info("images fetch is due")
                     old_repository_image_urls = (
                         old_repository["image_urls"]
                         if old_repository is not None and "image_urls" in old_repository
@@ -62,12 +79,16 @@ class UpdateRunner(Runner):
                     repository["image_urls"] = get_repository_image_urls(
                         owner_name, name, files, old_repository_image_urls
                     )
+                    repository["images_fetched_at"] = datetime.datetime.now()
+                    repository["cleaned_recently"] = False
                 else:
-                    repository["image_urls"] = []
-                    printer.info("Repository is not a valid vim color scheme")
-                repository["fetched_at"] = datetime.datetime.now()
+                    printer.info("images fetch not is due")
+
+            if "valid" in repository and repository["valid"] is True:
+                printer.info("Repository is a valid vim color scheme")
             else:
-                printer.info("Repository is not due for a content fetch")
+                printer.info("Repository is not a valid vim color scheme")
+                repository["image_urls"] = []
 
             self.database.upsert_repository(repository)
 
@@ -85,7 +106,7 @@ def call_build_webhook():
         printer.break_line()
 
 
-def is_fetch_due(old_repository, last_commit_at, last_job_at):
+def compute_is_fetch_due(old_repository, last_commit_at, last_job_at):
     # if the repository is new or has never been updated before, fetch
     if old_repository is None or "fetched_at" not in old_repository:
         return True

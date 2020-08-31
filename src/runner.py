@@ -9,6 +9,6 @@ class Runner:
         self.database.create_report({"job": job, "elapsed_time": elapsed_time, **result})
 
         printer.success(f"{job} finished.")
-        printer.info(f"Elapsed time: {elapsed_time}")
+        printer.info(f"elapsed_time: {elapsed_time}")
         for key in dict.keys(result):
             printer.info(f"{key}: {result[key]}")
