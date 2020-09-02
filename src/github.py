@@ -33,7 +33,7 @@ REPOSITORY_LIMIT = min(GITHUB_API_HARD_LIMIT, REPOSITORY_LIMIT)
 this = sys.modules[__name__]
 this.remaining_github_api_calls = None
 this.github_api_rate_limit_reset = None
-this.file_tree_requests_left = 20
+this.file_tree_requests_left = 30
 
 
 def convert_github_string_datetime(d):
@@ -118,6 +118,7 @@ def search_repositories():
         "vim colorscheme",
         "vim colour scheme",
         "vim colourscheme",
+        "vim theme",
     ]
 
     repositories = []

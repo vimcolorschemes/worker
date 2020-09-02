@@ -17,7 +17,7 @@ BUILD_WEBHOOK = os.getenv("BUILD_WEBHOOK")
 IMAGE_PATH_REGEX = r"^.*\.(png|jpe?g|webp)$"
 POTENTIAL_VIM_COLOR_SCHEME_PATH_REGEX = r"^.*\.(vim|erb)$"
 
-VIM_COLLECTION_THRESHOLD = 20
+VIM_COLLECTION_THRESHOLD = 30
 
 DAYS_IN_MONTH = 30
 
@@ -193,6 +193,7 @@ def get_repository_vim_color_scheme_names(owner_name, name, files):
         )
         return vim_color_scheme_names
 
+    printer.info("Repository contains too many vim files; probably a collection")
     return []
 
 
