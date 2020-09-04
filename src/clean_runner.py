@@ -9,73 +9,52 @@ import utils
 class CleanRunner(Runner):
     def run(self):
         repositories = self.database.get_repositories()
-        total_image_removed_count = 0
-        affected_repositories = []
+        cleaned_repositories = []
         for repository in repositories:
             printer.info(f"Cleaning {repository['owner']['name']}/{repository['name']}")
 
-            clean_image_urls, image_removed_count = get_clean_image_urls(repository)
-            (
-                clean_featured_image_url,
-                is_featured_image_removed,
-            ) = get_clean_featured_image_url(repository, clean_image_urls)
+            if "image_urls" not in repository or repository["image_urls"] is None:
+                repository["image_urls"] = []
 
-            repository["image_urls"] = clean_image_urls
-            repository["featured_image_url"] = clean_featured_image_url
+            repository["image_urls"] = utils.remove_duplicates(repository["image_urls"])
 
-            if image_removed_count > 0:
+            images_dirty, featured_image_dirty = get_dirtiness(repository)
+
+            if images_dirty:
+                repository["image_urls"] = []
+
+            if featured_image_dirty:
+                repository["featured_image_url"] = None
+
+            if images_dirty or featured_image_dirty:
                 repository["cleaned_recently"] = True
-                affected_repositories.append(
+                cleaned_repositories.append(
                     f"{repository['owner']['name']}/{repository['name']}"
                 )
 
-            total_image_removed_count += image_removed_count + (
-                1 if is_featured_image_removed else 0
-            )
-
             self.database.upsert_repository(repository)
 
-        results = {
-            "image_removed_count": total_image_removed_count,
-        }
-        if len(affected_repositories) > 0:
-            results["affected_repositories"] = affected_repositories
+        results = {}
+        if len(cleaned_repositories) > 0:
+            results["cleaned_repositories"] = cleaned_repositories
 
         return results
 
 
-def get_clean_image_urls(repository):
-    printer.info("Cleaning image urls")
+def get_dirtiness(repository):
+    images_dirty = False
+    featured_image_dirty = False
 
-    image_urls = repository["image_urls"] if "image_urls" in repository else []
-    if image_urls is None:
-        image_urls = []
+    for image_url in repository["image_urls"]:
+        if not request.is_image_url_valid(image_url):
+            images_dirty = True
+            break
 
-    initial_count = len(image_urls)
-    printer.info(f"Initial image count: {initial_count}")
+    if (
+        "featured_image_dirty" in repository
+        and repository["featured_image_url"] is not None
+        and not request.is_image_url_valid(repository["featured_image_url"])
+    ):
+        featured_image_dirty = True
 
-    # remove duplicates
-    printer.info("Removing duplicates")
-    image_urls = utils.remove_duplicates(image_urls)
-
-    # remove no-longer valid urls
-    printer.info("Removing invalid urls")
-    image_urls = list(
-        filter(lambda image_url: request.is_image_url_valid(image_url), image_urls)
-    )
-
-    image_removed_count = initial_count - len(image_urls)
-    printer.info(f"Removed {image_removed_count} images")
-
-    return image_urls, image_removed_count
-
-
-def get_clean_featured_image_url(repository, clean_image_urls):
-    printer.info("Cleaning featured image url")
-    initial_featured_image_url = (
-        repository["featured_image_url"] if "featured_image_url" in repository else None
-    )
-    featured_image_url = initial_featured_image_url
-    if featured_image_url is not None and featured_image_url not in clean_image_urls:
-        featured_image_url = None
-    return featured_image_url, initial_featured_image_url != featured_image_url
+    return images_dirty, featured_image_dirty
