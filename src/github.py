@@ -25,8 +25,6 @@ GITHUB_BASIC_AUTH = (
     else None
 )
 
-GITHUB_FILE_TREE_REQUEST_LIMIT = 30
-
 GITHUB_API_HARD_LIMIT = 1000
 REPOSITORY_LIMIT = os.getenv("REPOSITORY_LIMIT")
 REPOSITORY_LIMIT = int(REPOSITORY_LIMIT) if REPOSITORY_LIMIT is not None else None
@@ -36,7 +34,6 @@ REPOSITORY_LIMIT = min(GITHUB_API_HARD_LIMIT, REPOSITORY_LIMIT)
 this = sys.modules[__name__]
 this.remaining_github_api_calls = None
 this.github_api_rate_limit_reset = None
-this.file_tree_requests_left = GITHUB_FILE_TREE_REQUEST_LIMIT
 
 
 def convert_github_string_datetime(d):
@@ -119,11 +116,11 @@ def list_repositories_of_page(query, page=1):
 # If more than 100 repositories, it will search all pages one by one.
 def search_repositories():
     queries = [
+        "vim theme",
         "vim color scheme",
         "vim colorscheme",
         "vim colour scheme",
         "vim colourscheme",
-        "vim theme",
     ]
 
     repositories = []
@@ -220,11 +217,7 @@ def get_tree_path(tree_object):
 
 
 def get_files_of_tree(owner_name, name, tree_sha, tree_path):
-    if this.file_tree_requests_left <= 0:
-        return []
-
     tree_objects = list_objects_of_tree(owner_name, name, tree_sha)
-    this.file_tree_requests_left -= 1
 
     files = [obj for obj in tree_objects if obj["type"] == "blob"]
     trees = [obj for obj in tree_objects if obj["type"] == "tree"]
@@ -245,8 +238,6 @@ def get_repository_files(repository):
     name = repository["name"]
 
     printer.info(f"Getting files for {owner_name}/{name}")
-
-    this.file_tree_requests_left = GITHUB_FILE_TREE_REQUEST_LIMIT
 
     return get_files_of_tree(
         owner_name, name, repository["default_branch"], repository["default_branch"]
