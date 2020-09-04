@@ -25,15 +25,18 @@ GITHUB_BASIC_AUTH = (
     else None
 )
 
+GITHUB_FILE_TREE_REQUEST_LIMIT = 30
+
 GITHUB_API_HARD_LIMIT = 1000
 REPOSITORY_LIMIT = os.getenv("REPOSITORY_LIMIT")
 REPOSITORY_LIMIT = int(REPOSITORY_LIMIT) if REPOSITORY_LIMIT is not None else None
 REPOSITORY_LIMIT = min(GITHUB_API_HARD_LIMIT, REPOSITORY_LIMIT)
 
+
 this = sys.modules[__name__]
 this.remaining_github_api_calls = None
 this.github_api_rate_limit_reset = None
-this.file_tree_requests_left = 30
+this.file_tree_requests_left = GITHUB_FILE_TREE_REQUEST_LIMIT
 
 
 def convert_github_string_datetime(d):
@@ -243,7 +246,7 @@ def get_repository_files(repository):
 
     printer.info(f"Getting files for {owner_name}/{name}")
 
-    this.file_tree_requests_left = 20
+    this.file_tree_requests_left = GITHUB_FILE_TREE_REQUEST_LIMIT
 
     return get_files_of_tree(
         owner_name, name, repository["default_branch"], repository["default_branch"]
