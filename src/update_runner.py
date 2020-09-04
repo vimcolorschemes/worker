@@ -215,7 +215,11 @@ def get_repository_vim_color_scheme_names(owner_name, name, files):
     vim_color_scheme_names = []
     for vim_file in vim_files:
         vim_color_scheme_name = get_vim_color_scheme_name(owner_name, name, vim_file)
-        if vim_color_scheme_name is not None and vim_color_scheme_name != "":
+        if (
+            vim_color_scheme_name is not None
+            and vim_color_scheme_name != ""
+            and vim_color_scheme_name not in vim_color_scheme_names
+        ):
             vim_color_scheme_names.append(vim_color_scheme_name)
             if len(vim_color_scheme_names) > VIM_COLLECTION_THRESHOLD:
                 break
