@@ -107,8 +107,8 @@ def call_build_webhook():
 
 
 def compute_is_fetch_due(old_repository, last_commit_at, last_job_at):
-    # if the repository is new or has never been updated before, fetch
-    if old_repository is None or "fetched_at" not in old_repository:
+    # if the repository is new or has never been fetched before, fetch
+    if old_repository is None or "vim_fetched_at" not in old_repository:
         return True
 
     # if the repository was deemed invalid before, don't fetch
