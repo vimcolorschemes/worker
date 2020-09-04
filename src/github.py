@@ -90,6 +90,8 @@ def github_core_get(url, params=None, log=None):
 
     data = request.get(url=url, params=params, auth=GITHUB_BASIC_AUTH)
 
+    this.remaining_github_api_calls -= 1
+
     return data
 
 
