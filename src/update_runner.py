@@ -17,7 +17,7 @@ BUILD_WEBHOOK = os.getenv("BUILD_WEBHOOK")
 IMAGE_PATH_REGEX = r"^.*\.(png|jpe?g|webp)$"
 POTENTIAL_VIM_COLOR_SCHEME_PATH_REGEX = r"^.*\.(vim|erb)$"
 
-VIM_COLLECTION_THRESHOLD = 30
+VIM_COLLECTION_THRESHOLD = 15
 
 DAYS_IN_MONTH = 30
 
@@ -173,30 +173,6 @@ def get_image_urls_from_readme(owner_name, name, old_image_urls, max_image_count
     return image_urls
 
 
-def get_repository_vim_color_scheme_names(owner_name, name, files):
-    vim_files = list(
-        filter(
-            lambda file: re.match(POTENTIAL_VIM_COLOR_SCHEME_PATH_REGEX, file["path"]),
-            files,
-        )
-    )
-
-    if len(vim_files) < VIM_COLLECTION_THRESHOLD:
-        vim_color_scheme_names = list(
-            functools.reduce(
-                lambda acc, file_data: add_vim_color_scheme_name(
-                    owner_name, name, acc, file_data
-                ),
-                vim_files,
-                [],
-            )
-        )
-        return vim_color_scheme_names
-
-    printer.info("Repository contains too many vim files; probably a collection")
-    return []
-
-
 def update_stargazers_count_history(repository):
     history = (
         repository["stargazers_count_history"]
@@ -228,18 +204,39 @@ def update_stargazers_count_history(repository):
     return history
 
 
-def add_vim_color_scheme_name(owner_name, name, vim_color_scheme_names, file_data):
-    value = get_vim_color_scheme_name(owner_name, name, file_data)
-    if value is not None and value != "":
-        return vim_color_scheme_names + [value]
-    return vim_color_scheme_names
+def get_repository_vim_color_scheme_names(owner_name, name, files):
+    vim_files = list(
+        filter(
+            lambda file: re.match(POTENTIAL_VIM_COLOR_SCHEME_PATH_REGEX, file["path"]),
+            files,
+        )
+    )
+
+    vim_color_scheme_names = []
+    for vim_file in vim_files:
+        vim_color_scheme_name = get_vim_color_scheme_name(owner_name, name, vim_file)
+        if (
+            vim_color_scheme_name is not None
+            and vim_color_scheme_name != ""
+            and vim_color_scheme_name not in vim_color_scheme_names
+        ):
+            vim_color_scheme_names.append(vim_color_scheme_name)
+            if len(vim_color_scheme_names) > VIM_COLLECTION_THRESHOLD:
+                break
+
+    if len(vim_color_scheme_names) <= VIM_COLLECTION_THRESHOLD:
+        return vim_color_scheme_names
+
+    printer.info(
+        "Repository contains too many vim color schemes; probably a collection"
+    )
+    return []
 
 
-def get_vim_color_scheme_name(owner_name, name, file_data):
+def get_vim_color_scheme_name(owner_name, name, file):
     vim_color_scheme_name = None
     response = request.get(
-        utils.build_raw_blog_github_url(owner_name, name, file_data["path"]),
-        is_json=False,
+        utils.build_raw_blog_github_url(owner_name, name, file["path"]), is_json=False,
     )
     file_content = response.text if response is not None else ""
 
