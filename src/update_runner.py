@@ -195,7 +195,7 @@ def update_stargazers_count_history(repository):
         del history[index]
 
     if len(history) >= DAYS_IN_MONTH:
-        history.pop()
+        del history[0]
 
     history.append(
         {"date": today, "stargazers_count": repository["stargazers_count"],}
