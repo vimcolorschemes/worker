@@ -241,7 +241,7 @@ def get_vim_color_scheme_name(owner_name, name, file):
     file_content = response.text if response is not None else ""
 
     match = re.search(
-        r"let (g:)?colors?_name ?= ?('|\")([a-zA-Z-_0-9]+)('|\")", file_content
+        r"let (g:)?colors?_name ?= ?('|\")?([a-zA-Z-_0-9:]+)('|\")?", file_content
     )
     if match is not None:
         vim_color_scheme_name = match.group(3)
