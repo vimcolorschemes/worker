@@ -13,6 +13,8 @@ class CleanRunner(Runner):
         for repository in repositories:
             printer.info(f"Cleaning {repository['owner']['name']}/{repository['name']}")
 
+            repository = add_archived(repository)
+
             if "image_urls" not in repository or repository["image_urls"] is None:
                 repository["image_urls"] = []
 
@@ -39,6 +41,32 @@ class CleanRunner(Runner):
             results["cleaned_repositories"] = cleaned_repositories
 
         return results
+
+
+def add_archived(repository):
+    is_github_url_valid = "github_url" in repository and request.is_url_valid(
+        url=repository["github_url"], allow_redirects=False
+    )
+
+    initial_archived = False
+    if "archived" in repository:
+        initial_archived = repository["archived"]
+
+    if not is_github_url_valid and not initial_archived:
+        printer.info(
+            f"{repository['owner']['name']}/{repository['name']} will be archived"
+        )
+        repository["archived"] = True
+        return repository
+
+    if is_github_url_valid and initial_archived:
+        printer.info(
+            f"{repository['owner']['name']}/{repository['name']} will be unarchived"
+        )
+        repository["archived"] = False
+        return repository
+
+    return repository
 
 
 def get_dirtiness(repository):

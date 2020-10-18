@@ -56,6 +56,18 @@ def delete(url, auth=None):
     return request(verb="delete", url=url, auth=auth, is_json=False)
 
 
+def is_url_valid(url, allow_redirects=True):
+    try:
+        printer.info(f"HEAD at url {url}")
+        response = requests.head(url, allow_redirects=allow_redirects)
+        if response.status_code == 200:
+            return True
+        return False
+    except Exception as e:
+        printer.error(e)
+        return False
+
+
 VALID_IMAGE_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"]
 
 
