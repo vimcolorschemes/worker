@@ -4,7 +4,7 @@ jobs:
   deploy:
     name: deploy lambda function
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/production'
     steps:
       - uses: actions/checkout@v2
       - name: Zip source
