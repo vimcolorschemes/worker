@@ -1,6 +1,0 @@
-black
-pip-tools
-requests
-pymongo
-dnspython
-pytz
