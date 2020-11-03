@@ -4,3 +4,5 @@ services:
   vimcolorschemes_worker_go:
     container_name: vimcolorschemes_worker_go
     build: .
+    env_file:
+      - .env.docker
