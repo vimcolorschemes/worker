@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+
+set -e
+
+BREAK_LINE="
+"
+
+if ! docker --version >/dev/null 2>&1; then
+  echo "Please install Docker Desktop"
+  echo "https://www.docker.com/products/docker-desktop/"
+  exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+  echo "Please run Docker Desktop"
+  echo "https://docs.docker.com/desktop/"
+  exit 1
+fi
+
+if ! docker-compose --version >/dev/null 2>&1; then
+  echo "Please install docker-compose"
+  echo "https://docs.docker.com/compose/install/" exit 1
+fi
+
+build_container=0
+job=import
+
+
+display_help() {
+  echo "Welcome to vimcolorschemes/worker!"
+
+  echo "$BREAK_LINE"
+
+  echo "Available jobs are: ${jobs[@]}$BREAK_LINE"
+  echo "Use the -j flag to run a specific job$BREAK_LINE"
+  echo "Example: bin/start -j clean$BREAK_LINE"
+
+  echo "$BREAK_LINE"
+
+  echo "Use the -b flag to force a new build after a change"
+
+  echo "$BREAK_LINE"
+
+  echo "See more at https://github.com/vimcolorschemes/worker"
+
+  exit 0
+}
+
+while getopts ":j:b h" opt; do
+  case $opt in
+    j)
+      job=$OPTARG ;;
+    b)
+      build_container=1 ;;
+    h)
+      display_help ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+  esac
+done
+
+echo "
+ _  __(_)_ _  _______  / /__  _______ ____/ /  ___ __ _  ___ ___
+| |/ / /  ' \/ __/ _ \/ / _ \/ __(_-</ __/ _ \/ -_)  ' \/ -_|_-<
+|___/_/_/_/_/\__/\___/_/\___/_/ /___/\__/_//_/\__/_/_/_/\__/___/
+                   _    _____  ____/ /_____ ____
+                  | |/|/ / _ \/ __/  '_/ -_) __/
+                  |__,__/\___/_/ /_/\_\\__/_/   
+"
+
+echo "Running $job"
+
+if [[ $build_container = 1 ]]; then
+  echo "${BREAK_LINE}Building the vimcolorschemes_worker_go container image$BREAK_LINE"
+  docker-compose build
+fi;
+
+echo "${BREAK_LINE}Starting the vimcolorschemes_worker_go container$BREAK_LINE"
+docker-compose run vimcolorschemes_worker_go $job

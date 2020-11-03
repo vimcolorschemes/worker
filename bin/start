@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+set -e
+
+job=import
+
+while getopts ":j:" opt; do
+  case $opt in
+    j)
+      job=$OPTARG ;;
+    \?)
+      echo "invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+    :)
+      echo "option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+  esac
+done
+
+echo "
+ _  __(_)_ _  _______  / /__  _______ ____/ /  ___ __ _  ___ ___
+| |/ / /  ' \/ __/ _ \/ / _ \/ __(_-</ __/ _ \/ -_)  ' \/ -_|_-<
+|___/_/_/_/_/\__/\___/_/\___/_/ /___/\__/_//_/\__/_/_/_/\__/___/
+                   _    _____  ____/ /_____ ____
+                  | |/|/ / _ \/ __/  '_/ -_) __/
+                  |__,__/\___/_/ /_/\_\\__/_/   
+"
+
+go run main.go $job
