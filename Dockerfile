@@ -9,9 +9,8 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o main .
+ARG job
+
+RUN go build -o main ./cmd/$job
 
 ENTRYPOINT [ "/app/main" ]
-
-# default args
-CMD [ "import" ]

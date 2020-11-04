@@ -78,7 +78,7 @@ echo "Running $job"
 
 if [[ $build_container = 1 ]]; then
   echo "${BREAK_LINE}Building the vimcolorschemes_worker_go container image$BREAK_LINE"
-  docker-compose build
+  docker-compose build --build-arg job=$job
 fi;
 
 echo "${BREAK_LINE}Starting the vimcolorschemes_worker_go container$BREAK_LINE"

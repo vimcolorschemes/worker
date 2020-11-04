@@ -28,4 +28,4 @@ echo "
                   |__,__/\___/_/ /_/\_\\__/_/   
 "
 
-go run main.go $job
+go run cmd/$job/main.go
