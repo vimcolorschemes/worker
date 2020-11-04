@@ -7,7 +7,7 @@ import (
 )
 
 func Update() {
-	log.Print("Running update")
+	log.Print("Run update")
 
 	repositories := database.GetRepositories()
 

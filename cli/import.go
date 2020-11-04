@@ -1,27 +1,15 @@
 package cli
 
 import (
-	"context"
-	"github.com/google/go-github/v32/github"
 	"log"
+
+	"github.com/vimcolorschemes/worker/github"
 )
 
 func Import() {
-	log.Print("Running import")
+	log.Print("run import")
 
-	client := github.NewClient(nil)
-
-	repositories := searchRepositories(client)
+	repositories := github.SearchRepositories()
 
 	log.Print(len(repositories))
-}
-
-func searchRepositories(client *github.Client) []*github.Repository {
-	result, _, err := client.Search.Repositories(context.Background(), "vim color scheme", nil)
-
-	if err != nil {
-		panic(err)
-	}
-
-	return result.Repositories
 }

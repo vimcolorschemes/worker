@@ -3,9 +3,8 @@ package database
 import (
 	"context"
 	"log"
-	"os"
 
-	"github.com/joho/godotenv"
+	"github.com/vimcolorschemes/worker/dotenv"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -18,24 +17,11 @@ type Repository struct {
 	Name string             `bson:"name,omitempty"`
 }
 
-var connectionString string
 var repositoriesCollection *mongo.Collection
 var ctx = context.TODO()
 
 func init() {
-	log.Print("Loading .env file")
-	if err := godotenv.Load(); err != nil {
-		log.Print("No .env file found")
-	}
-}
-
-func init() {
-	connectionString, exists := os.LookupEnv("MONGODB_CONNECTION_STRING")
-	if !exists {
-		log.Panic("No connection string provided")
-	}
-
-	clientOptions := options.Client().ApplyURI(connectionString)
+	clientOptions := options.Client().ApplyURI(dotenv.Get("MONGODB_CONNECTION_STRING"))
 
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
