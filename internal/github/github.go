@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 
 	gogithub "github.com/google/go-github/v32/github"
 
@@ -13,6 +14,23 @@ import (
 )
 
 var client *gogithub.Client
+
+// TODO use const
+var searchOptions = &gogithub.SearchOptions{Sort: "stars", ListOptions: gogithub.ListOptions{PerPage: 100, Page: 1}}
+
+// TODO use const
+var queries = []string{
+	"vim theme",
+	"vim color scheme",
+	"vim colorscheme",
+	"vim colour scheme",
+	"vim colourscheme",
+	"neovim theme",
+	"neovim color scheme",
+	"neovim colorscheme",
+	"neovim colour scheme",
+	"neovim colourscheme",
+}
 
 func init() {
 	ctx := context.Background()
@@ -26,30 +44,14 @@ func init() {
 func SearchRepositories() []*gogithub.Repository {
 	log.Print("Search repositories")
 
-	queries := []string{
-		"vim theme",
-		"vim color scheme",
-		"vim colorscheme",
-		"vim colour scheme",
-		"vim colourscheme",
-		"neovim theme",
-		"neovim color scheme",
-		"neovim colorscheme",
-		"neovim colour scheme",
-		"neovim colourscheme",
-	}
-
 	var repositories []*gogithub.Repository
 
 	for _, query := range queries {
+		query = fmt.Sprintf("%s %s", query, "NOT dotfiles stars:>0")
+
 		log.Print("query: ", query)
 
-		result, _, err := client.Search.Repositories(context.Background(), query, nil)
-		if err != nil {
-			panic(err)
-		}
-
-		newRepositories := result.Repositories
+		newRepositories := queryRepositories(query)
 		log.Print("result count: ", len(newRepositories))
 
 		repositories = append(repositories, newRepositories...)
@@ -58,14 +60,58 @@ func SearchRepositories() []*gogithub.Repository {
 	return uniquifyRepositories(repositories)
 }
 
+func queryRepositories(query string) []*gogithub.Repository {
+	log.Print("page: ", 1)
+	result, _, err := client.Search.Repositories(context.Background(), query, &gogithub.SearchOptions{Sort: "stars", ListOptions: gogithub.ListOptions{PerPage: 100, Page: 1}})
+
+	if err != nil {
+		panic(err)
+	}
+
+	repositories := result.Repositories
+	log.Print("result count: ", len(repositories))
+
+	totalCount := result.GetTotal()
+	log.Print("total count: ", totalCount)
+
+	pageCount := int(math.Ceil(float64(totalCount) / 100))
+
+	log.Print("page count: ", pageCount)
+
+	if pageCount > 10 {
+		pageCount = 10
+		log.Print("page count limited to: ", pageCount)
+	}
+
+	if pageCount == 1 {
+		return repositories
+	}
+
+	for page := 2; page <= pageCount; page++ {
+		log.Print("page: ", page)
+		result, _, err = client.Search.Repositories(context.Background(), query, &gogithub.SearchOptions{Sort: "stars", ListOptions: gogithub.ListOptions{PerPage: 100, Page: page}})
+
+		if err != nil {
+			panic(err)
+		}
+
+		newRepositories := result.Repositories
+
+		log.Print("result count: ", len(newRepositories))
+
+		repositories = append(repositories, newRepositories...)
+	}
+
+	return repositories
+}
+
 func uniquifyRepositories(repositories []*gogithub.Repository) []*gogithub.Repository {
-	keys := make(map[string]bool)
+	keys := make(map[int64]bool)
 	unique := []*gogithub.Repository{}
 
 	for _, repository := range repositories {
-		repositoryKey := fmt.Sprintf("%d/%d", repository.Owner.Name, repository.Name)
-		if _, value := keys[repositoryKey]; !value {
-			keys[repositoryKey] = true
+		if _, value := keys[*repository.ID]; !value {
+			keys[*repository.ID] = true
 			unique = append(unique, repository)
 		}
 	}
