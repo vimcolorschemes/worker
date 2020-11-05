@@ -3,7 +3,7 @@ package cli
 import (
 	"log"
 
-	"github.com/vimcolorschemes/worker/database"
+	"github.com/vimcolorschemes/worker/internal/database"
 )
 
 func Update() {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/vimcolorschemes/worker/dotenv"
+	"github.com/vimcolorschemes/worker/internal/dotenv"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"

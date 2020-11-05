@@ -2,11 +2,12 @@ package github
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	gogithub "github.com/google/go-github/v32/github"
 
-	"github.com/vimcolorschemes/worker/dotenv"
+	"github.com/vimcolorschemes/worker/internal/dotenv"
 
 	"golang.org/x/oauth2"
 )
@@ -54,18 +55,20 @@ func SearchRepositories() []*gogithub.Repository {
 		repositories = append(repositories, newRepositories...)
 	}
 
-	var uniqueRepositories []*gogithub.Repository
-	m := map[*int64]bool{}
+	return uniquifyRepositories(repositories)
+}
+
+func uniquifyRepositories(repositories []*gogithub.Repository) []*gogithub.Repository {
+	keys := make(map[string]bool)
+	unique := []*gogithub.Repository{}
 
 	for _, repository := range repositories {
-		if !m[repository.ID] {
-			m[repository.ID] = true
-			log.Print(repository.ID)
-			log.Print(repository.Owner.Name)
-			log.Print(repository.Name)
-			uniqueRepositories = append(uniqueRepositories, repository)
+		repositoryKey := fmt.Sprintf("%d/%d", repository.Owner.Name, repository.Name)
+		if _, value := keys[repositoryKey]; !value {
+			keys[repositoryKey] = true
+			unique = append(unique, repository)
 		}
 	}
 
-	return uniqueRepositories
+	return unique
 }
