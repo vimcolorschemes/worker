@@ -11,6 +11,10 @@ func Update() {
 
 	repositories := database.GetRepositories()
 
+	for _, repository := range repositories {
+		log.Print(repository.Owner.Name, "/", repository.Name)
+	}
+
 	log.Print(len(repositories), " repositories to update")
 
 	log.Print(":wq")

@@ -14,12 +14,12 @@ import (
 )
 
 type Repository struct {
-	ID   int64              `bson:"_id,omitempty"`
-	Name string             `bson:"name,omitempty"`
-}
-
-type queryFilter struct {
-	github_id string
+	ID    int64 `bson:"_id,omitempty"`
+	Name  string
+	Owner struct {
+		Name      string
+		AvatarURL string
+	}
 }
 
 var ctx = context.TODO()
@@ -61,7 +61,10 @@ func UpsertRepositories(repositories []*gogithub.Repository) {
 		log.Print("Upserting ", *repository.Name)
 
 		filter := bson.M{"_id": *repository.ID}
-		update := bson.M{"$set": bson.M{"_id": *repository.ID, "name": *repository.Name}}
+
+		updateObject := getRepositoryUpdateObject(repository)
+		update := bson.M{"$set": updateObject}
+
 		upsertOptions := options.Update().SetUpsert(true)
 
 		_, err := repositoriesCollection.UpdateOne(ctx, filter, update, upsertOptions)
@@ -70,4 +73,13 @@ func UpsertRepositories(repositories []*gogithub.Repository) {
 			panic(err)
 		}
 	}
+}
+
+func getRepositoryUpdateObject(repository *gogithub.Repository) bson.M {
+		return bson.M{
+			"_id":              *repository.ID,
+			"owner.name":       *repository.Owner.Login,
+			"owner.avatarURL": *repository.Owner.AvatarURL,
+			"name":             *repository.Name,
+		}
 }
