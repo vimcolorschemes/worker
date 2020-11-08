@@ -11,5 +11,7 @@ func Update() {
 
 	repositories := database.GetRepositories()
 
-	log.Println(repositories)
+	log.Print(len(repositories), " repositories to update")
+
+	log.Print(":wq")
 }

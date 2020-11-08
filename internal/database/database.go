@@ -6,22 +6,28 @@ import (
 
 	"github.com/vimcolorschemes/worker/internal/dotenv"
 
+	gogithub "github.com/google/go-github/v32/github"
+
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Repository struct {
-	ID   primitive.ObjectID `bson:"_id,omitempty"`
+	ID   int64              `bson:"_id,omitempty"`
 	Name string             `bson:"name,omitempty"`
 }
 
-var repositoriesCollection *mongo.Collection
+type queryFilter struct {
+	github_id string
+}
+
 var ctx = context.TODO()
+var repositoriesCollection *mongo.Collection
 
 func init() {
-	clientOptions := options.Client().ApplyURI(dotenv.Get("MONGODB_CONNECTION_STRING", true))
+	connectionString := dotenv.Get("MONGODB_CONNECTION_STRING", true)
+	clientOptions := options.Client().ApplyURI(connectionString)
 
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
@@ -33,7 +39,7 @@ func init() {
 		panic(err)
 	}
 
-	repositoriesCollection = client.Database("colorschemes").Collection("repositories")
+	repositoriesCollection = client.Database("vimcolorschemes").Collection("repositories")
 }
 
 func GetRepositories() []Repository {
@@ -48,4 +54,20 @@ func GetRepositories() []Repository {
 		panic(err)
 	}
 	return repositories
+}
+
+func UpsertRepositories(repositories []*gogithub.Repository) {
+	for _, repository := range repositories {
+		log.Print("Upserting ", *repository.Name)
+
+		filter := bson.M{"_id": *repository.ID}
+		update := bson.M{"$set": bson.M{"_id": *repository.ID, "name": *repository.Name}}
+		upsertOptions := options.Update().SetUpsert(true)
+
+		_, err := repositoriesCollection.UpdateOne(ctx, filter, update, upsertOptions)
+
+		if err != nil {
+			panic(err)
+		}
+	}
 }

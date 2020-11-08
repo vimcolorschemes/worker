@@ -39,7 +39,6 @@ func init() {
 	initGitHubClient()
 
 	repositoryCountLimit = dotenv.GetInt("GITHUB_REPOSITORY_COUNT_LIMIT", false, 100)
-	log.Print("Fetching a soft limit of ", repositoryCountLimit, " repositories")
 	repositoryCountLimitPerPage = int(math.Min(float64(repositoryCountLimit), 100))
 	queryPageCountLimit = getPageCount(searchResultCountHardLimit, repositoryCountLimitPerPage)
 }
