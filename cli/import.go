@@ -9,6 +9,7 @@ import (
 	"github.com/vimcolorschemes/worker/internal/database"
 	"github.com/vimcolorschemes/worker/internal/dotenv"
 	"github.com/vimcolorschemes/worker/internal/github"
+	"github.com/vimcolorschemes/worker/internal/util"
 
 	gogithub "github.com/google/go-github/v32/github"
 )
@@ -40,7 +41,7 @@ func init() {
 
 	repositoryCountLimit = dotenv.GetInt("GITHUB_REPOSITORY_COUNT_LIMIT", false, 100)
 	repositoryCountLimitPerPage = int(math.Min(float64(repositoryCountLimit), 100))
-	queryPageCountLimit = getPageCount(searchResultCountHardLimit, repositoryCountLimitPerPage)
+	queryPageCountLimit = util.GetPageCount(searchResultCountHardLimit, repositoryCountLimitPerPage, repositoryCountLimitPerPage)
 }
 
 func Import() {
@@ -94,7 +95,7 @@ func queryRepositories(query string) []*gogithub.Repository {
 	totalCount = int(math.Min(float64(totalCount), float64(repositoryCountLimit)))
 	log.Print("total count: ", totalCount)
 
-	pageCount := getPageCount(totalCount, repositoryCountLimitPerPage)
+	pageCount := util.GetPageCount(totalCount, repositoryCountLimitPerPage, queryPageCountLimit)
 	log.Print("page count: ", pageCount)
 
 	if pageCount == 1 || len(repositories) >= repositoryCountLimit {
@@ -137,16 +138,6 @@ func uniquifyRepositories(repositories []*gogithub.Repository) []*gogithub.Repos
 	}
 
 	return unique
-}
-
-func getPageCount(totalCount int, itemPerPageCount int) int {
-	pageCount := int(math.Ceil(float64(totalCount / itemPerPageCount)))
-
-	if pageCount > queryPageCountLimit {
-		pageCount = queryPageCountLimit
-	}
-
-	return pageCount
 }
 
 func buildSearchOptions(page int) *gogithub.SearchOptions {
