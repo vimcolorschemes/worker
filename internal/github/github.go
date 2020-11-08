@@ -15,11 +15,14 @@ import (
 
 var client *gogithub.Client
 
-// TODO use const
-var searchOptions = &gogithub.SearchOptions{Sort: "stars", ListOptions: gogithub.ListOptions{PerPage: 100, Page: 1}}
+var repositoryCountLimit int
+var repositoryCountLimitPerPage int
 
-// TODO use const
-var queries = []string{
+const searchResultCountHardLimit = 1000
+
+var queryPageCountLimit int = searchResultCountHardLimit
+
+var queries = [10]string{
 	"vim theme",
 	"vim color scheme",
 	"vim colorscheme",
@@ -33,12 +36,12 @@ var queries = []string{
 }
 
 func init() {
-	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: dotenv.Get("GITHUB_TOKEN")},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client = gogithub.NewClient(tc)
+	initGitHubClient()
+
+	repositoryCountLimit = dotenv.GetInt("GITHUB_REPOSITORY_COUNT_LIMIT", false, 100)
+	log.Print("Fetching a soft limit of ", repositoryCountLimit, " repositories")
+	repositoryCountLimitPerPage = int(math.Min(float64(repositoryCountLimit), 100))
+	queryPageCountLimit = getPageCount(searchResultCountHardLimit, repositoryCountLimitPerPage)
 }
 
 func SearchRepositories() []*gogithub.Repository {
@@ -55,14 +58,28 @@ func SearchRepositories() []*gogithub.Repository {
 		log.Print("result count: ", len(newRepositories))
 
 		repositories = append(repositories, newRepositories...)
+
+		if len(repositories) >= repositoryCountLimit {
+			break
+		}
 	}
 
 	return uniquifyRepositories(repositories)
 }
 
+func initGitHubClient() {
+	ctx := context.Background()
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: dotenv.Get("GITHUB_TOKEN", true)},
+	)
+	tc := oauth2.NewClient(ctx, ts)
+	client = gogithub.NewClient(tc)
+}
+
 func queryRepositories(query string) []*gogithub.Repository {
 	log.Print("page: ", 1)
-	result, _, err := client.Search.Repositories(context.Background(), query, &gogithub.SearchOptions{Sort: "stars", ListOptions: gogithub.ListOptions{PerPage: 100, Page: 1}})
+
+	result, _, err := client.Search.Repositories(context.Background(), query, buildSearchOptions(1))
 
 	if err != nil {
 		panic(err)
@@ -72,24 +89,25 @@ func queryRepositories(query string) []*gogithub.Repository {
 	log.Print("result count: ", len(repositories))
 
 	totalCount := result.GetTotal()
+	totalCount = int(math.Min(float64(totalCount), float64(repositoryCountLimit)))
 	log.Print("total count: ", totalCount)
 
-	pageCount := int(math.Ceil(float64(totalCount) / 100))
-
+	pageCount := getPageCount(totalCount, repositoryCountLimitPerPage)
 	log.Print("page count: ", pageCount)
 
-	if pageCount > 10 {
-		pageCount = 10
-		log.Print("page count limited to: ", pageCount)
-	}
-
-	if pageCount == 1 {
+	if pageCount == 1 || len(repositories) >= repositoryCountLimit {
 		return repositories
 	}
 
+	return append(repositories, queryPaginatedRepositories(pageCount, query)...)
+}
+
+func queryPaginatedRepositories(pageCount int, query string) []*gogithub.Repository {
+	var repositories []*gogithub.Repository
+
 	for page := 2; page <= pageCount; page++ {
 		log.Print("page: ", page)
-		result, _, err = client.Search.Repositories(context.Background(), query, &gogithub.SearchOptions{Sort: "stars", ListOptions: gogithub.ListOptions{PerPage: 100, Page: page}})
+		result, _, err := client.Search.Repositories(context.Background(), query, buildSearchOptions(page))
 
 		if err != nil {
 			panic(err)
@@ -117,4 +135,18 @@ func uniquifyRepositories(repositories []*gogithub.Repository) []*gogithub.Repos
 	}
 
 	return unique
+}
+
+func getPageCount(totalCount int, itemPerPageCount int) int {
+	pageCount := int(math.Ceil(float64(totalCount / itemPerPageCount)))
+
+	if pageCount > queryPageCountLimit {
+		pageCount = queryPageCountLimit
+	}
+
+	return pageCount
+}
+
+func buildSearchOptions(page int) *gogithub.SearchOptions {
+	return &gogithub.SearchOptions{Sort: "stars", ListOptions: gogithub.ListOptions{PerPage: repositoryCountLimitPerPage, Page: page}}
 }

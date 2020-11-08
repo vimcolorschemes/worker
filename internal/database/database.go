@@ -21,7 +21,7 @@ var repositoriesCollection *mongo.Collection
 var ctx = context.TODO()
 
 func init() {
-	clientOptions := options.Client().ApplyURI(dotenv.Get("MONGODB_CONNECTION_STRING"))
+	clientOptions := options.Client().ApplyURI(dotenv.Get("MONGODB_CONNECTION_STRING", true))
 
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
