@@ -57,5 +57,9 @@ func getRepositoryUpdateObject(repository *gogithub.Repository) bson.M {
 		"owner.name":      *repository.Owner.Login,
 		"owner.avatarURL": *repository.Owner.AvatarURL,
 		"name":            *repository.Name,
+		"description":     *repository.Description,
+		"githubURL":       *repository.HTMLURL,
+		"homepageURL":     repository.GetHomepage(),
+		"stargazersCount": *repository.StargazersCount,
 	}
 }
