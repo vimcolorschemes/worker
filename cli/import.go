@@ -44,14 +44,14 @@ func Import() {
 	log.Print("Upserting ", len(repositories), " repositories")
 	for _, repository := range repositories {
 		log.Print("Upserting ", *repository.Name)
-		repositoryUpdateObject := getRepositoryUpdateObject(repository)
+		repositoryUpdateObject := getImportRepositoryObject(repository)
 		database.UpsertRepository(*repository.ID, repositoryUpdateObject)
 	}
 
 	log.Print(":wq")
 }
 
-func getRepositoryUpdateObject(repository *gogithub.Repository) bson.M {
+func getImportRepositoryObject(repository *gogithub.Repository) bson.M {
 	return bson.M{
 		"_id":             *repository.ID,
 		"owner.name":      *repository.Owner.Login,

@@ -2,9 +2,11 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math"
+	"time"
 
 	"github.com/vimcolorschemes/worker/internal/dotenv"
 	"github.com/vimcolorschemes/worker/internal/repository"
@@ -26,6 +28,35 @@ func init() {
 	tc := oauth2.NewClient(ctx, ts)
 
 	client = gogithub.NewClient(tc)
+}
+
+func GetRepository(ownerName string, name string) (*gogithub.Repository, error) {
+	repository, _, err := client.Repositories.Get(context.Background(), ownerName, name)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return repository, nil
+}
+
+func GetLastCommitAt(repository *gogithub.Repository) (time.Time, error) {
+	ownerName := *repository.Owner.Login
+	name := *repository.Name
+	defaultBranch := *repository.DefaultBranch
+	options := &gogithub.CommitsListOptions{SHA: defaultBranch}
+
+	commits, _, err := client.Repositories.ListCommits(context.Background(), ownerName, name, options)
+
+	if err != nil {
+		return time.Now(), err
+	}
+
+	if len(commits) == 0 {
+		return time.Now(), errors.New("no commits")
+	}
+
+	return commits[0].Commit.Author.GetDate(), nil
 }
 
 func SearchRepositories(queries []string, repositoryCountLimit int, repositoryCountLimitPerPage int) []*gogithub.Repository {

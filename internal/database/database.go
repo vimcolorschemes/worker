@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/vimcolorschemes/worker/internal/dotenv"
 
@@ -18,6 +19,8 @@ type Repository struct {
 		Name      string
 		AvatarURL string
 	}
+	Valid        bool
+	LastCommitAt time.Time
 }
 
 var ctx = context.TODO()
