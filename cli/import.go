@@ -9,6 +9,7 @@ import (
 	"github.com/vimcolorschemes/worker/internal/database"
 	"github.com/vimcolorschemes/worker/internal/dotenv"
 	"github.com/vimcolorschemes/worker/internal/github"
+	repoUtil "github.com/vimcolorschemes/worker/internal/repository"
 	"github.com/vimcolorschemes/worker/internal/util"
 
 	gogithub "github.com/google/go-github/v32/github"
@@ -50,8 +51,11 @@ func Import() {
 	repositories := searchRepositories()
 
 	log.Print("Upserting ", len(repositories), " repositories")
-
-	database.UpsertRepositories(repositories)
+	for _, repository := range repositories {
+		log.Print("Upserting ", *repository.Name)
+		repositoryUpdateObject := repoUtil.GetRepositoryUpdateObject(repository)
+		database.UpsertRepository(*repository.ID, repositoryUpdateObject)
+	}
 
 	log.Print(":wq")
 }
@@ -76,7 +80,7 @@ func searchRepositories() []*gogithub.Repository {
 		}
 	}
 
-	return uniquifyRepositories(repositories)
+	return repoUtil.UniquifyRepositories(repositories)
 }
 
 func queryRepositories(query string) []*gogithub.Repository {
@@ -124,20 +128,6 @@ func queryPaginatedRepositories(pageCount int, query string) []*gogithub.Reposit
 	}
 
 	return repositories
-}
-
-func uniquifyRepositories(repositories []*gogithub.Repository) []*gogithub.Repository {
-	keys := make(map[int64]bool)
-	unique := []*gogithub.Repository{}
-
-	for _, repository := range repositories {
-		if _, value := keys[*repository.ID]; !value {
-			keys[*repository.ID] = true
-			unique = append(unique, repository)
-		}
-	}
-
-	return unique
 }
 
 func buildSearchOptions(page int) *gogithub.SearchOptions {

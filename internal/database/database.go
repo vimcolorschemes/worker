@@ -6,8 +6,6 @@ import (
 
 	"github.com/vimcolorschemes/worker/internal/dotenv"
 
-	gogithub "github.com/google/go-github/v32/github"
-
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -56,30 +54,17 @@ func GetRepositories() []Repository {
 	return repositories
 }
 
-func UpsertRepositories(repositories []*gogithub.Repository) {
-	for _, repository := range repositories {
-		log.Print("Upserting ", *repository.Name)
+func UpsertRepository(id int64, updateObject bson.M) {
 
-		filter := bson.M{"_id": *repository.ID}
+	filter := bson.M{"_id": id}
 
-		updateObject := getRepositoryUpdateObject(repository)
-		update := bson.M{"$set": updateObject}
+	update := bson.M{"$set": updateObject}
 
-		upsertOptions := options.Update().SetUpsert(true)
+	upsertOptions := options.Update().SetUpsert(true)
 
-		_, err := repositoriesCollection.UpdateOne(ctx, filter, update, upsertOptions)
+	_, err := repositoriesCollection.UpdateOne(ctx, filter, update, upsertOptions)
 
-		if err != nil {
-			panic(err)
-		}
+	if err != nil {
+		panic(err)
 	}
-}
-
-func getRepositoryUpdateObject(repository *gogithub.Repository) bson.M {
-		return bson.M{
-			"_id":              *repository.ID,
-			"owner.name":       *repository.Owner.Login,
-			"owner.avatarURL": *repository.Owner.AvatarURL,
-			"name":             *repository.Name,
-		}
 }
