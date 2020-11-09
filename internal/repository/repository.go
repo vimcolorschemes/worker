@@ -2,7 +2,6 @@ package repository
 
 import (
 	gogithub "github.com/google/go-github/v32/github"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 func UniquifyRepositories(repositories []*gogithub.Repository) []*gogithub.Repository {
@@ -17,13 +16,4 @@ func UniquifyRepositories(repositories []*gogithub.Repository) []*gogithub.Repos
 	}
 
 	return unique
-}
-
-func GetRepositoryUpdateObject(repository *gogithub.Repository) bson.M {
-	return bson.M{
-		"_id":             *repository.ID,
-		"owner.name":      *repository.Owner.Login,
-		"owner.avatarURL": *repository.Owner.AvatarURL,
-		"name":            *repository.Name,
-	}
 }
