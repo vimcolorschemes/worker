@@ -40,6 +40,8 @@ func updateRepository(repository repoUtil.Repository) repoUtil.Repository {
 
 	repository.LastCommitAt = github.GetLastCommitAt(githubRepository)
 
+	repository.StargazersCount = *githubRepository.StargazersCount
+
 	repository.StargazersCountHistory = repoUtil.GetStargazersCountHistory(repository)
 
 	repository.Valid = true
@@ -50,6 +52,7 @@ func updateRepository(repository repoUtil.Repository) repoUtil.Repository {
 func getUpdateRepositoryObject(repository repoUtil.Repository) bson.M {
 	return bson.M{
 		"lastCommitAt":           repository.LastCommitAt,
+		"stargazersCount":        repository.StargazersCount,
 		"stargazersCountHistory": repository.StargazersCountHistory,
 		"valid":                  repository.Valid,
 	}

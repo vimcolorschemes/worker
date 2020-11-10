@@ -60,6 +60,5 @@ func getImportRepositoryObject(repository *gogithub.Repository) bson.M {
 		"description":     *repository.Description,
 		"githubURL":       *repository.HTMLURL,
 		"homepageURL":     repository.GetHomepage(),
-		"stargazersCount": *repository.StargazersCount,
 	}
 }
