@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -69,13 +68,12 @@ func TestGetStargazersCountHistory(t *testing.T) {
 	})
 
 	t.Run("should add item when there are some already", func(t *testing.T) {
-		dateForm := "2020-01-01"
-		date1, _ := time.Parse(dateForm, "1970-01-01")
+		date := time.Date(1990, time.November, 1, 0, 0, 0, 0, time.UTC)
 
 		repository := Repository{
 			StargazersCount: 101,
 			StargazersCountHistory: []StargazersCountHistoryItem{
-				{Date: date1, StargazersCount: 100},
+				{Date: date, StargazersCount: 100},
 			},
 		}
 
@@ -85,7 +83,7 @@ func TestGetStargazersCountHistory(t *testing.T) {
 
 		expected := []StargazersCountHistoryItem{
 			{Date: today, StargazersCount: 101},
-			{Date: date1, StargazersCount: 100},
+			{Date: date, StargazersCount: 100},
 		}
 
 		if !reflect.DeepEqual(history, expected) {
@@ -94,17 +92,16 @@ func TestGetStargazersCountHistory(t *testing.T) {
 	})
 
 	t.Run("should sort items by date (desc)", func(t *testing.T) {
-		dateLayout := "2020-01-01"
-		date1, _ := time.Parse(dateLayout, "1970-01-01")
-		date2, _ := time.Parse(dateLayout, "1970-01-02")
-		date3, _ := time.Parse(dateLayout, "1970-01-03")
+		date1 := time.Date(1990, time.November, 10, 0, 0, 0, 0, time.UTC)
+		date2 := time.Date(1990, time.November, 20, 0, 0, 0, 0, time.UTC)
+		date3 := time.Date(1990, time.November, 30, 0, 0, 0, 0, time.UTC)
 
 		repository := Repository{
 			StargazersCount: 101,
 			StargazersCountHistory: []StargazersCountHistoryItem{
-				{Date: date1, StargazersCount: 100},
+				{Date: date1, StargazersCount: 90},
 				{Date: date2, StargazersCount: 100},
-				{Date: date3, StargazersCount: 100},
+				{Date: date3, StargazersCount: 110},
 			},
 		}
 
@@ -114,9 +111,9 @@ func TestGetStargazersCountHistory(t *testing.T) {
 
 		expected := []StargazersCountHistoryItem{
 			{Date: today, StargazersCount: 101},
-			{Date: date3, StargazersCount: 100},
+			{Date: date3, StargazersCount: 110},
 			{Date: date2, StargazersCount: 100},
-			{Date: date1, StargazersCount: 100},
+			{Date: date1, StargazersCount: 90},
 		}
 
 		if !reflect.DeepEqual(history, expected) {
@@ -125,8 +122,7 @@ func TestGetStargazersCountHistory(t *testing.T) {
 	})
 
 	t.Run("should override today's item", func(t *testing.T) {
-		dateLayout := "2020-01-01"
-		date, _ := time.Parse(dateLayout, "1970-01-03")
+		date := time.Date(1990, time.November, 30, 0, 0, 0, 0, time.UTC)
 
 		today := dateUtil.Today()
 
@@ -152,8 +148,7 @@ func TestGetStargazersCountHistory(t *testing.T) {
 	})
 
 	t.Run("should override all of today's items", func(t *testing.T) {
-		dateLayout := "2020-01-01"
-		date, _ := time.Parse(dateLayout, "1970-01-03")
+		date := time.Date(1990, time.November, 30, 0, 0, 0, 0, time.UTC)
 
 		today := dateUtil.Today()
 
@@ -179,15 +174,10 @@ func TestGetStargazersCountHistory(t *testing.T) {
 	})
 
 	t.Run("should keep only 31 days worth of history", func(t *testing.T) {
-		dateLayout := "2020-01-01"
 		history := []StargazersCountHistoryItem{}
 
 		for i := 1; i <= 31; i++ {
-			leadingZero := ""
-			if i < 10 {
-				leadingZero = "0"
-			}
-			date, _ := time.Parse(dateLayout, fmt.Sprintf("1970-01-%s%d", leadingZero, i))
+			date := time.Date(1990, time.November, i, 0, 0, 0, 0, time.UTC)
 			item := StargazersCountHistoryItem{Date: date, StargazersCount: 100}
 			history = append(history, item)
 		}

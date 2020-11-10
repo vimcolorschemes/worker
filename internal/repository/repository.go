@@ -50,7 +50,7 @@ func GetStargazersCountHistory(repository Repository) []StargazersCountHistoryIt
 	// sort: newest first
 	if len(history) > 0 {
 		sort.Slice(history, func(i int, j int) bool {
-			return history[i].Date.Before(history[j].Date)
+			return history[i].Date.After(history[j].Date)
 		})
 	}
 
