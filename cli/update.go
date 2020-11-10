@@ -44,6 +44,8 @@ func updateRepository(repository repoUtil.Repository) repoUtil.Repository {
 
 	repository.StargazersCountHistory = repoUtil.GetStargazersCountHistory(repository)
 
+	repository.WeekStargazersCount = repoUtil.ComputeTrendingStargazersCount(repository, 7)
+
 	repository.Valid = true
 
 	return repository
@@ -54,6 +56,7 @@ func getUpdateRepositoryObject(repository repoUtil.Repository) bson.M {
 		"lastCommitAt":           repository.LastCommitAt,
 		"stargazersCount":        repository.StargazersCount,
 		"stargazersCountHistory": repository.StargazersCountHistory,
+		"weekStargazersCount":    repository.WeekStargazersCount,
 		"valid":                  repository.Valid,
 	}
 }

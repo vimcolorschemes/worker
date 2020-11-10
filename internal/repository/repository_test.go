@@ -194,3 +194,119 @@ func TestGetStargazersCountHistory(t *testing.T) {
 		}
 	})
 }
+
+func TestComputeTrendingStargazersCount(t *testing.T) {
+	t.Run("should sum the difference for all items when count is equal to days count", func(t *testing.T) {
+		today := dateUtil.Today()
+
+		history := []StargazersCountHistoryItem{
+			{Date: today, StargazersCount: 120},
+			{Date: today, StargazersCount: 100},
+		}
+
+		repository := Repository{
+			StargazersCountHistory: history,
+		}
+
+		result := ComputeTrendingStargazersCount(repository, 2)
+
+		if result != 20 {
+			t.Errorf("Incorrect result for ComputeTrendingStargazersCount, got: %d, want: %d", result, 20)
+		}
+	})
+
+	t.Run("should sum the difference for all items when count is less than days count", func(t *testing.T) {
+		today := dateUtil.Today()
+
+		history := []StargazersCountHistoryItem{
+			{Date: today, StargazersCount: 120},
+			{Date: today, StargazersCount: 100},
+		}
+
+		repository := Repository{
+			StargazersCountHistory: history,
+		}
+
+		result := ComputeTrendingStargazersCount(repository, 3)
+
+		if result != 20 {
+			t.Errorf("Incorrect result for ComputeTrendingStargazersCount, got: %d, want: %d", result, 20)
+		}
+	})
+
+	t.Run("should sum the difference for first items when count is more than days count", func(t *testing.T) {
+		today := dateUtil.Today()
+
+		history := []StargazersCountHistoryItem{
+			{Date: today, StargazersCount: 150},
+			{Date: today, StargazersCount: 140},
+			{Date: today, StargazersCount: 130},
+			{Date: today, StargazersCount: 120},
+			{Date: today, StargazersCount: 110},
+			{Date: today, StargazersCount: 100},
+		}
+
+		repository := Repository{
+			StargazersCountHistory: history,
+		}
+
+		result := ComputeTrendingStargazersCount(repository, 2)
+
+		if result != 10 {
+			t.Errorf("Incorrect result for ComputeTrendingStargazersCount, got: %d, want: %d", result, 10)
+		}
+	})
+
+	t.Run("should return 0 when there is no items", func(t *testing.T) {
+		history := []StargazersCountHistoryItem{}
+
+		repository := Repository{
+			StargazersCountHistory: history,
+		}
+
+		result := ComputeTrendingStargazersCount(repository, 2)
+
+		if result != 0 {
+			t.Errorf("Incorrect result for ComputeTrendingStargazersCount, got: %d, want: %d", result, 0)
+		}
+	})
+
+	t.Run("should handle negative counts", func(t *testing.T) {
+		today := dateUtil.Today()
+
+		history := []StargazersCountHistoryItem{
+			{Date: today, StargazersCount: 100},
+			{Date: today, StargazersCount: 120},
+		}
+
+		repository := Repository{
+			StargazersCountHistory: history,
+		}
+
+		result := ComputeTrendingStargazersCount(repository, 2)
+
+		if result != -20 {
+			t.Errorf("Incorrect result for ComputeTrendingStargazersCount, got: %d, want: %d", result, -20)
+		}
+	})
+
+	t.Run("should handle 'back-to-zero' counts", func(t *testing.T) {
+		today := dateUtil.Today()
+
+		history := []StargazersCountHistoryItem{
+			{Date: today, StargazersCount: 120},
+			{Date: today, StargazersCount: 100},
+			{Date: today, StargazersCount: 120},
+		}
+
+		repository := Repository{
+			StargazersCountHistory: history,
+		}
+
+		result := ComputeTrendingStargazersCount(repository, 3)
+
+		if result != 0 {
+			t.Errorf("Incorrect result for ComputeTrendingStargazersCount, got: %d, want: %d", result, 0)
+		}
+	})
+}

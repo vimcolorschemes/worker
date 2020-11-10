@@ -20,6 +20,7 @@ type Repository struct {
 	LastCommitAt           time.Time
 	StargazersCount        int
 	StargazersCountHistory []StargazersCountHistoryItem
+	WeekStargazersCount    int
 }
 
 type StargazersCountHistoryItem struct {
@@ -81,4 +82,20 @@ func GetStargazersCountHistory(repository Repository) []StargazersCountHistoryIt
 	}
 
 	return history
+}
+
+func ComputeTrendingStargazersCount(repository Repository, dayCount int) int {
+	if repository.StargazersCountHistory == nil || len(repository.StargazersCountHistory) == 0 {
+		return 0
+	}
+
+	firstIndex := len(repository.StargazersCountHistory) - 1
+	if dayCount-1 < firstIndex {
+		firstIndex = dayCount - 1
+	}
+
+	firstDayCount := repository.StargazersCountHistory[firstIndex].StargazersCount
+	lastDayCount := repository.StargazersCountHistory[0].StargazersCount
+
+	return lastDayCount - firstDayCount
 }
