@@ -3,25 +3,14 @@ package database
 import (
 	"context"
 	"log"
-	"time"
 
 	"github.com/vimcolorschemes/worker/internal/dotenv"
+	"github.com/vimcolorschemes/worker/internal/repository"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-type Repository struct {
-	ID    int64 `bson:"_id,omitempty"`
-	Name  string
-	Owner struct {
-		Name      string
-		AvatarURL string
-	}
-	Valid        bool
-	LastCommitAt time.Time
-}
 
 var ctx = context.TODO()
 var repositoriesCollection *mongo.Collection
@@ -43,8 +32,8 @@ func init() {
 	repositoriesCollection = client.Database("vimcolorschemes").Collection("repositories")
 }
 
-func GetRepositories() []Repository {
-	var repositories []Repository
+func GetRepositories() []repository.Repository {
+	var repositories []repository.Repository
 	cursor, err := repositoriesCollection.Find(ctx, bson.M{})
 	if err != nil {
 		log.Print("here")

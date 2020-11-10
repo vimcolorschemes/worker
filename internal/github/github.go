@@ -2,7 +2,6 @@ package github
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -40,7 +39,7 @@ func GetRepository(ownerName string, name string) (*gogithub.Repository, error) 
 	return repository, nil
 }
 
-func GetLastCommitAt(repository *gogithub.Repository) (time.Time, error) {
+func GetLastCommitAt(repository *gogithub.Repository) time.Time {
 	ownerName := *repository.Owner.Login
 	name := *repository.Name
 	defaultBranch := *repository.DefaultBranch
@@ -48,15 +47,12 @@ func GetLastCommitAt(repository *gogithub.Repository) (time.Time, error) {
 
 	commits, _, err := client.Repositories.ListCommits(context.Background(), ownerName, name, options)
 
-	if err != nil {
-		return time.Now(), err
+	if err != nil || len(commits) == 0 {
+		log.Print("Error getting last commit of ", ownerName, "/", name)
+		return time.Time{}
 	}
 
-	if len(commits) == 0 {
-		return time.Now(), errors.New("no commits")
-	}
-
-	return commits[0].Commit.Author.GetDate(), nil
+	return commits[0].Commit.Author.GetDate()
 }
 
 func SearchRepositories(queries []string, repositoryCountLimit int, repositoryCountLimitPerPage int) []*gogithub.Repository {
