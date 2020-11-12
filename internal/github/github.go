@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -16,6 +17,8 @@ import (
 )
 
 var client *gogithub.Client
+
+const fileQueryLimit = 50
 
 func init() {
 	ctx := context.Background()
@@ -53,6 +56,50 @@ func GetLastCommitAt(repository *gogithub.Repository) time.Time {
 	}
 
 	return commits[0].Commit.Author.GetDate()
+}
+
+func GetRepositoryFileURLs(repository *gogithub.Repository) []string {
+	ownerName := *repository.Owner.Login
+	name := *repository.Name
+	basePath := ""
+
+	fileURLs, err := getRepositoryFileUrlsAtPath(ownerName, name, basePath)
+	if err != nil {
+		log.Print(err)
+		return []string{}
+	}
+	return fileURLs
+}
+
+func getRepositoryFileUrlsAtPath(ownerName string, name string, path string) ([]string, error) {
+	options := &gogithub.RepositoryContentGetOptions{}
+	_, contents, _, _ := client.Repositories.GetContents(context.Background(), ownerName, name, path, options)
+
+	fileURLs := []string{}
+
+	for _, content := range contents {
+		if len(fileURLs) > fileQueryLimit {
+			// limit reached
+			return []string{}, errors.New("File limit reached")
+		}
+
+		switch content.GetType() {
+		case "file":
+			fileURLs = append(fileURLs, content.GetDownloadURL())
+			break
+		case "dir":
+			newFileURLs, err := getRepositoryFileUrlsAtPath(ownerName, name, content.GetPath())
+			if err != nil {
+				return []string{}, err
+			}
+			fileURLs = append(fileURLs, newFileURLs...)
+			break
+		default:
+			break
+		}
+	}
+
+	return fileURLs, nil
 }
 
 func SearchRepositories(queries []string, repositoryCountLimit int, repositoryCountLimitPerPage int) []*gogithub.Repository {

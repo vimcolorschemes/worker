@@ -21,6 +21,7 @@ type Repository struct {
 	StargazersCount        int
 	StargazersCountHistory []StargazersCountHistoryItem
 	WeekStargazersCount    int
+	VimColorSchemeNames    []string
 }
 
 type StargazersCountHistoryItem struct {
@@ -57,7 +58,7 @@ func GetStargazersCountHistory(repository Repository) []StargazersCountHistoryIt
 
 	today := date.RoundTimeToDate(time.Now().UTC())
 
-	// Remove present entries for today
+	// remove present entries for today
 	for index := 0; index < len(history); {
 		item := history[index]
 		if item.Date == today {

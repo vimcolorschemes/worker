@@ -12,7 +12,7 @@ func TestToday(t *testing.T) {
 
 		hourDiff := today.Sub(result).Hours()
 
-		// Since Today returns no hours, there should be a diff, but it should be
+		// since Today returns no hours, there should be a diff, but it should be
 		// less than 24 hours
 		if hourDiff > 24 {
 			t.Errorf("Incorrect result for Today, got diff: %f, want diff: <%d", hourDiff, 24)
@@ -23,7 +23,7 @@ func TestToday(t *testing.T) {
 		result := Today()
 
 		if result.Hour() != 0 || result.Minute() != 0 || result.Second() != 0 || result.Nanosecond() != 0 {
-			t.Errorf("Incorrect result for Today, got time")
+			t.Error("Incorrect result for Today, got time")
 		}
 	})
 }
@@ -34,7 +34,7 @@ func TestRoundTimeToDate(t *testing.T) {
 		result := RoundTimeToDate(datetime)
 
 		if result.Hour() != 0 || result.Minute() != 0 || result.Second() != 0 || result.Nanosecond() != 0 {
-			t.Errorf("Incorrect result for RoundTimeToDate, got time")
+			t.Error("Incorrect result for RoundTimeToDate, got time")
 		}
 	})
 }
