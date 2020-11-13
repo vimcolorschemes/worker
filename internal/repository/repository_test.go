@@ -6,6 +6,7 @@ import (
 	"time"
 
 	gogithub "github.com/google/go-github/v32/github"
+	"github.com/vimcolorschemes/worker/internal/date"
 	dateUtil "github.com/vimcolorschemes/worker/internal/date"
 )
 
@@ -307,6 +308,86 @@ func TestComputeTrendingStargazersCount(t *testing.T) {
 
 		if result != 0 {
 			t.Errorf("Incorrect result for ComputeTrendingStargazersCount, got: %d, want: %d", result, 0)
+		}
+	})
+}
+
+func TestComputeRepositoryValidity(t *testing.T) {
+	t.Run("should return valid for a repository that checks all boxes", func(t *testing.T) {
+		var repository Repository
+		repository.LastCommitAt = time.Now()
+		repository.StargazersCount = 1
+		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date.Today(), StargazersCount: 1}}
+		repository.VimColorSchemeNames = []string{"test"}
+
+		isValid := IsRepositoryValid(repository)
+		if !isValid {
+			t.Errorf("Incorrect result for IsRepositoryValid, got: %v, want: %v", isValid, true)
+		}
+	})
+
+	t.Run("should return invalid for a repository with no last commit at", func(t *testing.T) {
+		var repository Repository
+		repository.StargazersCount = 1
+		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date.Today(), StargazersCount: 1}}
+		repository.VimColorSchemeNames = []string{"test"}
+
+		isValid := IsRepositoryValid(repository)
+		if isValid {
+			t.Errorf("Incorrect result for IsRepositoryValid, got: %v, want: %v", isValid, false)
+		}
+	})
+
+	t.Run("should return invalid for a repository with a non strictly positive stargazers count", func(t *testing.T) {
+		var repository Repository
+		repository.LastCommitAt = time.Now()
+		repository.StargazersCount = 0
+		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date.Today(), StargazersCount: 1}}
+		repository.VimColorSchemeNames = []string{"test"}
+
+		isValid := IsRepositoryValid(repository)
+		if isValid {
+			t.Errorf("Incorrect result for IsRepositoryValid, got: %v, want: %v", isValid, false)
+		}
+	})
+
+	t.Run("should return invalid for a repository with an empty stargazers count history", func(t *testing.T) {
+		var repository Repository
+		repository.LastCommitAt = time.Now()
+		repository.StargazersCount = 1
+		repository.StargazersCountHistory = []StargazersCountHistoryItem{}
+		repository.VimColorSchemeNames = []string{"test"}
+
+		isValid := IsRepositoryValid(repository)
+		if isValid {
+			t.Errorf("Incorrect result for IsRepositoryValid, got: %v, want: %v", isValid, false)
+		}
+	})
+
+	t.Run("should return invalid for a repository with an outdated stargazers count history", func(t *testing.T) {
+		var repository Repository
+		repository.LastCommitAt = time.Now()
+		repository.StargazersCount = 1
+		date := time.Date(1990, time.November, 01, 0, 0, 0, 0, time.UTC)
+		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date, StargazersCount: 1}}
+		repository.VimColorSchemeNames = []string{"test"}
+
+		isValid := IsRepositoryValid(repository)
+		if isValid {
+			t.Errorf("Incorrect result for IsRepositoryValid, got: %v, want: %v", isValid, false)
+		}
+	})
+
+	t.Run("should return invalid for a repository with an empty vim color scheme name list", func(t *testing.T) {
+		var repository Repository
+		repository.LastCommitAt = time.Now()
+		repository.StargazersCount = 1
+		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date.Today(), StargazersCount: 1}}
+		repository.VimColorSchemeNames = []string{}
+
+		isValid := IsRepositoryValid(repository)
+		if isValid {
+			t.Errorf("Incorrect result for IsRepositoryValid, got: %v, want: %v", isValid, false)
 		}
 	})
 }

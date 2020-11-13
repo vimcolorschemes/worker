@@ -8,7 +8,7 @@ import (
 	"github.com/vimcolorschemes/worker/internal/file"
 )
 
-func GetVimColorSchemeNames(vimFileURLs []string) []string {
+func GetVimColorSchemeNames(vimFileURLs []string) ([]string, error) {
 	vimColorSchemeNames := []string{}
 
 	for _, vimFileURL := range vimFileURLs {
@@ -28,7 +28,11 @@ func GetVimColorSchemeNames(vimFileURLs []string) []string {
 		vimColorSchemeNames = append(vimColorSchemeNames, vimColorSchemeName)
 	}
 
-	return vimColorSchemeNames
+	if len(vimColorSchemeNames) == 0 {
+		return []string{}, errors.New("no vim color schemes found")
+	}
+
+	return vimColorSchemeNames, nil
 }
 
 func GetVimColorSchemeName(fileContent *string) (string, error) {

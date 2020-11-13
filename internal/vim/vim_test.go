@@ -27,7 +27,11 @@ func TestGetVimColorSchemeNames(t *testing.T) {
 		server2 := test.MockServer(fileContent2, http.StatusOK)
 		defer server2.Close()
 
-		names := GetVimColorSchemeNames([]string{server1.URL, server2.URL})
+		names, err := GetVimColorSchemeNames([]string{server1.URL, server2.URL})
+
+		if err != nil {
+			t.Error("Incorrect result for GetVimColorSchemeNames, got error")
+		}
 
 		expectedNames := []string{"test", "hello"}
 
@@ -54,7 +58,11 @@ func TestGetVimColorSchemeNames(t *testing.T) {
 		server2 := test.MockServer(fileContent2, http.StatusOK)
 		defer server2.Close()
 
-		names := GetVimColorSchemeNames([]string{server1.URL, server2.URL})
+		names, err := GetVimColorSchemeNames([]string{server1.URL, server2.URL})
+
+		if err != nil {
+			t.Error("Incorrect result for GetVimColorSchemeNames, got error")
+		}
 
 		expectedNames := []string{"hello"}
 
@@ -63,7 +71,7 @@ func TestGetVimColorSchemeNames(t *testing.T) {
 		}
 	})
 
-	t.Run("should return empty array on invalid vim color scheme files", func(t *testing.T) {
+	t.Run("should return empty array and error on invalid vim color scheme files", func(t *testing.T) {
 		fileContent1 := `
 			hi clear
 			syntax reset
@@ -71,6 +79,7 @@ func TestGetVimColorSchemeNames(t *testing.T) {
 		fileContent2 := `
 			hi clear
 			syntax reset
+			let g:color='test'
 		`
 
 		server1 := test.MockServer(fileContent1, http.StatusOK)
@@ -79,9 +88,13 @@ func TestGetVimColorSchemeNames(t *testing.T) {
 		server2 := test.MockServer(fileContent2, http.StatusOK)
 		defer server2.Close()
 
-		names := GetVimColorSchemeNames([]string{server1.URL, server2.URL})
+		names, err := GetVimColorSchemeNames([]string{server1.URL, server2.URL})
 
 		expectedNames := []string{}
+
+		if err == nil {
+			t.Error("Incorrect result for GetVimColorSchemeNames, got no error")
+		}
 
 		if !reflect.DeepEqual(names, expectedNames) {
 			t.Errorf("Incorrect result for GetVimColorSchemeNames, got: %s, want: %s", names, expectedNames)
@@ -98,7 +111,11 @@ func TestGetVimColorSchemeNames(t *testing.T) {
 		server := test.MockServer(fileContent, http.StatusOK)
 		defer server.Close()
 
-		names := GetVimColorSchemeNames([]string{server.URL, "wrong url"})
+		names, err := GetVimColorSchemeNames([]string{server.URL, "wrong url"})
+
+		if err != nil {
+			t.Error("Incorrect result for GetVimColorSchemeNames, got error")
+		}
 
 		expectedNames := []string{"test"}
 

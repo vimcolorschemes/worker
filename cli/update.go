@@ -64,15 +64,16 @@ func updateRepository(repository repoUtil.Repository) repoUtil.Repository {
 	log.Print(len(vimFileURLs), " vim files found")
 	if len(vimFileURLs) > 0 {
 		log.Print("Checking for vim color scheme names")
-		repository.VimColorSchemeNames = vim.GetVimColorSchemeNames(vimFileURLs)
-
-		if len(repository.VimColorSchemeNames) == 0 {
+		if vimColorSchemeNames, err := vim.GetVimColorSchemeNames(vimFileURLs); err != nil {
 			log.Print("Did not find any vim color scheme names")
+		} else {
+			repository.VimColorSchemeNames = vimColorSchemeNames
 		}
 	}
 
-	log.Print("Computing validity of repository")
-	repository.Valid = true
+	log.Print("Checking if ", repository.Owner.Name, "/", repository.Name, " is valid")
+	repository.Valid = repoUtil.IsRepositoryValid(repository)
+	log.Printf("Valid: %v", repository.Valid)
 
 	return repository
 }

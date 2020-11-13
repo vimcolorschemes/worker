@@ -38,3 +38,40 @@ func TestRoundTimeToDate(t *testing.T) {
 		}
 	})
 }
+
+func TestIsSameDay(t *testing.T) {
+	t.Run("should return true when comparing the same time", func(t *testing.T) {
+		date := time.Now()
+
+		if !IsSameDay(date, date) {
+			t.Errorf("Incorrect result for IsSameDay, returned false for %s and %s", date, date)
+		}
+	})
+
+	t.Run("should return true when comparing 2 equal times", func(t *testing.T) {
+		date1 := time.Now()
+		date2 := time.Now()
+
+		if !IsSameDay(date1, date2) {
+			t.Errorf("Incorrect result for IsSameDay, returned false for %s and %s", date1, date2)
+		}
+	})
+
+	t.Run("should return true when comparing 2 times of same day", func(t *testing.T) {
+		date1 := time.Date(2020, time.January, 01, 23, 59, 59, 999, time.UTC)
+		date2 := time.Date(2020, time.January, 01, 00, 00, 00, 000, time.UTC)
+
+		if !IsSameDay(date1, date2) {
+			t.Errorf("Incorrect result for IsSameDay, returned false for %s and %s", date1, date2)
+		}
+	})
+
+	t.Run("should return false when comparing 2 different days", func(t *testing.T) {
+		date1 := time.Date(2020, time.January, 01, 23, 59, 59, 999, time.UTC)
+		date2 := time.Date(2019, time.January, 01, 00, 00, 00, 000, time.UTC)
+
+		if IsSameDay(date1, date2) {
+			t.Errorf("Incorrect result for IsSameDay, returned true for %s and %s", date1, date2)
+		}
+	})
+}

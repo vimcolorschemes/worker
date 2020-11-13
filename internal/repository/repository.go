@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"log"
 	"sort"
 	"time"
 
@@ -99,4 +100,34 @@ func ComputeTrendingStargazersCount(repository Repository, dayCount int) int {
 	lastDayCount := repository.StargazersCountHistory[0].StargazersCount
 
 	return lastDayCount - firstDayCount
+}
+
+func IsRepositoryValid(repository Repository) bool {
+	var defaultTime time.Time
+	if repository.LastCommitAt == defaultTime {
+		log.Print("Repository last commit at is not valid")
+		return false
+	}
+
+	if repository.StargazersCount < 1 {
+		log.Print("Repository does not have enough stars")
+		return false
+	}
+
+	if len(repository.StargazersCountHistory) < 1 {
+		log.Print("Repository stargazers count history is empty")
+		return false
+	}
+
+	if !date.IsSameDay(repository.StargazersCountHistory[0].Date, date.Today()) {
+		log.Print("Repository stargazers count history last entry is not today")
+		return false
+	}
+
+	if len(repository.VimColorSchemeNames) < 1 {
+		log.Print("Repository does not have vim color scheme names")
+		return false
+	}
+
+	return true
 }
