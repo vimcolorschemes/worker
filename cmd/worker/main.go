@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"os"
 
@@ -8,7 +9,12 @@ import (
 )
 
 func main() {
-	job := getArgJob()
+	job, err := getArgJob()
+
+	if err != nil {
+		log.Print(err)
+		os.Exit(1)
+	}
 
 	switch job {
 	case "import":
@@ -16,22 +22,15 @@ func main() {
 	case "update":
 		cli.Update()
 	default:
-		if job == "" {
-			log.Print("Please Provide an argument")
-			os.Exit(1)
-		} else {
-			log.Print(job, " is not a valid job")
-			os.Exit(1)
-		}
+		log.Print(job, " is not a valid job")
+		os.Exit(1)
 	}
 }
 
-func getArgJob() string {
-	var job = ""
-
+func getArgJob() (string, error) {
 	if len(os.Args) > 1 {
-		job = os.Args[1]
+		return os.Args[1], nil
 	}
 
-	return job
+	return "", errors.New("Please provide an argument")
 }
