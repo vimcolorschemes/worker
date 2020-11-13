@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/vimcolorschemes/worker/internal/database"
 	"github.com/vimcolorschemes/worker/internal/file"
@@ -15,6 +16,8 @@ import (
 
 func Update() {
 	log.Print("Run update")
+
+	startTime := time.Now()
 
 	repositories := database.GetRepositories()
 
@@ -31,6 +34,17 @@ func Update() {
 
 		database.UpsertRepository(repository.ID, updateObject)
 	}
+
+	fmt.Println()
+
+	elapsedTime := time.Since(startTime)
+	log.Printf("Elapsed time: %s", elapsedTime)
+
+	fmt.Println()
+
+	log.Print("Creating update report")
+	data := bson.M{"repositoryCount": len(repositories)}
+	database.CreateReport("update", elapsedTime.Seconds(), data)
 
 	fmt.Println()
 

@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/vimcolorschemes/worker/internal/dotenv"
 	"github.com/vimcolorschemes/worker/internal/repository"
@@ -14,6 +15,7 @@ import (
 
 var ctx = context.TODO()
 var repositoriesCollection *mongo.Collection
+var reportsCollection *mongo.Collection
 
 func init() {
 	connectionString := dotenv.Get("MONGODB_CONNECTION_STRING", true)
@@ -29,7 +31,9 @@ func init() {
 		panic(err)
 	}
 
-	repositoriesCollection = client.Database("vimcolorschemes").Collection("repositories")
+	database := client.Database("vimcolorschemes")
+	repositoriesCollection = database.Collection("repositories")
+	reportsCollection = database.Collection("reports")
 }
 
 func GetRepositories() []repository.Repository {
@@ -47,7 +51,6 @@ func GetRepositories() []repository.Repository {
 }
 
 func UpsertRepository(id int64, updateObject bson.M) {
-
 	filter := bson.M{"_id": id}
 
 	update := bson.M{"$set": updateObject}
@@ -57,6 +60,22 @@ func UpsertRepository(id int64, updateObject bson.M) {
 	_, err := repositoriesCollection.UpdateOne(ctx, filter, update, upsertOptions)
 
 	if err != nil {
+		log.Printf("Error upserting repository: %s", err)
+		panic(err)
+	}
+}
+
+func CreateReport(job string, elapsedTime float64, data bson.M) {
+	object := bson.M{
+		"date":        time.Now(),
+		"job":         job,
+		"elapsedTime": elapsedTime,
+		"data":        data,
+	}
+	_, err := reportsCollection.InsertOne(ctx, object, &options.InsertOneOptions{})
+
+	if err != nil {
+		log.Printf("Error creating report: %s", err)
 		panic(err)
 	}
 }

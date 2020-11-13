@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"fmt"
 	"log"
 	"math"
+	"time"
 
 	"github.com/vimcolorschemes/worker/internal/database"
 	"github.com/vimcolorschemes/worker/internal/dotenv"
@@ -39,6 +41,8 @@ func init() {
 func Import() {
 	log.Print("run import")
 
+	startTime := time.Now()
+
 	repositories := github.SearchRepositories(queries, repositoryCountLimit, repositoryCountLimitPerPage)
 
 	log.Print("Upserting ", len(repositories), " repositories")
@@ -47,6 +51,19 @@ func Import() {
 		repositoryUpdateObject := getImportRepositoryObject(repository)
 		database.UpsertRepository(*repository.ID, repositoryUpdateObject)
 	}
+
+	fmt.Println()
+
+	elapsedTime := time.Since(startTime)
+	log.Printf("Elapsed time: %s", elapsedTime)
+
+	fmt.Println()
+
+	log.Print("Creating import report")
+	data := bson.M{"repositoryCount": len(repositories)}
+	database.CreateReport("import", elapsedTime.Seconds(), data)
+
+	fmt.Println()
 
 	log.Print(":wq")
 }
