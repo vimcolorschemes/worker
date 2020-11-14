@@ -6,33 +6,49 @@ import (
 	"regexp"
 
 	"github.com/vimcolorschemes/worker/internal/file"
+	"github.com/vimcolorschemes/worker/internal/repository"
 )
 
-func GetVimColorSchemeNames(vimFileURLs []string) ([]string, error) {
-	vimColorSchemeNames := []string{}
+func GetVimColorSchemes(vimFileURLs []string) ([]repository.ColorScheme, error) {
+	vimColorSchemes := []repository.ColorScheme{}
 
 	for _, vimFileURL := range vimFileURLs {
+		if containsURL(vimColorSchemes, vimFileURL) {
+			continue
+		}
+
 		fileContent, err := file.DownloadFile(vimFileURL)
 		if err != nil {
 			log.Print("Error downloading file: ", vimFileURL)
 			continue
 		}
 
-		vimColorSchemeName, err := GetVimColorSchemeName(&fileContent)
-		if err != nil || vimColorSchemeName == "" || contains(vimColorSchemeNames, vimColorSchemeName) {
+		if !IsVimColorScheme(&fileContent) {
 			continue
 		}
 
-		log.Print("Found ", vimColorSchemeName)
+		vimColorSchemeName, err := GetVimColorSchemeName(&fileContent)
+		if err != nil || vimColorSchemeName == "" {
+			continue
+		}
 
-		vimColorSchemeNames = append(vimColorSchemeNames, vimColorSchemeName)
+		log.Print("Found ", vimColorSchemeName, " at ", vimFileURL)
+
+		vimColorSchemes = append(vimColorSchemes, repository.ColorScheme{Name: vimColorSchemeName, FileURL: vimFileURL})
 	}
 
-	if len(vimColorSchemeNames) == 0 {
-		return []string{}, errors.New("no vim color schemes found")
+	if len(vimColorSchemes) == 0 {
+		return []repository.ColorScheme{}, errors.New("no vim color schemes found")
 	}
 
-	return vimColorSchemeNames, nil
+	return vimColorSchemes, nil
+}
+
+func IsVimColorScheme(fileContent *string) bool {
+	vimNormalHighlight := regexp.MustCompile(`hi!? Normal`)
+	isAVimColorScheme := vimNormalHighlight.MatchString(*fileContent)
+
+	return isAVimColorScheme
 }
 
 func GetVimColorSchemeName(fileContent *string) (string, error) {
@@ -48,9 +64,9 @@ func GetVimColorSchemeName(fileContent *string) (string, error) {
 	return matches[2], nil
 }
 
-func contains(s []string, str string) bool {
-	for _, v := range s {
-		if v == str {
+func containsURL(colorSchemes []repository.ColorScheme, fileURL string) bool {
+	for _, colorScheme := range colorSchemes {
+		if colorScheme.FileURL == fileURL {
 			return true
 		}
 	}

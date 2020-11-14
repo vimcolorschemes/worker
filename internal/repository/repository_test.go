@@ -6,7 +6,6 @@ import (
 	"time"
 
 	gogithub "github.com/google/go-github/v32/github"
-	"github.com/vimcolorschemes/worker/internal/date"
 	dateUtil "github.com/vimcolorschemes/worker/internal/date"
 )
 
@@ -317,8 +316,8 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		var repository Repository
 		repository.LastCommitAt = time.Now()
 		repository.StargazersCount = 1
-		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date.Today(), StargazersCount: 1}}
-		repository.VimColorSchemeNames = []string{"test"}
+		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
+		repository.VimColorSchemes = []ColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
 		isValid := IsRepositoryValid(repository)
 		if !isValid {
@@ -329,8 +328,8 @@ func TestComputeRepositoryValidity(t *testing.T) {
 	t.Run("should return invalid for a repository with no last commit at", func(t *testing.T) {
 		var repository Repository
 		repository.StargazersCount = 1
-		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date.Today(), StargazersCount: 1}}
-		repository.VimColorSchemeNames = []string{"test"}
+		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
+		repository.VimColorSchemes = []ColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
 		isValid := IsRepositoryValid(repository)
 		if isValid {
@@ -342,8 +341,8 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		var repository Repository
 		repository.LastCommitAt = time.Now()
 		repository.StargazersCount = 0
-		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date.Today(), StargazersCount: 1}}
-		repository.VimColorSchemeNames = []string{"test"}
+		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
+		repository.VimColorSchemes = []ColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
 		isValid := IsRepositoryValid(repository)
 		if isValid {
@@ -356,7 +355,7 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		repository.LastCommitAt = time.Now()
 		repository.StargazersCount = 1
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{}
-		repository.VimColorSchemeNames = []string{"test"}
+		repository.VimColorSchemes = []ColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
 		isValid := IsRepositoryValid(repository)
 		if isValid {
@@ -370,7 +369,7 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		repository.StargazersCount = 1
 		date := time.Date(1990, time.November, 01, 0, 0, 0, 0, time.UTC)
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date, StargazersCount: 1}}
-		repository.VimColorSchemeNames = []string{"test"}
+		repository.VimColorSchemes = []ColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
 		isValid := IsRepositoryValid(repository)
 		if isValid {
@@ -382,8 +381,8 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		var repository Repository
 		repository.LastCommitAt = time.Now()
 		repository.StargazersCount = 1
-		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date.Today(), StargazersCount: 1}}
-		repository.VimColorSchemeNames = []string{}
+		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
+		repository.VimColorSchemes = []ColorScheme{}
 
 		isValid := IsRepositoryValid(repository)
 		if isValid {

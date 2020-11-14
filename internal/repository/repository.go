@@ -11,23 +11,30 @@ import (
 )
 
 type Repository struct {
-	ID    int64 `bson:"_id,omitempty"`
-	Name  string
-	Owner struct {
-		Name      string
-		AvatarURL string
-	}
-	Valid                  bool
-	LastCommitAt           time.Time
-	StargazersCount        int
-	StargazersCountHistory []StargazersCountHistoryItem
-	WeekStargazersCount    int
-	VimColorSchemeNames    []string
+	ID                     int64                        `bson:"_id,omitempty"`
+	Name                   string                       `bson:"name"`
+	Owner                  RepositoryOwner              `bson:"owner"`
+	Valid                  bool                         `bson:"valid"`
+	LastCommitAt           time.Time                    `bson:"lastCommitAt"`
+	StargazersCount        int                          `bson:"stargazersCount"`
+	StargazersCountHistory []StargazersCountHistoryItem `bson:"stargazersCountHistory"`
+	WeekStargazersCount    int                          `bson:"weekStargazersCount"`
+	VimColorSchemes        []ColorScheme                `bson:"vimColorSchemes"`
+}
+
+type RepositoryOwner struct {
+	Name      string `bson:"name"`
+	AvatarURL string `bson:"avatarURL"`
 }
 
 type StargazersCountHistoryItem struct {
-	Date            time.Time
-	StargazersCount int
+	Date            time.Time `bson:"date"`
+	StargazersCount int       `bson:"stargazersCount"`
+}
+
+type ColorScheme struct {
+	FileURL string `bson:"fileURL"`
+	Name    string `bson:"name"`
 }
 
 func UniquifyRepositories(repositories []*gogithub.Repository) []*gogithub.Repository {
@@ -124,8 +131,8 @@ func IsRepositoryValid(repository Repository) bool {
 		return false
 	}
 
-	if len(repository.VimColorSchemeNames) < 1 {
-		log.Print("Repository does not have vim color scheme names")
+	if len(repository.VimColorSchemes) < 1 {
+		log.Print("Repository does not have vim color schemes")
 		return false
 	}
 

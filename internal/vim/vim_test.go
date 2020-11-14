@@ -5,20 +5,23 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/vimcolorschemes/worker/internal/repository"
 	"github.com/vimcolorschemes/worker/internal/test"
 )
 
-func TestGetVimColorSchemeNames(t *testing.T) {
-	t.Run("should return vim color scheme names of multiple valid files", func(t *testing.T) {
+func TestGetVimColorSchemes(t *testing.T) {
+	t.Run("should return vim color scheme file URLs of multiple valid files", func(t *testing.T) {
 		fileContent1 := `
 			hi clear
 			syntax reset
 			let g:colors_name = "test"
+			hi Normal cterm=97
 		`
 		fileContent2 := `
 			hi clear
 			syntax reset
 			let g:colors_name = "hello"
+			hi Normal cterm=97
 		`
 
 		server1 := test.MockServer(fileContent1, http.StatusOK)
@@ -27,47 +30,40 @@ func TestGetVimColorSchemeNames(t *testing.T) {
 		server2 := test.MockServer(fileContent2, http.StatusOK)
 		defer server2.Close()
 
-		names, err := GetVimColorSchemeNames([]string{server1.URL, server2.URL})
+		colorSchemes, err := GetVimColorSchemes([]string{server1.URL, server2.URL})
 
 		if err != nil {
-			t.Error("Incorrect result for GetVimColorSchemeNames, got error")
+			t.Error("Incorrect result for GetVimColorSchemes, got error")
 		}
 
-		expectedNames := []string{"test", "hello"}
+		expectedColorSchemes := []repository.ColorScheme{{Name: "test", FileURL: server1.URL}, {Name: "hello", FileURL: server2.URL}}
 
-		if !reflect.DeepEqual(names, expectedNames) {
-			t.Errorf("Incorrect result for GetVimColorSchemeNames, got: %s, want: %s", names, expectedNames)
+		if !reflect.DeepEqual(colorSchemes, expectedColorSchemes) {
+			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", colorSchemes, expectedColorSchemes)
 		}
 	})
 
-	t.Run("should handle duplicate vim color scheme names", func(t *testing.T) {
-		fileContent1 := `
+	t.Run("should handle duplicate vim color scheme file URLs", func(t *testing.T) {
+		fileContent := `
 			hi clear
 			syntax reset
 			let g:colors_name = "hello"
-		`
-		fileContent2 := `
-			hi clear
-			syntax reset
-			let g:colors_name = "hello"
+			hi Normal cterm=97
 		`
 
-		server1 := test.MockServer(fileContent1, http.StatusOK)
-		defer server1.Close()
+		server := test.MockServer(fileContent, http.StatusOK)
+		defer server.Close()
 
-		server2 := test.MockServer(fileContent2, http.StatusOK)
-		defer server2.Close()
-
-		names, err := GetVimColorSchemeNames([]string{server1.URL, server2.URL})
+		colorSchemes, err := GetVimColorSchemes([]string{server.URL, server.URL})
 
 		if err != nil {
-			t.Error("Incorrect result for GetVimColorSchemeNames, got error")
+			t.Error("Incorrect result for GetVimColorSchemes, got error")
 		}
 
-		expectedNames := []string{"hello"}
+		expectedColorSchemes := []repository.ColorScheme{{Name: "hello", FileURL: server.URL}}
 
-		if !reflect.DeepEqual(names, expectedNames) {
-			t.Errorf("Incorrect result for GetVimColorSchemeNames, got: %s, want: %s", names, expectedNames)
+		if !reflect.DeepEqual(colorSchemes, expectedColorSchemes) {
+			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", colorSchemes, expectedColorSchemes)
 		}
 	})
 
@@ -75,11 +71,18 @@ func TestGetVimColorSchemeNames(t *testing.T) {
 		fileContent1 := `
 			hi clear
 			syntax reset
+			let g:color='hello'
 		`
 		fileContent2 := `
 			hi clear
 			syntax reset
+			hi Normal cterm=97
+		`
+		fileContent3 := `
+			hi clear
+			syntax reset
 			let g:color='test'
+			hi Normal cterm=97
 		`
 
 		server1 := test.MockServer(fileContent1, http.StatusOK)
@@ -88,16 +91,19 @@ func TestGetVimColorSchemeNames(t *testing.T) {
 		server2 := test.MockServer(fileContent2, http.StatusOK)
 		defer server2.Close()
 
-		names, err := GetVimColorSchemeNames([]string{server1.URL, server2.URL})
+		server3 := test.MockServer(fileContent3, http.StatusOK)
+		defer server3.Close()
 
-		expectedNames := []string{}
+		colorSchemes, err := GetVimColorSchemes([]string{server1.URL, server2.URL, server3.URL})
+
+		expectedColorSchemes := []repository.ColorScheme{}
 
 		if err == nil {
-			t.Error("Incorrect result for GetVimColorSchemeNames, got no error")
+			t.Error("Incorrect result for GetVimColorSchemes, got no error")
 		}
 
-		if !reflect.DeepEqual(names, expectedNames) {
-			t.Errorf("Incorrect result for GetVimColorSchemeNames, got: %s, want: %s", names, expectedNames)
+		if !reflect.DeepEqual(colorSchemes, expectedColorSchemes) {
+			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", colorSchemes, expectedColorSchemes)
 		}
 	})
 
@@ -106,21 +112,22 @@ func TestGetVimColorSchemeNames(t *testing.T) {
 			hi clear
 			syntax reset
 			let g:colors_name = "test"
+			hi Normal cterm=97
 		`
 
 		server := test.MockServer(fileContent, http.StatusOK)
 		defer server.Close()
 
-		names, err := GetVimColorSchemeNames([]string{server.URL, "wrong url"})
+		colorSchemes, err := GetVimColorSchemes([]string{server.URL, "wrong url"})
 
 		if err != nil {
-			t.Error("Incorrect result for GetVimColorSchemeNames, got error")
+			t.Error("Incorrect result for GetVimColorSchemes, got error")
 		}
 
-		expectedNames := []string{"test"}
+		expectedColorSchemes := []repository.ColorScheme{{Name: "test", FileURL: server.URL}}
 
-		if !reflect.DeepEqual(names, expectedNames) {
-			t.Errorf("Incorrect result for GetVimColorSchemeNames, got: %s, want: %s", names, expectedNames)
+		if !reflect.DeepEqual(colorSchemes, expectedColorSchemes) {
+			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", colorSchemes, expectedColorSchemes)
 		}
 	})
 }
@@ -140,59 +147,59 @@ var validTests = []struct {
 	{fileContent: `
 		hi clear
 		let g:colors_name="hello_world"
-		syntax reset`, name: "hello_world"},
+		syntex reset`, name: "hello_world"},
 	{fileContent: `
 		hi clear
 		let g:color_name="hello (world)"
-		syntax reset`, name: "hello (world)"},
+		syntex reset`, name: "hello (world)"},
 	{fileContent: `
 		hi clear
 		let colors_name = "abcd1234"
-		syntax reset`, name: "abcd1234"},
+		syntex reset`, name: "abcd1234"},
 	{fileContent: `
 		hi clear
 		let color_name = "TEST"
-		syntax reset`, name: "TEST"},
+		syntex reset`, name: "TEST"},
 	{fileContent: `
 		hi clear
 		let colors_name="TEst"
-		syntax reset`, name: "TEst"},
+		syntex reset`, name: "TEst"},
 	{fileContent: `
 		hi clear
 		let color_name="test"
-		syntax reset`, name: "test"},
+		syntex reset`, name: "test"},
 	{fileContent: `
 		hi clear
 		let g:colors_name = 'test'
-		syntax reset`, name: "test"},
+		syntex reset`, name: "test"},
 	{fileContent: `
 		hi clear
 		let g:color_name = 'test'
-		syntax reset`, name: "test"},
+		syntex reset`, name: "test"},
 	{fileContent: `
 		hi clear
 		let g:colors_name='test'
-		syntax reset`, name: "test"},
+		syntex reset`, name: "test"},
 	{fileContent: `
 		hi clear
 		let g:color_name='test'
-		syntax reset`, name: "test"},
+		syntex reset`, name: "test"},
 	{fileContent: `
 		hi clear
 		let colors_name = 'test'
-		syntax reset`, name: "test"},
+		syntex reset`, name: "test"},
 	{fileContent: `
 		hi clear
 		let color_name = 'test'
-		syntax reset`, name: "test"},
+		syntex reset`, name: "test"},
 	{fileContent: `
 		hi clear
 		let colors_name='test'
-		syntax reset`, name: "test"},
+		syntex reset`, name: "test"},
 	{fileContent: `
 		hi clear
 		let color_name='test'
-		syntax reset`, name: "test"},
+		syntex reset`, name: "test"},
 }
 
 func TestGetVimColorSchemeName(t *testing.T) {
@@ -231,7 +238,7 @@ func TestGetVimColorSchemeName(t *testing.T) {
 		`,
 		`
 			hi clear
-			let colors_name = "{}"
+			let colors_name = "{test}"
 			syntax reset
 		`,
 		`
@@ -248,6 +255,37 @@ func TestGetVimColorSchemeName(t *testing.T) {
 			}
 			if name != "" {
 				t.Errorf("Incorrect result for GetVimColorSchemeName, got: %s, want: %s", name, "")
+			}
+		}
+	})
+}
+
+func TestIsVimColorScheme(t *testing.T) {
+	valid := []string{
+		`
+			exe "hi! Normal"        .s:fg_foreground  .s:bg_normal      .s:fmt_none
+		`,
+		`
+			hi Normal ctermbg=254 ctermfg=237 guibg=#e8e9ec guifg=#33374c
+		`,
+	}
+	t.Run("should return true if the file has necessary content", func(t *testing.T) {
+		for _, fileContent := range valid {
+			if !IsVimColorScheme(&fileContent) {
+				t.Errorf("Incorrect result for IsVimColorScheme, got false for: %s", fileContent)
+			}
+		}
+	})
+
+	invalid := []string{
+		`
+			Normal ctermbg=254 ctermfg=237 guibg=#e8e9ec guifg=#33374c
+		`,
+	}
+	t.Run("should return false if the file does not have necessary content", func(t *testing.T) {
+		for _, fileContent := range invalid {
+			if IsVimColorScheme(&fileContent) {
+				t.Errorf("Incorrect result for IsVimColorScheme, got true for: %s", fileContent)
 			}
 		}
 	})

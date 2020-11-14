@@ -78,10 +78,10 @@ func updateRepository(repository repoUtil.Repository) repoUtil.Repository {
 	log.Print(len(vimFileURLs), " vim files found")
 	if len(vimFileURLs) > 0 {
 		log.Print("Checking for vim color scheme names")
-		if vimColorSchemeNames, err := vim.GetVimColorSchemeNames(vimFileURLs); err != nil {
-			log.Print("Did not find any vim color scheme names")
+		if vimColorSchemes, err := vim.GetVimColorSchemes(vimFileURLs); err != nil {
+			log.Print("Did not find any vim color schemes")
 		} else {
-			repository.VimColorSchemeNames = vimColorSchemeNames
+			repository.VimColorSchemes = vimColorSchemes
 		}
 	}
 
@@ -98,7 +98,7 @@ func getUpdateRepositoryObject(repository repoUtil.Repository) bson.M {
 		"stargazersCount":        repository.StargazersCount,
 		"stargazersCountHistory": repository.StargazersCountHistory,
 		"weekStargazersCount":    repository.WeekStargazersCount,
-		"vimColorSchemeNames":    repository.VimColorSchemeNames,
+		"vimColorSchemes":        repository.VimColorSchemes,
 		"valid":                  repository.Valid,
 	}
 }
