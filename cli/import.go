@@ -78,12 +78,12 @@ func Import() {
 
 func getImportRepositoryObject(repository *gogithub.Repository) bson.M {
 	return bson.M{
-		"_id":             *repository.ID,
-		"owner.name":      *repository.Owner.Login,
-		"owner.avatarURL": *repository.Owner.AvatarURL,
-		"name":            *repository.Name,
-		"description":     *repository.Description,
-		"githubURL":       *repository.HTMLURL,
+		"_id":             repository.GetID(),
+		"owner.name":      repository.GetOwner().GetLogin(),
+		"owner.avatarURL": repository.GetOwner().GetAvatarURL(),
+		"name":            repository.GetName(),
+		"description":     repository.GetDescription(),
+		"githubURL":       repository.GetHTMLURL(),
 		"homepageURL":     repository.GetHomepage(),
 	}
 }
