@@ -22,6 +22,8 @@ var client *gogithub.Client
 
 const fileQueryLimit = 50
 
+const searchResultCountHardLimit = 1000
+
 func init() {
 	if strings.HasSuffix(os.Args[0], ".test") {
 		// Running in test mode
@@ -146,8 +148,9 @@ func queryRepositories(query string, repositoryCountLimit int, repositoryCountLi
 	totalCount := -1
 	repositories := []*gogithub.Repository{}
 
-	for len(repositories) != totalCount {
+	for len(repositories) != totalCount && page*repositoryCountLimitPerPage <= searchResultCountHardLimit {
 		log.Print("page: ", page)
+		log.Print("repository count: ", len(repositories))
 
 		searchOptions := &gogithub.SearchOptions{Sort: "stars", ListOptions: gogithub.ListOptions{PerPage: repositoryCountLimitPerPage, Page: page}}
 		result, _, err := client.Search.Repositories(context.Background(), query, searchOptions)

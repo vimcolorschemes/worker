@@ -18,8 +18,6 @@ import (
 var repositoryCountLimit int
 var repositoryCountLimitPerPage int
 
-const searchResultCountHardLimit = 1000
-
 var queries = []string{
 	"vim theme",
 	"vim color scheme",
