@@ -59,6 +59,14 @@ Fetch the necessary data for the repositories
 bin/start update
 ```
 
+#### generate
+
+Generate color data for the vim color scheme previews
+
+```shell
+bin/start generate
+```
+
 ### Run tests
 
 ```shell
