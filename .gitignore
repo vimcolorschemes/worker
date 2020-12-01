@@ -3,3 +3,7 @@
 .env.*
 !.env.example
 !.env.docker.example
+!internal/dotenv/.env.test
+
+# generate job temporary files
+.tmp

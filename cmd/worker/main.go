@@ -8,28 +8,32 @@ import (
 	"github.com/vimcolorschemes/worker/cli"
 )
 
+var jobRunnerMap = map[string]interface{}{
+	"import":   cli.Import,
+	"update":   cli.Update,
+	"generate": cli.Generate,
+}
+
 func main() {
-	job, err := getArgJob()
+	job, err := getJobArg(os.Args)
 
 	if err != nil {
 		log.Print(err)
 		os.Exit(1)
 	}
 
-	switch job {
-	case "import":
-		cli.Import()
-	case "update":
-		cli.Update()
-	default:
+	runner := jobRunnerMap[job]
+	if runner == nil {
 		log.Print(job, " is not a valid job")
 		os.Exit(1)
 	}
+
+	runner.(func())()
 }
 
-func getArgJob() (string, error) {
-	if len(os.Args) > 1 {
-		return os.Args[1], nil
+func getJobArg(osArgs []string) (string, error) {
+	if len(osArgs) > 1 {
+		return osArgs[1], nil
 	}
 
 	return "", errors.New("Please provide an argument")

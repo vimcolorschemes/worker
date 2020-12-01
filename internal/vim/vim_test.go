@@ -33,13 +33,17 @@ func TestGetVimColorSchemes(t *testing.T) {
 		colorSchemes, err := GetVimColorSchemes([]string{server1.URL, server2.URL})
 
 		if err != nil {
-			t.Error("Incorrect result for GetVimColorSchemes, got error")
+			t.Errorf("Incorrect result for GetVimColorSchemes, got error: %s", err)
 		}
 
-		expectedColorSchemes := []repository.ColorScheme{{Name: "test", FileURL: server1.URL}, {Name: "hello", FileURL: server2.URL}}
+		expectedVimColorSchemes := []repository.VimColorScheme{{Name: "test", FileURL: server1.URL}, {Name: "hello", FileURL: server2.URL}}
 
-		if !reflect.DeepEqual(colorSchemes, expectedColorSchemes) {
-			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", colorSchemes, expectedColorSchemes)
+		if !reflect.DeepEqual(colorSchemes, expectedVimColorSchemes) {
+			var names []string
+			for _, colorScheme := range colorSchemes {
+				names = append(names, colorScheme.Name)
+			}
+			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", names, []string{"test", "hello"})
 		}
 	})
 
@@ -60,10 +64,14 @@ func TestGetVimColorSchemes(t *testing.T) {
 			t.Error("Incorrect result for GetVimColorSchemes, got error")
 		}
 
-		expectedColorSchemes := []repository.ColorScheme{{Name: "hello", FileURL: server.URL}}
+		expectedVimColorSchemes := []repository.VimColorScheme{{Name: "hello", FileURL: server.URL}}
 
-		if !reflect.DeepEqual(colorSchemes, expectedColorSchemes) {
-			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", colorSchemes, expectedColorSchemes)
+		if !reflect.DeepEqual(colorSchemes, expectedVimColorSchemes) {
+			var names []string
+			for _, colorScheme := range colorSchemes {
+				names = append(names, colorScheme.Name)
+			}
+			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", names, []string{"hello"})
 		}
 	})
 
@@ -96,14 +104,18 @@ func TestGetVimColorSchemes(t *testing.T) {
 
 		colorSchemes, err := GetVimColorSchemes([]string{server1.URL, server2.URL, server3.URL})
 
-		expectedColorSchemes := []repository.ColorScheme{}
+		expectedVimColorSchemes := []repository.VimColorScheme{}
 
 		if err == nil {
 			t.Error("Incorrect result for GetVimColorSchemes, got no error")
 		}
 
-		if !reflect.DeepEqual(colorSchemes, expectedColorSchemes) {
-			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", colorSchemes, expectedColorSchemes)
+		if !reflect.DeepEqual(colorSchemes, expectedVimColorSchemes) {
+			var names []string
+			for _, colorScheme := range colorSchemes {
+				names = append(names, colorScheme.Name)
+			}
+			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", names, []string{})
 		}
 	})
 
@@ -124,10 +136,14 @@ func TestGetVimColorSchemes(t *testing.T) {
 			t.Error("Incorrect result for GetVimColorSchemes, got error")
 		}
 
-		expectedColorSchemes := []repository.ColorScheme{{Name: "test", FileURL: server.URL}}
+		expectedVimColorSchemes := []repository.VimColorScheme{{Name: "test", FileURL: server.URL}}
 
-		if !reflect.DeepEqual(colorSchemes, expectedColorSchemes) {
-			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", colorSchemes, expectedColorSchemes)
+		if !reflect.DeepEqual(colorSchemes, expectedVimColorSchemes) {
+			var names []string
+			for _, colorScheme := range colorSchemes {
+				names = append(names, colorScheme.Name)
+			}
+			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", names, []string{"name"})
 		}
 	})
 }
@@ -200,17 +216,21 @@ var validTests = []struct {
 		hi clear
 		let color_name='test'
 		syntex reset`, name: "test"},
+	{fileContent: `
+		hi clear
+		vim.g.colors_name = 'highlite'
+		syntex reset`, name: "highlite"},
 }
 
 func TestGetVimColorSchemeName(t *testing.T) {
 	t.Run("should return the vim color scheme name if the file is valid", func(t *testing.T) {
 		for _, item := range validTests {
-			name, err := GetVimColorSchemeName(&item.fileContent)
+			name, err := getVimColorSchemeName(&item.fileContent)
 			if err != nil {
-				t.Error("Incorrect result for GetVimColorSchemeName, got error")
+				t.Error("Incorrect result for getVimColorSchemeName, got error")
 			}
 			if name != item.name {
-				t.Errorf("Incorrect result for GetVimColorSchemeName, got: %s, want: %s", name, item.name)
+				t.Errorf("Incorrect result for getVimColorSchemeName, got: %s, want: %s", name, item.name)
 			}
 		}
 	})
@@ -249,12 +269,12 @@ func TestGetVimColorSchemeName(t *testing.T) {
 	}
 	t.Run("should return an error if the file is invalid", func(t *testing.T) {
 		for _, fileContent := range invalid {
-			name, err := GetVimColorSchemeName(&fileContent)
+			name, err := getVimColorSchemeName(&fileContent)
 			if err == nil {
-				t.Error("Incorrect result for GetVimColorSchemeName, got no error")
+				t.Error("Incorrect result for getVimColorSchemeName, got no error")
 			}
 			if name != "" {
-				t.Errorf("Incorrect result for GetVimColorSchemeName, got: %s, want: %s", name, "")
+				t.Errorf("Incorrect result for getVimColorSchemeName, got: %s, want: %s", name, "")
 			}
 		}
 	})
@@ -268,25 +288,60 @@ func TestIsVimColorScheme(t *testing.T) {
 		`
 			hi Normal ctermbg=254 ctermfg=237 guibg=#e8e9ec guifg=#33374c
 		`,
+		`
+			gitrebaseSummary = 'Normal'
+		`,
 	}
 	t.Run("should return true if the file has necessary content", func(t *testing.T) {
 		for _, fileContent := range valid {
-			if !IsVimColorScheme(&fileContent) {
-				t.Errorf("Incorrect result for IsVimColorScheme, got false for: %s", fileContent)
+			if !isVimColorScheme(&fileContent) {
+				t.Errorf("Incorrect result for isVimColorScheme, got false for: %s", fileContent)
 			}
 		}
 	})
 
 	invalid := []string{
 		`
-			Normal ctermbg=254 ctermfg=237 guibg=#e8e9ec guifg=#33374c
+			normal ctermbg=254 ctermfg=237 guibg=#e8e9ec guifg=#33374c
 		`,
 	}
 	t.Run("should return false if the file does not have necessary content", func(t *testing.T) {
 		for _, fileContent := range invalid {
-			if IsVimColorScheme(&fileContent) {
-				t.Errorf("Incorrect result for IsVimColorScheme, got true for: %s", fileContent)
+			if isVimColorScheme(&fileContent) {
+				t.Errorf("Incorrect result for isVimColorScheme, got true for: %s", fileContent)
 			}
+		}
+	})
+}
+
+func TestContainsURL(t *testing.T) {
+	t.Run("should return true if list contains URL", func(t *testing.T) {
+		vimColorSchemes := []repository.VimColorScheme{{FileURL: "URL1"}, {FileURL: "URL2"}}
+
+		result := containsURL(vimColorSchemes, "URL2")
+
+		if !result {
+			t.Errorf("Incorrect result for containsURL, got %v, want: %v", result, true)
+		}
+	})
+
+	t.Run("should return false if list is empty", func(t *testing.T) {
+		vimColorSchemes := []repository.VimColorScheme{}
+
+		result := containsURL(vimColorSchemes, "URL1")
+
+		if result {
+			t.Errorf("Incorrect result for containsURL, got %v, want: %v", result, false)
+		}
+	})
+
+	t.Run("should return false if list does not contain URL", func(t *testing.T) {
+		vimColorSchemes := []repository.VimColorScheme{{FileURL: "URL1"}, {FileURL: "URL2"}}
+
+		result := containsURL(vimColorSchemes, "URL3")
+
+		if result {
+			t.Errorf("Incorrect result for containsURL, got %v, want: %v", result, false)
 		}
 	})
 }

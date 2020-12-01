@@ -58,3 +58,23 @@ Fetch the necessary data for the repositories
 ```shell
 bin/start update
 ```
+
+### Run tests
+
+```shell
+bin/test
+```
+
+`go test` flags can be used:
+
+```shell
+bin/test --cover
+```
+
+### Lint
+
+[golint](https://github.com/golang/lint) is configured to run using `bin/lint`.
+
+### Format code
+
+`go fmt` can be easily used on all code using `bin/format`.

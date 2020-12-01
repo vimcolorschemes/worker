@@ -10,33 +10,62 @@ import (
 	"github.com/vimcolorschemes/worker/internal/date"
 )
 
+// Repository represents a repository as it's stored in the database
 type Repository struct {
 	ID                     int64                        `bson:"_id,omitempty"`
 	Name                   string                       `bson:"name"`
-	Owner                  RepositoryOwner              `bson:"owner"`
+	Owner                  Owner                        `bson:"owner"`
+	GitHubURL              string                       `bson:"githubURL"`
+	HomepageURL            string                       `bson:"homepageURL"`
 	Valid                  bool                         `bson:"valid"`
 	LastCommitAt           time.Time                    `bson:"lastCommitAt"`
 	StargazersCount        int                          `bson:"stargazersCount"`
 	StargazersCountHistory []StargazersCountHistoryItem `bson:"stargazersCountHistory"`
 	WeekStargazersCount    int                          `bson:"weekStargazersCount"`
-	VimColorSchemes        []ColorScheme                `bson:"vimColorSchemes"`
+	VimColorSchemes        []VimColorScheme             `bson:"vimColorSchemes"`
 }
 
-type RepositoryOwner struct {
+// Owner represents the owner of a repository
+type Owner struct {
 	Name      string `bson:"name"`
 	AvatarURL string `bson:"avatarURL"`
 }
 
+// StargazersCountHistoryItem represents a repository's stargazers count at a given date
 type StargazersCountHistoryItem struct {
 	Date            time.Time `bson:"date"`
 	StargazersCount int       `bson:"stargazersCount"`
 }
 
-type ColorScheme struct {
-	FileURL string `bson:"fileURL"`
-	Name    string `bson:"name"`
+// VimColorScheme represents a vim color scheme's meta data
+type VimColorScheme struct {
+	FileURL string             `bson:"fileURL"`
+	Name    string             `bson:"name"`
+	Data    VimColorSchemeData `bson:"data"`
+	Valid   bool               `bson:"valid"`
 }
 
+// VimColorSchemeData represents the color values for light and dark backgrounds
+type VimColorSchemeData struct {
+	Light VimColorSchemeColorDefinitions `bson:"light"`
+	Dark  VimColorSchemeColorDefinitions `bson:"dark"`
+}
+
+// VimColorSchemeColorDefinitions represents the color data fetched from vcspg.vim
+type VimColorSchemeColorDefinitions map[string]interface{}
+
+// VimBackgroundValue sets up an enum containing the possible values for background in vim
+type VimBackgroundValue string
+
+const (
+	// LightBackground represents light background value for vim
+	LightBackground VimBackgroundValue = "light"
+
+	// DarkBackground represents light background value for vim
+	DarkBackground VimBackgroundValue = "dark"
+)
+
+// UniquifyRepositories makes sure no repository is listed twice in a list
 func UniquifyRepositories(repositories []*gogithub.Repository) []*gogithub.Repository {
 	keys := make(map[int64]bool)
 	unique := []*gogithub.Repository{}
@@ -51,7 +80,8 @@ func UniquifyRepositories(repositories []*gogithub.Repository) []*gogithub.Repos
 	return unique
 }
 
-func GetStargazersCountHistory(repository Repository) []StargazersCountHistoryItem {
+// AppendToStargazersCountHistory appends today's item to the stargazers count history
+func AppendToStargazersCountHistory(repository Repository) []StargazersCountHistoryItem {
 	history := repository.StargazersCountHistory
 	if history == nil {
 		history = []StargazersCountHistoryItem{}
@@ -93,6 +123,7 @@ func GetStargazersCountHistory(repository Repository) []StargazersCountHistoryIt
 	return history
 }
 
+// ComputeTrendingStargazersCount adds up the stargazers counts from the last days
 func ComputeTrendingStargazersCount(repository Repository, dayCount int) int {
 	if repository.StargazersCountHistory == nil || len(repository.StargazersCountHistory) == 0 {
 		return 0
@@ -109,6 +140,7 @@ func ComputeTrendingStargazersCount(repository Repository, dayCount int) int {
 	return lastDayCount - firstDayCount
 }
 
+// IsRepositoryValid returns true if a repository is considered valid from our standards
 func IsRepositoryValid(repository Repository) bool {
 	var defaultTime time.Time
 	if repository.LastCommitAt == defaultTime {

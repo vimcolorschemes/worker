@@ -34,12 +34,20 @@ var queries = []string{
 }
 
 func init() {
-	repositoryCountLimit = dotenv.GetInt("GITHUB_REPOSITORY_COUNT_LIMIT", false, 100)
+	repositoryCountLimitValue, err := dotenv.GetInt("GITHUB_REPOSITORY_COUNT_LIMIT")
+	if err != nil {
+		repositoryCountLimitValue = 100
+	}
+	repositoryCountLimit = repositoryCountLimitValue
+
 	repositoryCountLimitPerPage = int(math.Min(float64(repositoryCountLimit), 100))
 }
 
+// Import potential vim color scheme repositories from GitHub
 func Import() {
-	log.Print("run import")
+	log.Print("Run import")
+
+	log.Printf("Repository limit: %d", repositoryCountLimit)
 
 	startTime := time.Now()
 

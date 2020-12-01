@@ -14,6 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+// Update the imported repositories with all kinds of useful information
 func Update() {
 	log.Print("Run update")
 
@@ -66,7 +67,7 @@ func updateRepository(repository repoUtil.Repository) repoUtil.Repository {
 	repository.LastCommitAt = github.GetLastCommitAt(githubRepository)
 
 	log.Print("Building stargazers count history")
-	repository.StargazersCountHistory = repoUtil.GetStargazersCountHistory(repository)
+	repository.StargazersCountHistory = repoUtil.AppendToStargazersCountHistory(repository)
 
 	log.Print("Computing week stargazers count")
 	repository.WeekStargazersCount = repoUtil.ComputeTrendingStargazersCount(repository, 7)
@@ -78,11 +79,11 @@ func updateRepository(repository repoUtil.Repository) repoUtil.Repository {
 	log.Print(len(vimFileURLs), " vim files found")
 	if len(vimFileURLs) > 0 {
 		log.Print("Checking for vim color scheme names")
-		if vimColorSchemes, err := vim.GetVimColorSchemes(vimFileURLs); err != nil {
+		vimColorSchemes, err := vim.GetVimColorSchemes(vimFileURLs)
+		if err != nil {
 			log.Print("Did not find any vim color schemes")
-		} else {
-			repository.VimColorSchemes = vimColorSchemes
 		}
+		repository.VimColorSchemes = vimColorSchemes
 	}
 
 	log.Print("Checking if ", repository.Owner.Name, "/", repository.Name, " is valid")

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+if [[ -z $GOBIN ]]; then
+  echo "Setup the \$GOPATH and \$GOBIN global environment variables"
+  echo ""
+  echo "Add the following to your bash or zsh profile:"
+  echo "  export GOPATH=\$HOME/go"
+  echo "  export GOBIN=\$GOPATH/bin"
+  echo ""
+  echo "Then source your profile:"
+  echo "  > source \$HOME/.bash_profile"
+  echo "or"
+  echo "  > source \$HOME/.zshrc"
+  exit 1
+fi;
+
+if ! $GOBIN/golint ./... $@; then
+  echo ""
+  echo "Install golint:"
+  echo "  > go get -u golang.org/x/lint/golint"
+else
+  echo "Linting done"
+fi;

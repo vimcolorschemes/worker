@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/vimcolorschemes/worker/internal/dotenv"
@@ -21,10 +23,20 @@ var client *gogithub.Client
 const fileQueryLimit = 50
 
 func init() {
+	if strings.HasSuffix(os.Args[0], ".test") {
+		// Running in test mode
+		return
+	}
+
 	ctx := context.Background()
 
+	gitHubToken, exists := dotenv.Get("GITHUB_TOKEN")
+	if !exists {
+		log.Panic("GitHub Token not found in env")
+	}
+
 	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: dotenv.Get("GITHUB_TOKEN", true)},
+		&oauth2.Token{AccessToken: gitHubToken},
 	)
 
 	tc := oauth2.NewClient(ctx, ts)
@@ -32,6 +44,7 @@ func init() {
 	client = gogithub.NewClient(tc)
 }
 
+// GetRepository gets a repository from the GitHub API using a repository's owner and name
 func GetRepository(ownerName string, name string) (*gogithub.Repository, error) {
 	repository, _, err := client.Repositories.Get(context.Background(), ownerName, name)
 
@@ -42,6 +55,7 @@ func GetRepository(ownerName string, name string) (*gogithub.Repository, error) 
 	return repository, nil
 }
 
+// GetLastCommitAt gets the date of the last commit done in a repository's default branch
 func GetLastCommitAt(repository *gogithub.Repository) time.Time {
 	ownerName := *repository.Owner.Login
 	name := *repository.Name
@@ -58,6 +72,7 @@ func GetLastCommitAt(repository *gogithub.Repository) time.Time {
 	return commits[0].Commit.Author.GetDate()
 }
 
+// GetRepositoryFileURLs returns all file URLs in a repository
 func GetRepositoryFileURLs(repository *gogithub.Repository) []string {
 	ownerName := *repository.Owner.Login
 	name := *repository.Name
@@ -102,6 +117,7 @@ func getRepositoryFileUrlsAtPath(ownerName string, name string, path string) ([]
 	return fileURLs, nil
 }
 
+// SearchRepositories returns all repositories from GitHub API matching some queries
 func SearchRepositories(queries []string, repositoryCountLimit int, repositoryCountLimitPerPage int) []*gogithub.Repository {
 	log.Print("Search repositories")
 

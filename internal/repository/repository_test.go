@@ -50,12 +50,12 @@ func TestUniquifyRepositories(t *testing.T) {
 	})
 }
 
-func TestGetStargazersCountHistory(t *testing.T) {
+func TestAppendToStargazersCountHistory(t *testing.T) {
 	t.Run("should initialize history when it's empty", func(t *testing.T) {
 		repository := Repository{
 			StargazersCount: 100,
 		}
-		history := GetStargazersCountHistory(repository)
+		history := AppendToStargazersCountHistory(repository)
 		today := dateUtil.Today()
 
 		expected := []StargazersCountHistoryItem{
@@ -63,7 +63,7 @@ func TestGetStargazersCountHistory(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(history, expected) {
-			t.Error("Incorrect result for GetStargazersCountHistory, did not get expected history")
+			t.Error("Incorrect result for AppendToStargazersCountHistory, did not get expected history")
 		}
 	})
 
@@ -77,7 +77,7 @@ func TestGetStargazersCountHistory(t *testing.T) {
 			},
 		}
 
-		history := GetStargazersCountHistory(repository)
+		history := AppendToStargazersCountHistory(repository)
 
 		today := dateUtil.Today()
 
@@ -87,7 +87,7 @@ func TestGetStargazersCountHistory(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(history, expected) {
-			t.Error("Incorrect result for GetStargazersCountHistory, did not get expected history")
+			t.Error("Incorrect result for AppendToStargazersCountHistory, did not get expected history")
 		}
 	})
 
@@ -105,7 +105,7 @@ func TestGetStargazersCountHistory(t *testing.T) {
 			},
 		}
 
-		history := GetStargazersCountHistory(repository)
+		history := AppendToStargazersCountHistory(repository)
 
 		today := dateUtil.Today()
 
@@ -117,7 +117,7 @@ func TestGetStargazersCountHistory(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(history, expected) {
-			t.Error("Incorrect result for GetStargazersCountHistory, did not get expected history")
+			t.Error("Incorrect result for AppendToStargazersCountHistory, did not get expected history")
 		}
 	})
 
@@ -135,7 +135,7 @@ func TestGetStargazersCountHistory(t *testing.T) {
 			},
 		}
 
-		history := GetStargazersCountHistory(repository)
+		history := AppendToStargazersCountHistory(repository)
 
 		expected := []StargazersCountHistoryItem{
 			{Date: today, StargazersCount: 101},
@@ -143,7 +143,7 @@ func TestGetStargazersCountHistory(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(history, expected) {
-			t.Error("Incorrect result for GetStargazersCountHistory, did not get expected history")
+			t.Error("Incorrect result for AppendToStargazersCountHistory, did not get expected history")
 		}
 	})
 
@@ -161,7 +161,7 @@ func TestGetStargazersCountHistory(t *testing.T) {
 			},
 		}
 
-		history := GetStargazersCountHistory(repository)
+		history := AppendToStargazersCountHistory(repository)
 
 		expected := []StargazersCountHistoryItem{
 			{Date: today, StargazersCount: 101},
@@ -169,7 +169,7 @@ func TestGetStargazersCountHistory(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(history, expected) {
-			t.Error("Incorrect result for GetStargazersCountHistory, did not get expected history")
+			t.Error("Incorrect result for AppendToStargazersCountHistory, did not get expected history")
 		}
 	})
 
@@ -187,10 +187,10 @@ func TestGetStargazersCountHistory(t *testing.T) {
 			StargazersCountHistory: history,
 		}
 
-		result := GetStargazersCountHistory(repository)
+		result := AppendToStargazersCountHistory(repository)
 
 		if len(result) != 31 {
-			t.Errorf("Incorrect result for GetStargazersCountHistory, got length: %d, want length: %d", len(result), 31)
+			t.Errorf("Incorrect result for AppendToStargazersCountHistory, got length: %d, want length: %d", len(result), 31)
 		}
 	})
 }
@@ -317,7 +317,7 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		repository.LastCommitAt = time.Now()
 		repository.StargazersCount = 1
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
-		repository.VimColorSchemes = []ColorScheme{{Name: "test", FileURL: "http://vim.org"}}
+		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
 		isValid := IsRepositoryValid(repository)
 		if !isValid {
@@ -329,7 +329,7 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		var repository Repository
 		repository.StargazersCount = 1
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
-		repository.VimColorSchemes = []ColorScheme{{Name: "test", FileURL: "http://vim.org"}}
+		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
 		isValid := IsRepositoryValid(repository)
 		if isValid {
@@ -342,7 +342,7 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		repository.LastCommitAt = time.Now()
 		repository.StargazersCount = 0
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
-		repository.VimColorSchemes = []ColorScheme{{Name: "test", FileURL: "http://vim.org"}}
+		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
 		isValid := IsRepositoryValid(repository)
 		if isValid {
@@ -355,7 +355,7 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		repository.LastCommitAt = time.Now()
 		repository.StargazersCount = 1
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{}
-		repository.VimColorSchemes = []ColorScheme{{Name: "test", FileURL: "http://vim.org"}}
+		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
 		isValid := IsRepositoryValid(repository)
 		if isValid {
@@ -369,7 +369,7 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		repository.StargazersCount = 1
 		date := time.Date(1990, time.November, 01, 0, 0, 0, 0, time.UTC)
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date, StargazersCount: 1}}
-		repository.VimColorSchemes = []ColorScheme{{Name: "test", FileURL: "http://vim.org"}}
+		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
 		isValid := IsRepositoryValid(repository)
 		if isValid {
@@ -382,7 +382,7 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		repository.LastCommitAt = time.Now()
 		repository.StargazersCount = 1
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
-		repository.VimColorSchemes = []ColorScheme{}
+		repository.VimColorSchemes = []VimColorScheme{}
 
 		isValid := IsRepositoryValid(repository)
 		if isValid {

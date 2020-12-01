@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"log"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/vimcolorschemes/worker/internal/dotenv"
@@ -18,7 +20,16 @@ var repositoriesCollection *mongo.Collection
 var reportsCollection *mongo.Collection
 
 func init() {
-	connectionString := dotenv.Get("MONGODB_CONNECTION_STRING", true)
+	if strings.HasSuffix(os.Args[0], ".test") {
+		// Running in test mode
+		return
+	}
+
+	connectionString, exists := dotenv.Get("MONGODB_CONNECTION_STRING")
+	if !exists {
+		log.Panic("Database connection string not found in env")
+	}
+
 	clientOptions := options.Client().ApplyURI(connectionString)
 
 	client, err := mongo.Connect(ctx, clientOptions)
@@ -36,9 +47,19 @@ func init() {
 	reportsCollection = database.Collection("reports")
 }
 
+// GetRepositories gets all repositories stored in the database
 func GetRepositories() []repository.Repository {
+	return getRepositories(bson.M{})
+}
+
+// GetValidRepositories gets repositories stored in the database that are marked as valid
+func GetValidRepositories() []repository.Repository {
+	return getRepositories(bson.M{"valid": true})
+}
+
+func getRepositories(filter bson.M) []repository.Repository {
 	var repositories []repository.Repository
-	cursor, err := repositoriesCollection.Find(ctx, bson.M{})
+	cursor, err := repositoriesCollection.Find(ctx, filter)
 	if err != nil {
 		log.Print("here")
 		panic(err)
@@ -50,6 +71,7 @@ func GetRepositories() []repository.Repository {
 	return repositories
 }
 
+// UpsertRepository updates the repository if it exists, inserts it if not
 func UpsertRepository(id int64, updateObject bson.M) {
 	filter := bson.M{"_id": id}
 
@@ -65,6 +87,7 @@ func UpsertRepository(id int64, updateObject bson.M) {
 	}
 }
 
+// CreateReport stores a job report in the database
 func CreateReport(job string, elapsedTime float64, data bson.M) {
 	object := bson.M{
 		"date":        time.Now(),
