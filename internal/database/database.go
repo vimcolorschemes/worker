@@ -32,6 +32,13 @@ func init() {
 
 	clientOptions := options.Client().ApplyURI(connectionString)
 
+	databaseUsername, usernameExists := dotenv.Get("MONGODB_USERNAME")
+	databasePassword, passwordExists := dotenv.Get("MONGODB_PASSWORD")
+	if usernameExists && databaseUsername != "" && passwordExists && databasePassword != "" {
+		credentials := options.Credential{Username: databaseUsername, Password: databasePassword}
+		clientOptions.SetAuth(credentials)
+	}
+
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		panic(err)
