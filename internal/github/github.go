@@ -14,7 +14,6 @@ import (
 	"github.com/vimcolorschemes/worker/internal/repository"
 
 	gogithub "github.com/google/go-github/v32/github"
-
 	"golang.org/x/oauth2"
 )
 
@@ -32,15 +31,13 @@ func init() {
 
 	ctx := context.Background()
 
+	var ts oauth2.TokenSource
 	gitHubToken, exists := dotenv.Get("GITHUB_TOKEN")
-	if !exists {
-		log.Panic("GitHub Token not found in env")
+	if exists {
+		ts = oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: gitHubToken},
+		)
 	}
-
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: gitHubToken},
-	)
-
 	tc := oauth2.NewClient(ctx, ts)
 
 	client = gogithub.NewClient(tc)
@@ -48,9 +45,13 @@ func init() {
 
 // GetRepository gets a repository from the GitHub API using a repository's owner and name
 func GetRepository(ownerName string, name string) (*gogithub.Repository, error) {
-	repository, _, err := client.Repositories.Get(context.Background(), ownerName, name)
+	repository, response, err := client.Repositories.Get(context.Background(), ownerName, name)
 
-	if err != nil {
+	if _, ok := err.(*gogithub.RateLimitError); ok {
+		log.Print("Hit rate limit reached")
+		waitForRateLimitReset(response.Rate.Reset)
+		return GetRepository(ownerName, name)
+	} else if err != nil {
 		return nil, err
 	}
 
@@ -64,10 +65,13 @@ func GetLastCommitAt(repository *gogithub.Repository) time.Time {
 	defaultBranch := *repository.DefaultBranch
 	options := &gogithub.CommitsListOptions{SHA: defaultBranch}
 
-	commits, _, err := client.Repositories.ListCommits(context.Background(), ownerName, name, options)
-
-	if err != nil || len(commits) == 0 {
-		log.Print("Error getting last commit of ", ownerName, "/", name)
+	commits, response, err := client.Repositories.ListCommits(context.Background(), ownerName, name, options)
+	if _, ok := err.(*gogithub.RateLimitError); ok {
+		log.Print("Hit rate limit reached")
+		waitForRateLimitReset(response.Rate.Reset)
+		return GetLastCommitAt(repository)
+	} else if err != nil || len(commits) == 0 {
+		log.Printf("Error getting last commit of %s/%s: %s", ownerName, name, err)
 		return time.Time{}
 	}
 
@@ -85,12 +89,21 @@ func GetRepositoryFileURLs(repository *gogithub.Repository) []string {
 		log.Print(err)
 		return []string{}
 	}
+
 	return fileURLs
 }
 
 func getRepositoryFileUrlsAtPath(ownerName string, name string, path string) ([]string, error) {
 	options := &gogithub.RepositoryContentGetOptions{}
-	_, contents, _, _ := client.Repositories.GetContents(context.Background(), ownerName, name, path, options)
+	_, contents, response, err := client.Repositories.GetContents(context.Background(), ownerName, name, path, options)
+	if _, ok := err.(*gogithub.RateLimitError); ok {
+		log.Print("Hit rate limit reached")
+		waitForRateLimitReset(response.Rate.Reset)
+		return getRepositoryFileUrlsAtPath(ownerName, name, path)
+	} else if err != nil {
+		log.Print(err)
+		return []string{}, err
+	}
 
 	fileURLs := []string{}
 
@@ -153,16 +166,19 @@ func queryRepositories(query string, repositoryCountLimit int, repositoryCountLi
 		log.Print("repository count: ", len(repositories))
 
 		searchOptions := &gogithub.SearchOptions{Sort: "stars", ListOptions: gogithub.ListOptions{PerPage: repositoryCountLimitPerPage, Page: page}}
-		result, _, err := client.Search.Repositories(context.Background(), query, searchOptions)
-
-		if err != nil {
-			panic(err)
+		result, response, err := client.Search.Repositories(context.Background(), query, searchOptions)
+		if _, ok := err.(*gogithub.RateLimitError); ok {
+			log.Print("Hit rate limit reached")
+			waitForRateLimitReset(response.Rate.Reset)
+			return queryRepositories(query, repositoryCountLimit, repositoryCountLimitPerPage)
+		} else if err != nil {
+			log.Panic(err)
 		}
 
 		if totalCount == -1 {
 			totalCount = result.GetTotal()
 			totalCount = int(math.Min(float64(totalCount), float64(repositoryCountLimit)))
-			log.Print("total count: ", totalCount)
+			log.Printf("total count: %d", totalCount)
 		}
 
 		repositories = append(repositories, result.Repositories...)
@@ -171,4 +187,20 @@ func queryRepositories(query string, repositoryCountLimit int, repositoryCountLi
 	}
 
 	return repositories
+}
+
+func waitForRateLimitReset(resetTime gogithub.Timestamp) {
+	log.Printf("Sleep until rate limit reset at %s", resetTime)
+
+	for {
+		timeLeft := resetTime.Time.Sub(time.Now())
+		log.Printf("Time left until reset: %s", timeLeft)
+
+		time.Sleep(time.Second)
+
+		if resetTime.Time.Before(time.Now()) {
+			log.Print("Rate limit over, continuing...")
+			break
+		}
+	}
 }
