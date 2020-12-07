@@ -21,6 +21,7 @@ type Repository struct {
 	UpdatedAt              time.Time                    `bson:"updatedAt"`
 	GeneratedAt            time.Time                    `bson:"generatedAt"`
 	LastCommitAt           time.Time                    `bson:"lastCommitAt"`
+	GitHubCreatedAt        time.Time                    `bson:"githubCreatedAt"`
 	StargazersCount        int                          `bson:"stargazersCount"`
 	StargazersCountHistory []StargazersCountHistoryItem `bson:"stargazersCountHistory"`
 	WeekStargazersCount    int                          `bson:"weekStargazersCount"`
