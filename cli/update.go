@@ -66,6 +66,11 @@ func updateRepository(repository repoUtil.Repository) repoUtil.Repository {
 	log.Print("Fetching date of last commit")
 	repository.LastCommitAt = github.GetLastCommitAt(githubRepository)
 
+	if repository.UpdatedAt.After(repository.LastCommitAt) {
+		log.Print("Repository is not due for a full update")
+		return repository
+	}
+
 	log.Print("Building stargazers count history")
 	repository.StargazersCountHistory = repoUtil.AppendToStargazersCountHistory(repository)
 
@@ -101,5 +106,6 @@ func getUpdateRepositoryObject(repository repoUtil.Repository) bson.M {
 		"weekStargazersCount":    repository.WeekStargazersCount,
 		"vimColorSchemes":        repository.VimColorSchemes,
 		"valid":                  repository.Valid,
+		"updatedAt":              time.Now(),
 	}
 }

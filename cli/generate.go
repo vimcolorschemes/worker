@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/vimcolorschemes/worker/internal/database"
 	file "github.com/vimcolorschemes/worker/internal/file"
@@ -39,6 +40,11 @@ func Generate() {
 		fmt.Println()
 
 		log.Print("Generating vim previews for ", repository.Owner.Name, "/", repository.Name)
+
+		if repository.GeneratedAt.After(repository.LastCommitAt) {
+			log.Print("Repository is not due for a generate")
+			continue
+		}
 
 		newVimColorSchemes := repository.VimColorSchemes
 
@@ -253,5 +259,6 @@ func getGenerateRepositoryObject(repository repoHelper.Repository) bson.M {
 	return bson.M{
 		"vimColorSchemes": repository.VimColorSchemes,
 		"valid":           repository.Valid,
+		"generatedAt":     time.Now(),
 	}
 }
