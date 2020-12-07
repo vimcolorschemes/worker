@@ -18,6 +18,8 @@ type Repository struct {
 	GitHubURL              string                       `bson:"githubURL"`
 	HomepageURL            string                       `bson:"homepageURL"`
 	Valid                  bool                         `bson:"valid"`
+	UpdatedAt              time.Time                    `bson:"updatedAt"`
+	GeneratedAt            time.Time                    `bson:"generatedAt"`
 	LastCommitAt           time.Time                    `bson:"lastCommitAt"`
 	GitHubCreatedAt        time.Time                    `bson:"githubCreatedAt"`
 	StargazersCount        int                          `bson:"stargazersCount"`
