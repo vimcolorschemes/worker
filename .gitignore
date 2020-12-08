@@ -1,8 +1,9 @@
 # dotenv files
 .env
 .env.*
-!.env.example
+!.env.deploy.example
 !.env.docker.example
+!.env.example
 !internal/dotenv/.env.test
 
 # generate job temporary files

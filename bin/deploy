@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+set -e
+
+BREAK_LINE="
+"
+
+if ! docker --version >/dev/null 2>&1; then
+  echo "Please install Docker Desktop"
+  echo "https://www.docker.com/products/docker-desktop/"
+  exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+  echo "Please run Docker Desktop"
+  echo "https://docs.docker.com/desktop/"
+  exit 1
+fi
+
+if ! docker-compose --version >/dev/null 2>&1; then
+  echo "Please install docker-compose"
+  echo "https://docs.docker.com/compose/install/" exit 1
+fi
+
+echo "
+ _  __(_)_ _  _______  / /__  _______ ____/ /  ___ __ _  ___ ___
+| |/ / /  ' \/ __/ _ \/ / _ \/ __(_-</ __/ _ \/ -_)  ' \/ -_|_-<
+|___/_/_/_/_/\__/\___/_/\___/_/ /___/\__/_//_/\__/_/_/_/\__/___/
+                   _    _____  ____/ /_____ ____
+                  | |/|/ / _ \/ __/  '_/ -_) __/
+                  |__,__/\___/_/ /_/\_\\__/_/
+"
+
+echo "${BREAK_LINE}Sourcing the dotenv dotenv file"
+source .env.deploy
+
+echo "${BREAK_LINE}Logging in to ECR"
+aws ecr get-login-password --region us-east-1 --profile $AWS_PROFILE | docker login --username AWS --password-stdin $AWS_REGISTRY_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+echo "${BREAK_LINE}Building the docker image"
+docker build -t vimcolorschemes/worker .
+
+echo "${BREAK_LINE}Tagging the image"
+docker tag vimcolorschemes/worker:latest $AWS_REGISTRY_ID.dkr.ecr.$AWS_REGION.amazonaws.com/vimcolorschemes/worker:latest
+
+echo "${BREAK_LINE}Pushing the image to the registry"
+docker push $AWS_REGISTRY_ID.dkr.ecr.$AWS_REGION.amazonaws.com/vimcolorschemes/worker:latest
