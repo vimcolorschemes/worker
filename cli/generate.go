@@ -24,6 +24,8 @@ var colorDataFilePath string
 func Generate() {
 	log.Print("Running generate")
 
+	startTime := time.Now()
+
 	fmt.Println()
 
 	initVimFiles()
@@ -87,6 +89,10 @@ func Generate() {
 		generateObject := getGenerateRepositoryObject(repository)
 		database.UpsertRepository(repository.ID, generateObject)
 	}
+
+	fmt.Println()
+
+	database.CreateReport("generate", time.Since(startTime).Seconds(), bson.M{})
 
 	fmt.Println()
 
