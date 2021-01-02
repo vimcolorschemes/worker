@@ -2,7 +2,7 @@
 function! GetColorGroupName(synID) abort
   let l:name = synIDattr(a:synID, 'name')
   if l:name == ''
-    let l:name = 'Normal'
+    let l:name = 'NormalFg'
   endif
   return l:name
 endfunction
@@ -19,19 +19,18 @@ endfunction
 " Get some color values that are not picked up by GetColorValues
 function! GetExtraColorValues() abort
   return {
-        \ 'LineNr': synIDattr(hlID('LineNr'), 'fg#'),
-        \ 'VertSplitFg': synIDattr(hlID('VertSplit'), 'fg#'),
-        \ 'VertSplitBg': synIDattr(hlID('VertSplit'), 'bg#'),
-        \ 'FoldedFg': synIDattr(hlID('Folded'), 'fg#'),
-        \ 'FoldedBg': synIDattr(hlID('Folded'), 'bg#'),
-        \ 'StatusLine': synIDattr(hlID('StatusLine'), 'fg#'),
-        \ 'StatusLineBackground': synIDattr(hlID('StatusLine'), 'bg#'),
-        \ 'Cursor': synIDattr(hlID('Cursor'), 'bg#'),
-        \ 'CursorLine': synIDattr(hlID('CursorLine'), 'bg#'),
-        \ 'CursorLineNr': synIDattr(hlID('CursorLineNr'), 'fg#'),
-        \ 'CursorColumn': synIDattr(hlID('CursorColumn'), 'bg#'),
-        \ 'MatchParen': synIDattr(hlID('MatchParen'), 'bg#'),
-        \ 'Background': synIDattr(hlID('Normal'), 'bg#'),
+        \ 'NormalFg':        synIDattr(hlID('Normal'),       'fg#'),
+        \ 'NormalBg':        synIDattr(hlID('Normal'),       'bg#'),
+        \ 'StatusLineFg':    synIDattr(hlID('StatusLine'),   'fg#'),
+        \ 'StatusLineBg':    synIDattr(hlID('StatusLine'),   'bg#'),
+        \ 'CursorFg':        synIDattr(hlID('Cursor'),       'fg#'),
+        \ 'CursorBg':        synIDattr(hlID('Cursor'),       'bg#'),
+        \ 'LineNrFg':        synIDattr(hlID('LineNr'),       'fg#'),
+        \ 'LineNrBg':        synIDattr(hlID('LineNr'),       'bg#'),
+        \ 'CursorLineFg':    synIDattr(hlID('CursorLine'),   'fg#'),
+        \ 'CursorLineBg':    synIDattr(hlID('CursorLine'),   'bg#'),
+        \ 'CursorLineNrFg':  synIDattr(hlID('CursorLineNr'), 'fg#'),
+        \ 'CursorLineNrBg':  synIDattr(hlID('CursorLineNr'), 'bg#'),
         \  }
 endfunction
 
