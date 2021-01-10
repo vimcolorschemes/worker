@@ -75,14 +75,12 @@ func Generate() {
 				Dark:  darkVimColorSchemeColors,
 			}
 
-			newVimColorScheme := repoHelper.VimColorScheme{
+			newVimColorSchemes[index] = repoHelper.VimColorScheme{
 				Name:    vimColorScheme.Name,
 				FileURL: vimColorScheme.FileURL,
 				Data:    vimColorSchemeData,
 				Valid:   true,
 			}
-
-			newVimColorSchemes[index] = newVimColorScheme
 		}
 
 		repository.VimColorSchemes = newVimColorSchemes

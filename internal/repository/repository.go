@@ -50,8 +50,8 @@ type VimColorScheme struct {
 
 // VimColorSchemeData represents the color values for light and dark backgrounds
 type VimColorSchemeData struct {
-	Light VimColorSchemeColorDefinitions `bson:"light"`
-	Dark  VimColorSchemeColorDefinitions `bson:"dark"`
+	Light VimColorSchemeColorDefinitions `bson:"light,omitempty"`
+	Dark  VimColorSchemeColorDefinitions `bson:"dark,omitempty"`
 }
 
 // VimColorSchemeColorDefinitions represents the color data fetched from vcspg.vim
