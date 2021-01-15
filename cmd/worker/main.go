@@ -15,7 +15,7 @@ var jobRunnerMap = map[string]interface{}{
 }
 
 func main() {
-	job, err := getJobArg(os.Args)
+	job, force, err := getJobArg(os.Args)
 
 	if err != nil {
 		log.Print(err)
@@ -28,13 +28,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	runner.(func())()
+	runner.(func(force bool))(force)
 }
 
-func getJobArg(osArgs []string) (string, error) {
-	if len(osArgs) > 1 {
-		return osArgs[1], nil
+func getJobArg(osArgs []string) (string, bool, error) {
+	if len(osArgs) < 2 {
+		return "", false, errors.New("Please provide an argument")
 	}
 
-	return "", errors.New("Please provide an argument")
+	if len(osArgs) < 3 {
+		return osArgs[1], false, nil
+	}
+
+	return osArgs[1], osArgs[2] == "--force", nil
 }

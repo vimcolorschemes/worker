@@ -42,7 +42,7 @@ func init() {
 }
 
 // Import potential vim color scheme repositories from GitHub
-func Import() {
+func Import(_force bool) {
 	log.Print("Run import")
 
 	log.Printf("Repository limit: %d", repositoryCountLimit)

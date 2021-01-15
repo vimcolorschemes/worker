@@ -59,12 +59,24 @@ Fetch the necessary data for the repositories
 bin/start update
 ```
 
+Force a full update of all the repositories by using the `--force` option.
+
+```shell
+bin/start update --force
+```
+
 #### generate
 
 Generate color data for the vim color scheme previews
 
 ```shell
 bin/start generate
+```
+
+Force a full generation of all the repositories by using the `--force` option.
+
+```shell
+bin/start generate --force
 ```
 
 ### Run tests

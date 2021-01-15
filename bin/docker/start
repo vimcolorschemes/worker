@@ -24,6 +24,7 @@ fi
 
 build_container=0
 job=import
+force=
 
 
 display_help() {
@@ -46,12 +47,14 @@ display_help() {
   exit 0
 }
 
-while getopts ":j:b h" opt; do
+while getopts ":j:b:f h" opt; do
   case $opt in
     j)
       job=$OPTARG ;;
     b)
       build_container=1 ;;
+    f)
+      force="--force" ;;
     h)
       display_help ;;
     \?)
@@ -82,4 +85,4 @@ if [[ $build_container = 1 ]]; then
 fi;
 
 echo "${BREAK_LINE}Starting the vimcolorschemes_worker_go container$BREAK_LINE"
-docker-compose run vimcolorschemes_worker_go $job
+docker-compose run vimcolorschemes_worker_go $job $force

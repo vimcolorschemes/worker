@@ -21,7 +21,7 @@ var vimFilesPath string
 var colorDataFilePath string
 
 // Generate vim color scheme data for all valid repositories
-func Generate() {
+func Generate(force bool) {
 	log.Print("Running generate")
 
 	startTime := time.Now()
@@ -43,7 +43,7 @@ func Generate() {
 
 		log.Print("Generating vim previews for ", repository.Owner.Name, "/", repository.Name)
 
-		if repository.GeneratedAt.After(repository.LastCommitAt) {
+		if !force && repository.GeneratedAt.After(repository.LastCommitAt) {
 			log.Print("Repository is not due for a generate")
 			continue
 		}

@@ -15,7 +15,7 @@ import (
 )
 
 // Update the imported repositories with all kinds of useful information
-func Update() {
+func Update(force bool) {
 	log.Print("Run update")
 
 	startTime := time.Now()
@@ -29,7 +29,7 @@ func Update() {
 
 		log.Print("Updating ", repository.Owner.Name, "/", repository.Name)
 
-		updatedRepository := updateRepository(repository)
+		updatedRepository := updateRepository(repository, force)
 
 		updateObject := getUpdateRepositoryObject(updatedRepository)
 
@@ -52,7 +52,7 @@ func Update() {
 	log.Print(":wq")
 }
 
-func updateRepository(repository repoUtil.Repository) repoUtil.Repository {
+func updateRepository(repository repoUtil.Repository, force bool) repoUtil.Repository {
 	githubRepository, err := github.GetRepository(repository.Owner.Name, repository.Name)
 	if err != nil {
 		log.Print("Error fetching ", repository.Owner.Name, "/", repository.Name)
@@ -66,7 +66,7 @@ func updateRepository(repository repoUtil.Repository) repoUtil.Repository {
 	log.Print("Fetching date of last commit")
 	repository.LastCommitAt = github.GetLastCommitAt(githubRepository)
 
-	if repository.UpdatedAt.After(repository.LastCommitAt) {
+	if !force && repository.UpdatedAt.After(repository.LastCommitAt) {
 		log.Print("Repository is not due for a full update")
 		return repository
 	}
