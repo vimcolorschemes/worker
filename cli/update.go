@@ -66,16 +66,16 @@ func updateRepository(repository repoUtil.Repository, force bool) repoUtil.Repos
 	log.Print("Fetching date of last commit")
 	repository.LastCommitAt = github.GetLastCommitAt(githubRepository)
 
-	if !force && repository.UpdatedAt.After(repository.LastCommitAt) {
-		log.Print("Repository is not due for a full update")
-		return repository
-	}
-
 	log.Print("Building stargazers count history")
 	repository.StargazersCountHistory = repoUtil.AppendToStargazersCountHistory(repository)
 
 	log.Print("Computing week stargazers count")
 	repository.WeekStargazersCount = repoUtil.ComputeTrendingStargazersCount(repository, 7)
+
+	if !force && repository.UpdatedAt.After(repository.LastCommitAt) {
+		log.Print("Repository is not due for a full update")
+		return repository
+	}
 
 	log.Print("Getting vim color scheme names")
 	fileURLs := github.GetRepositoryFileURLs(githubRepository)
