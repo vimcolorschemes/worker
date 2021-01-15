@@ -71,7 +71,7 @@ function! GetColorValues() abort
   return l:values
 endfunction
 
-" Returns true if the color hex value is considered to be light
+" Returns true if the color hex value is light
 function! IsHexColorLight(color) abort
   let l:rawColor = trim(a:color, '#')
 
