@@ -167,7 +167,7 @@ var validTests = []struct {
 	{fileContent: `
 		hi clear
 		let g:color_name="hello (world)"
-		syntex reset`, name: "hello (world)"},
+		syntex reset`, name: "helloworld"},
 	{fileContent: `
 		hi clear
 		let colors_name = "abcd1234"
@@ -175,11 +175,11 @@ var validTests = []struct {
 	{fileContent: `
 		hi clear
 		let color_name = "TEST"
-		syntex reset`, name: "TEST"},
+		syntex reset`, name: "test"},
 	{fileContent: `
 		hi clear
 		let colors_name="TEst"
-		syntex reset`, name: "TEst"},
+		syntex reset`, name: "test"},
 	{fileContent: `
 		hi clear
 		let color_name="test"

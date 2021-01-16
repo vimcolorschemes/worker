@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"regexp"
+	"strings"
 
 	"github.com/vimcolorschemes/worker/internal/file"
 	"github.com/vimcolorschemes/worker/internal/repository"
@@ -62,7 +63,10 @@ func getVimColorSchemeName(fileContent *string) (string, error) {
 		return "", errors.New("no vim color scheme match")
 	}
 
-	return matches[3], nil
+	expression := regexp.MustCompile(`[() ]`)
+	cleanedName := expression.ReplaceAllString(matches[3], "")
+
+	return strings.ToLower(cleanedName), nil
 }
 
 func containsURL(colorSchemes []repository.VimColorScheme, fileURL string) bool {
