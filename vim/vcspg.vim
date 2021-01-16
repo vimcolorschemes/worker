@@ -88,14 +88,31 @@ function! IsHexColorLight(color) abort
   endif
 endfunction
 
+" Returns true if the color hex value is dark
+function! IsHexColorDark(color) abort
+  let l:islight = IsHexColorLight(a:color)
+  if l:islight
+    return 0
+  else
+    return 1
+  endif
+endfunction
+
 " Gets all color values of the current file and stores them in a file as JSON
 function WriteColorValues(filename, background) abort
   let l:colorscheme = trim(execute('colorscheme'))
   if l:colorscheme != 'default'
     try
+      let l:background = synIDattr(hlID('Normal'), 'bg#')
       let l:foreground = synIDattr(hlID('Normal'), 'fg#')
 
-      let l:iscolorschemedark = IsHexColorLight(l:foreground)
+      let l:iscolorschemedark = 1
+
+      if l:background != ""
+        let l:iscolorschemedark = IsHexColorDark(l:background)
+      elseif l:foreground != ""
+        let l:iscolorschemedark = IsHexColorLight(l:foreground)
+      endif
 
       let l:data = {}
       if !l:iscolorschemedark && a:background == 'light' || l:iscolorschemedark && a:background == 'dark'
