@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/vimcolorschemes/worker/internal/database"
@@ -41,6 +43,8 @@ func Generate(force bool, repoKey string) bson.M {
 
 	log.Printf("Generating vim preview for %d repositories", len(repositories))
 
+	var generateCount int
+
 	for _, repository := range repositories {
 		fmt.Println()
 
@@ -50,6 +54,8 @@ func Generate(force bool, repoKey string) bson.M {
 			log.Print("Repository is not due for a generate")
 			continue
 		}
+
+		generateCount++
 
 		newVimColorSchemes := repository.VimColorSchemes
 
@@ -61,6 +67,8 @@ func Generate(force bool, repoKey string) bson.M {
 		}
 
 		for index, vimColorScheme := range newVimColorSchemes {
+			file.DownloadFile(vimColorScheme.FileURL, fmt.Sprintf("%s/colors/%s.vim", tmpDirectoryPath, vimColorScheme.Name))
+
 			lightVimColorSchemeColors, err := getVimColorSchemeColorData(vimColorScheme.Name, repoHelper.LightBackground)
 			if err != nil {
 				log.Print(err)
@@ -93,7 +101,7 @@ func Generate(force bool, repoKey string) bson.M {
 
 	cleanUp()
 
-	return bson.M{}
+	return bson.M{"repositoryCount": generateCount}
 }
 
 // Initializes a temporary directory for vim configuration files
@@ -140,7 +148,9 @@ func setupVim() {
 
 	myVimrc := fmt.Sprintf("let $MYVIMRC='%s'\n\n", vimrcPath)
 
-	vimrcContent := fmt.Sprintf("%s\n%s", baseVimrcContent, myVimrc)
+	runtimepath := fmt.Sprintf("let &runtimepath.=',%s/colors'\n\n", tmpDirectoryPath)
+
+	vimrcContent := fmt.Sprintf("%s\n%s\n%s", baseVimrcContent, myVimrc, runtimepath)
 
 	err = file.AppendToFile(vimrcContent, vimrcPath)
 	if err != nil {
@@ -153,11 +163,6 @@ func setupVim() {
 	}
 
 	err = file.AppendToFile(vcspg, vimrcPath)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	err = installPlugin("https://github.com/sheerun/vim-polyglot", "plugins/vim-polyglot")
 	if err != nil {
 		log.Panic(err)
 	}
@@ -179,8 +184,37 @@ func installPlugin(gitRepositoryURL string, path string) error {
 		return err
 	}
 
-	runtimePath := fmt.Sprintf("let &runtimepath.=',%s'\n\n", target)
-	err = file.AppendToFile(runtimePath, vimrcPath)
+	err = addSubdirectoriesToRuntimepath(target)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func addSubdirectoriesToRuntimepath(path string) error {
+	var paths []string
+
+	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !info.IsDir() || strings.Contains(path, ".git") {
+			return nil
+		}
+
+		paths = append(paths, path)
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	runtimepath := fmt.Sprintf("let &runtimepath.=',%s'\n\n", strings.Join(paths, ","))
+
+	err = file.AppendToFile(runtimepath, vimrcPath)
 	if err != nil {
 		return err
 	}
