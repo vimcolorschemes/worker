@@ -1,10 +1,9 @@
 package cli
 
 import (
-	"fmt"
 	"log"
 	"math"
-	"time"
+	"strings"
 
 	"github.com/vimcolorschemes/worker/internal/database"
 	"github.com/vimcolorschemes/worker/internal/dotenv"
@@ -42,14 +41,23 @@ func init() {
 }
 
 // Import potential vim color scheme repositories from GitHub
-func Import(_force bool) {
-	log.Print("Run import")
-
+func Import(_force bool, repoKey string) bson.M {
 	log.Printf("Repository limit: %d", repositoryCountLimit)
 
-	startTime := time.Now()
-
-	repositories := github.SearchRepositories(queries, repositoryCountLimit, repositoryCountLimitPerPage)
+	var repositories []*gogithub.Repository
+	if repoKey != "" {
+		matches := strings.Split(repoKey, "/")
+		if len(matches) < 2 {
+			log.Panic("repo key not valid")
+		}
+		repository, err := github.GetRepository(matches[0], matches[1])
+		if err != nil {
+			log.Panic(err)
+		}
+		repositories = []*gogithub.Repository{repository}
+	} else {
+		repositories = github.SearchRepositories(queries, repositoryCountLimit, repositoryCountLimitPerPage)
+	}
 
 	log.Print("Upserting ", len(repositories), " repositories")
 	for _, repository := range repositories {
@@ -58,20 +66,7 @@ func Import(_force bool) {
 		database.UpsertRepository(*repository.ID, repositoryUpdateObject)
 	}
 
-	fmt.Println()
-
-	elapsedTime := time.Since(startTime)
-	log.Printf("Elapsed time: %s", elapsedTime)
-
-	fmt.Println()
-
-	log.Print("Creating import report")
-	data := bson.M{"repositoryCount": len(repositories)}
-	database.CreateReport("import", elapsedTime.Seconds(), data)
-
-	fmt.Println()
-
-	log.Print(":wq")
+	return bson.M{"repositoryCount": len(repositories)}
 }
 
 func getImportRepositoryObject(repository *gogithub.Repository) bson.M {

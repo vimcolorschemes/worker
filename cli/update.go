@@ -8,19 +8,24 @@ import (
 	"github.com/vimcolorschemes/worker/internal/database"
 	"github.com/vimcolorschemes/worker/internal/file"
 	"github.com/vimcolorschemes/worker/internal/github"
-	repoUtil "github.com/vimcolorschemes/worker/internal/repository"
+	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
 	"github.com/vimcolorschemes/worker/internal/vim"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 // Update the imported repositories with all kinds of useful information
-func Update(force bool) {
-	log.Print("Run update")
-
-	startTime := time.Now()
-
-	repositories := database.GetRepositories()
+func Update(force bool, repoKey string) bson.M {
+	var repositories []repoHelper.Repository
+	if repoKey != "" {
+		repository, err := database.GetRepository(repoKey)
+		if err != nil {
+			log.Panic(err)
+		}
+		repositories = []repoHelper.Repository{repository}
+	} else {
+		repositories = database.GetRepositories()
+	}
 
 	log.Print(len(repositories), " repositories to update")
 
@@ -36,23 +41,10 @@ func Update(force bool) {
 		database.UpsertRepository(repository.ID, updateObject)
 	}
 
-	fmt.Println()
-
-	elapsedTime := time.Since(startTime)
-	log.Printf("Elapsed time: %s", elapsedTime)
-
-	fmt.Println()
-
-	log.Print("Creating update report")
-	data := bson.M{"repositoryCount": len(repositories)}
-	database.CreateReport("update", elapsedTime.Seconds(), data)
-
-	fmt.Println()
-
-	log.Print(":wq")
+	return bson.M{"repositoryCount": len(repositories)}
 }
 
-func updateRepository(repository repoUtil.Repository, force bool) repoUtil.Repository {
+func updateRepository(repository repoHelper.Repository, force bool) repoHelper.Repository {
 	githubRepository, err := github.GetRepository(repository.Owner.Name, repository.Name)
 	if err != nil {
 		log.Print("Error fetching ", repository.Owner.Name, "/", repository.Name)
@@ -67,10 +59,10 @@ func updateRepository(repository repoUtil.Repository, force bool) repoUtil.Repos
 	repository.LastCommitAt = github.GetLastCommitAt(githubRepository)
 
 	log.Print("Building stargazers count history")
-	repository.StargazersCountHistory = repoUtil.AppendToStargazersCountHistory(repository)
+	repository.StargazersCountHistory = repoHelper.AppendToStargazersCountHistory(repository)
 
 	log.Print("Computing week stargazers count")
-	repository.WeekStargazersCount = repoUtil.ComputeTrendingStargazersCount(repository, 7)
+	repository.WeekStargazersCount = repoHelper.ComputeTrendingStargazersCount(repository, 7)
 
 	if !force && repository.UpdatedAt.After(repository.LastCommitAt) {
 		log.Print("Repository is not due for a full update")
@@ -92,13 +84,13 @@ func updateRepository(repository repoUtil.Repository, force bool) repoUtil.Repos
 	}
 
 	log.Print("Checking if ", repository.Owner.Name, "/", repository.Name, " is valid")
-	repository.Valid = repoUtil.IsRepositoryValid(repository)
+	repository.Valid = repoHelper.IsRepositoryValid(repository)
 	log.Printf("Valid: %v", repository.Valid)
 
 	return repository
 }
 
-func getUpdateRepositoryObject(repository repoUtil.Repository) bson.M {
+func getUpdateRepositoryObject(repository repoHelper.Repository) bson.M {
 	return bson.M{
 		"lastCommitAt":           repository.LastCommitAt,
 		"stargazersCount":        repository.StargazersCount,

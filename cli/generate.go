@@ -21,20 +21,23 @@ var vimFilesPath string
 var colorDataFilePath string
 
 // Generate vim color scheme data for all valid repositories
-func Generate(force bool) {
-	log.Print("Running generate")
-
-	startTime := time.Now()
-
-	fmt.Println()
-
+func Generate(force bool, repoKey string) bson.M {
 	initVimFiles()
 
 	setupVim()
 
 	fmt.Println()
 
-	repositories := database.GetValidRepositories()
+	var repositories []repoHelper.Repository
+	if repoKey != "" {
+		repository, err := database.GetRepository(repoKey)
+		if err != nil {
+			log.Panic(err)
+		}
+		repositories = []repoHelper.Repository{repository}
+	} else {
+		repositories = database.GetValidRepositories()
+	}
 
 	log.Printf("Generating vim preview for %d repositories", len(repositories))
 
@@ -88,15 +91,9 @@ func Generate(force bool) {
 		database.UpsertRepository(repository.ID, generateObject)
 	}
 
-	fmt.Println()
-
-	database.CreateReport("generate", time.Since(startTime).Seconds(), bson.M{})
-
-	fmt.Println()
-
-	log.Print(":wq")
-
 	cleanUp()
+
+	return bson.M{}
 }
 
 // Initializes a temporary directory for vim configuration files

@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 	"strings"
@@ -57,6 +58,27 @@ func init() {
 // GetRepositories gets all repositories stored in the database
 func GetRepositories() []repository.Repository {
 	return getRepositories(bson.M{})
+}
+
+// GetRepository gets the repository matching the repository key
+func GetRepository(repoKey string) (repository.Repository, error) {
+	matches := strings.Split(repoKey, "/")
+
+	if len(matches) < 2 {
+		return repository.Repository{}, errors.New("key not valid")
+	}
+
+	ownerName := matches[0]
+	name := matches[1]
+
+	var repo repository.Repository
+
+	err := repositoriesCollection.FindOne(ctx, bson.M{"owner.name": ownerName, "name": name}).Decode(&repo)
+	if err != nil {
+		return repository.Repository{}, err
+	}
+
+	return repo, nil
 }
 
 // GetValidRepositories gets repositories stored in the database that are marked as valid

@@ -51,6 +51,12 @@ Import repositories into the database
 bin/start import
 ```
 
+Import only a specific repository using the `--repo` option.
+
+```shell
+bin/start import --repo morhetz/gruvbox
+```
+
 #### update
 
 Fetch the necessary data for the repositories
@@ -65,6 +71,13 @@ Force a full update of all the repositories by using the `--force` option.
 bin/start update --force
 ```
 
+Update only a specific repository using the `--repo` option.
+
+```shell
+bin/start update --repo morhetz/gruvbox
+```
+
+
 #### generate
 
 Generate color data for the vim color scheme previews
@@ -77,6 +90,12 @@ Force a full generation of all the repositories by using the `--force` option.
 
 ```shell
 bin/start generate --force
+```
+
+Generate preview data for only a specific repository using the `--repo` option.
+
+```shell
+bin/start generate --repo morhetz/gruvbox
 ```
 
 ### Run tests
