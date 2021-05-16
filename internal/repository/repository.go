@@ -25,7 +25,7 @@ type Repository struct {
 	StargazersCount        int                          `bson:"stargazersCount"`
 	StargazersCountHistory []StargazersCountHistoryItem `bson:"stargazersCountHistory"`
 	WeekStargazersCount    int                          `bson:"weekStargazersCount"`
-	VimColorSchemes        []VimColorScheme             `bson:"vimColorSchemes"`
+	VimColorSchemes        []VimColorScheme             `bson:"vimColorSchemes,omitempty"`
 }
 
 // Owner represents the owner of a repository
@@ -50,12 +50,15 @@ type VimColorScheme struct {
 
 // VimColorSchemeData represents the color values for light and dark backgrounds
 type VimColorSchemeData struct {
-	Light VimColorSchemeColorDefinitions `bson:"light,omitempty"`
-	Dark  VimColorSchemeColorDefinitions `bson:"dark,omitempty"`
+	Light []VimColorSchemeGroup `bson:"light,omitempty"`
+	Dark  []VimColorSchemeGroup `bson:"dark,omitempty"`
 }
 
-// VimColorSchemeColorDefinitions represents the color data fetched from vcspg.vim
-type VimColorSchemeColorDefinitions map[string]interface{}
+// VimColorSchemeGroup represents a vim color scheme group's data
+type VimColorSchemeGroup struct {
+	Name    string `bson:"name"`
+	HexCode string `bson:"hexCode"`
+}
 
 // VimBackgroundValue sets up an enum containing the possible values for background in vim
 type VimBackgroundValue string
