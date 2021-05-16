@@ -223,7 +223,7 @@ func addSubdirectoriesToRuntimepath(path string) error {
 }
 
 // Gathers the color scheme data on a specific background from vcspg.vim
-func getVimColorSchemeColorData(colorSchemeName string, background repoHelper.VimBackgroundValue) (repoHelper.VimColorSchemeColorDefinitions, error) {
+func getVimColorSchemeColorData(colorSchemeName string, background repoHelper.VimBackgroundValue) ([]repoHelper.VimColorSchemeColorDefinition, error) {
 	err := executePreviewGenerator(colorSchemeName, background)
 	if err != nil {
 		return nil, err
@@ -239,15 +239,19 @@ func getVimColorSchemeColorData(colorSchemeName string, background repoHelper.Vi
 		return nil, err
 	}
 
-	var vimColorSchemeColors repoHelper.VimColorSchemeColorDefinitions
-	err = json.Unmarshal([]byte(vimColorSchemeOutput), &vimColorSchemeColors)
+	var vimColorSchemeColorsResult map[string]string
+	err = json.Unmarshal([]byte(vimColorSchemeOutput), &vimColorSchemeColorsResult)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(vimColorSchemeColors) == 0 {
-		// Store nil instead of empty object if no data was gathered
-		return nil, nil
+	vimColorSchemeColors := make([]repoHelper.VimColorSchemeColorDefinition, 0, len(vimColorSchemeColorsResult))
+
+	for key, value := range vimColorSchemeColorsResult {
+		vimColorSchemeColors = append(vimColorSchemeColors, repoHelper.VimColorSchemeColorDefinition{
+			Name:    key,
+			HexCode: value,
+		})
 	}
 
 	return vimColorSchemeColors, nil
