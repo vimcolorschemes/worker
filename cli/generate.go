@@ -223,7 +223,7 @@ func addSubdirectoriesToRuntimepath(path string) error {
 }
 
 // Gathers the color scheme data on a specific background from vcspg.vim
-func getVimColorSchemeColorData(colorSchemeName string, background repoHelper.VimBackgroundValue) ([]repoHelper.VimColorSchemeColorDefinition, error) {
+func getVimColorSchemeColorData(colorSchemeName string, background repoHelper.VimBackgroundValue) ([]repoHelper.VimColorSchemeGroup, error) {
 	err := executePreviewGenerator(colorSchemeName, background)
 	if err != nil {
 		return nil, err
@@ -245,12 +245,12 @@ func getVimColorSchemeColorData(colorSchemeName string, background repoHelper.Vi
 		return nil, err
 	}
 
-	vimColorSchemeColors := make([]repoHelper.VimColorSchemeColorDefinition, 0, len(vimColorSchemeColorsResult))
+	vimColorSchemeColors := make([]repoHelper.VimColorSchemeGroup, 0, len(vimColorSchemeColorsResult))
 
-	for key, value := range vimColorSchemeColorsResult {
-		vimColorSchemeColors = append(vimColorSchemeColors, repoHelper.VimColorSchemeColorDefinition{
-			Name:    key,
-			HexCode: value,
+	for groupName, hexCode := range vimColorSchemeColorsResult {
+		vimColorSchemeColors = append(vimColorSchemeColors, repoHelper.VimColorSchemeGroup{
+			Name:    groupName,
+			HexCode: hexCode,
 		})
 	}
 

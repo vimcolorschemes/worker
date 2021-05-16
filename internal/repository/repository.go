@@ -50,14 +50,14 @@ type VimColorScheme struct {
 
 // VimColorSchemeData represents the color values for light and dark backgrounds
 type VimColorSchemeData struct {
-	Light []VimColorSchemeColorDefinition `bson:"light,omitempty"`
-	Dark  []VimColorSchemeColorDefinition `bson:"dark,omitempty"`
+	Light []VimColorSchemeGroup `bson:"light,omitempty"`
+	Dark  []VimColorSchemeGroup `bson:"dark,omitempty"`
 }
 
-// VimColorSchemeColorDefinition represents the color data fetched from vcspg.vim
-type VimColorSchemeColorDefinition struct {
-	Name    string
-	HexCode string
+// VimColorSchemeGroup represents a vim color scheme group's data
+type VimColorSchemeGroup struct {
+	Name    string `bson:"name"`
+	HexCode string `bson:"hexCode"`
 }
 
 // VimBackgroundValue sets up an enum containing the possible values for background in vim
