@@ -311,7 +311,7 @@ func TestComputeTrendingStargazersCount(t *testing.T) {
 	})
 }
 
-func TestComputeRepositoryValidity(t *testing.T) {
+func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 	t.Run("should return valid for a repository that checks all boxes", func(t *testing.T) {
 		var repository Repository
 		repository.LastCommitAt = time.Now()
@@ -319,9 +319,9 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
-		isValid := IsRepositoryValid(repository)
+		isValid := IsRepositoryValidAfterUpdate(repository)
 		if !isValid {
-			t.Errorf("Incorrect result for IsRepositoryValid, got: %v, want: %v", isValid, true)
+			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, true)
 		}
 	})
 
@@ -331,9 +331,9 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
-		isValid := IsRepositoryValid(repository)
+		isValid := IsRepositoryValidAfterUpdate(repository)
 		if isValid {
-			t.Errorf("Incorrect result for IsRepositoryValid, got: %v, want: %v", isValid, false)
+			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, false)
 		}
 	})
 
@@ -344,9 +344,9 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
-		isValid := IsRepositoryValid(repository)
+		isValid := IsRepositoryValidAfterUpdate(repository)
 		if isValid {
-			t.Errorf("Incorrect result for IsRepositoryValid, got: %v, want: %v", isValid, false)
+			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, false)
 		}
 	})
 
@@ -357,9 +357,9 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
-		isValid := IsRepositoryValid(repository)
+		isValid := IsRepositoryValidAfterUpdate(repository)
 		if isValid {
-			t.Errorf("Incorrect result for IsRepositoryValid, got: %v, want: %v", isValid, false)
+			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, false)
 		}
 	})
 
@@ -371,9 +371,9 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date, StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
-		isValid := IsRepositoryValid(repository)
+		isValid := IsRepositoryValidAfterUpdate(repository)
 		if isValid {
-			t.Errorf("Incorrect result for IsRepositoryValid, got: %v, want: %v", isValid, false)
+			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, false)
 		}
 	})
 
@@ -384,9 +384,48 @@ func TestComputeRepositoryValidity(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{}
 
-		isValid := IsRepositoryValid(repository)
+		isValid := IsRepositoryValidAfterUpdate(repository)
 		if isValid {
-			t.Errorf("Incorrect result for IsRepositoryValid, got: %v, want: %v", isValid, false)
+			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, false)
+		}
+	})
+}
+
+func TestComputeRepositoryValidityAfterGenerate(t *testing.T) {
+	t.Run("should return valid for a repository that checks all boxes", func(t *testing.T) {
+		var repository Repository
+		repository.LastCommitAt = time.Now()
+		repository.StargazersCount = 1
+		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
+		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org", Valid: true}}
+
+		isValid := IsRepositoryValidAfterGenerate(repository)
+		if !isValid {
+			t.Errorf("Incorrect result for IsRepositoryValidAfterGenerate, got: %v, want: %v", isValid, true)
+		}
+	})
+
+	t.Run("should return invalid for a repository with no valid vim color schemes", func(t *testing.T) {
+		var repository Repository
+		repository.StargazersCount = 1
+		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
+		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org", Valid: false}}
+
+		isValid := IsRepositoryValidAfterGenerate(repository)
+		if isValid {
+			t.Errorf("Incorrect result for IsRepositoryValidAfterGenerate, got: %v, want: %v", isValid, false)
+		}
+	})
+
+	t.Run("should return invalid for a repository with no vim color schemes", func(t *testing.T) {
+		var repository Repository
+		repository.StargazersCount = 1
+		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
+		repository.VimColorSchemes = []VimColorScheme{}
+
+		isValid := IsRepositoryValidAfterGenerate(repository)
+		if isValid {
+			t.Errorf("Incorrect result for IsRepositoryValidAfterGenerate, got: %v, want: %v", isValid, false)
 		}
 	})
 }

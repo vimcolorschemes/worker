@@ -17,8 +17,9 @@ type Repository struct {
 	Owner                  Owner                        `bson:"owner"`
 	GitHubURL              string                       `bson:"githubURL"`
 	HomepageURL            string                       `bson:"homepageURL"`
-	Valid                  bool                         `bson:"valid"`
+	UpdateValid            bool                         `bson:"updateValid"`
 	UpdatedAt              time.Time                    `bson:"updatedAt"`
+	GenerateValid          bool                         `bson:"generateValid"`
 	GeneratedAt            time.Time                    `bson:"generatedAt"`
 	LastCommitAt           time.Time                    `bson:"lastCommitAt"`
 	GitHubCreatedAt        time.Time                    `bson:"githubCreatedAt"`
@@ -146,8 +147,9 @@ func ComputeTrendingStargazersCount(repository Repository, dayCount int) int {
 	return lastDayCount - firstDayCount
 }
 
-// IsRepositoryValid returns true if a repository is considered valid from our standards
-func IsRepositoryValid(repository Repository) bool {
+// IsRepositoryValidAfterUpdate returns true if a repository is considered
+// valid from our standards after an update job
+func IsRepositoryValidAfterUpdate(repository Repository) bool {
 	var defaultTime time.Time
 	if repository.LastCommitAt == defaultTime {
 		log.Print("Repository last commit at is not valid")
@@ -171,6 +173,28 @@ func IsRepositoryValid(repository Repository) bool {
 
 	if len(repository.VimColorSchemes) < 1 {
 		log.Print("Repository does not have vim color schemes")
+		return false
+	}
+
+	return true
+}
+
+// IsRepositoryValidAfterGenerate returns true if a repository is considered
+// valid from our standards after a generate job
+func IsRepositoryValidAfterGenerate(repository Repository) bool {
+	if !IsRepositoryValidAfterUpdate(repository) {
+		return false
+	}
+
+	var hasValidVimColorScheme = false
+	for _, vimColorScheme := range repository.VimColorSchemes {
+		if vimColorScheme.Valid {
+			hasValidVimColorScheme = true
+		}
+	}
+
+	if !hasValidVimColorScheme {
+		log.Print("Repository does not have a valid vim color scheme")
 		return false
 	}
 

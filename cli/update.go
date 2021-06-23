@@ -48,7 +48,7 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 	githubRepository, err := github.GetRepository(repository.Owner.Name, repository.Name)
 	if err != nil {
 		log.Print("Error fetching ", repository.Owner.Name, "/", repository.Name)
-		repository.Valid = false
+		repository.UpdateValid = false
 		return repository
 	}
 
@@ -84,8 +84,8 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 	}
 
 	log.Print("Checking if ", repository.Owner.Name, "/", repository.Name, " is valid")
-	repository.Valid = repoHelper.IsRepositoryValid(repository)
-	log.Printf("Valid: %v", repository.Valid)
+	repository.UpdateValid = repoHelper.IsRepositoryValidAfterUpdate(repository)
+	log.Printf("Update valid: %v", repository.UpdateValid)
 
 	return repository
 }
@@ -97,7 +97,7 @@ func getUpdateRepositoryObject(repository repoHelper.Repository) bson.M {
 		"stargazersCountHistory": repository.StargazersCountHistory,
 		"weekStargazersCount":    repository.WeekStargazersCount,
 		"vimColorSchemes":        repository.VimColorSchemes,
-		"valid":                  repository.Valid,
+		"updateValid":            repository.UpdateValid,
 		"updatedAt":              time.Now(),
 	}
 }

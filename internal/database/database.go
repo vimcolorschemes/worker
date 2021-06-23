@@ -83,7 +83,7 @@ func GetRepository(repoKey string) (repository.Repository, error) {
 
 // GetValidRepositories gets repositories stored in the database that are marked as valid
 func GetValidRepositories() []repository.Repository {
-	return getRepositories(bson.M{"valid": true})
+	return getRepositories(bson.M{"updateValid": true})
 }
 
 func getRepositories(filter bson.M) []repository.Repository {
