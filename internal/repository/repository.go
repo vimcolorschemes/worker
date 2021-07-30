@@ -43,10 +43,11 @@ type StargazersCountHistoryItem struct {
 
 // VimColorScheme represents a vim color scheme's meta data
 type VimColorScheme struct {
-	FileURL string             `bson:"fileURL"`
-	Name    string             `bson:"name"`
-	Data    VimColorSchemeData `bson:"data"`
-	Valid   bool               `bson:"valid"`
+	FileURL         string             `bson:"fileURL"`
+	Name            string             `bson:"name"`
+	Data            VimColorSchemeData `bson:"data"`
+	Valid           bool               `bson:"valid"`
+	UsesXtermColors bool               `bson:"usesXtermColors"`
 }
 
 // VimColorSchemeData represents the color values for light and dark backgrounds
@@ -92,9 +93,7 @@ func AppendToStargazersCountHistory(repository Repository) []StargazersCountHist
 	history := repository.StargazersCountHistory
 	if history == nil {
 		history = []StargazersCountHistoryItem{}
-	}
-
-	// sort: newest first
+	} // sort: newest first
 	if len(history) > 0 {
 		sort.Slice(history, func(i int, j int) bool {
 			return history[i].Date.After(history[j].Date)

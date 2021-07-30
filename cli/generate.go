@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vimcolorschemes/worker/internal/color"
 	"github.com/vimcolorschemes/worker/internal/database"
 	file "github.com/vimcolorschemes/worker/internal/file"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
@@ -69,13 +70,13 @@ func Generate(force bool, repoKey string) bson.M {
 		for index, vimColorScheme := range newVimColorSchemes {
 			file.DownloadFile(vimColorScheme.FileURL, fmt.Sprintf("%s/colors/%s.vim", tmpDirectoryPath, vimColorScheme.Name))
 
-			lightVimColorSchemeColors, err := getVimColorSchemeColorData(vimColorScheme.Name, repoHelper.LightBackground)
+			lightVimColorSchemeColors, err := getVimColorSchemeColorData(vimColorScheme, repoHelper.LightBackground)
 			if err != nil {
 				log.Print(err)
 				continue
 			}
 
-			darkVimColorSchemeColors, err := getVimColorSchemeColorData(vimColorScheme.Name, repoHelper.DarkBackground)
+			darkVimColorSchemeColors, err := getVimColorSchemeColorData(vimColorScheme, repoHelper.DarkBackground)
 			if err != nil {
 				log.Print(err)
 				continue
@@ -87,10 +88,11 @@ func Generate(force bool, repoKey string) bson.M {
 			}
 
 			newVimColorSchemes[index] = repoHelper.VimColorScheme{
-				Name:    vimColorScheme.Name,
-				FileURL: vimColorScheme.FileURL,
-				Data:    vimColorSchemeData,
-				Valid:   true,
+				Name:            vimColorScheme.Name,
+				FileURL:         vimColorScheme.FileURL,
+				Data:            vimColorSchemeData,
+				Valid:           true,
+				UsesXtermColors: vimColorScheme.UsesXtermColors,
 			}
 		}
 
@@ -225,8 +227,8 @@ func addSubdirectoriesToRuntimepath(path string) error {
 }
 
 // Gathers the color scheme data on a specific background from vcspg.vim
-func getVimColorSchemeColorData(colorSchemeName string, background repoHelper.VimBackgroundValue) ([]repoHelper.VimColorSchemeGroup, error) {
-	err := executePreviewGenerator(colorSchemeName, background)
+func getVimColorSchemeColorData(vimColorScheme repoHelper.VimColorScheme, background repoHelper.VimBackgroundValue) ([]repoHelper.VimColorSchemeGroup, error) {
+	err := executePreviewGenerator(vimColorScheme, background)
 	if err != nil {
 		return nil, err
 	}
@@ -249,10 +251,14 @@ func getVimColorSchemeColorData(colorSchemeName string, background repoHelper.Vi
 
 	vimColorSchemeColors := make([]repoHelper.VimColorSchemeGroup, 0, len(vimColorSchemeColorsResult))
 
-	for groupName, hexCode := range vimColorSchemeColorsResult {
+	for groupName, colorCode := range vimColorSchemeColorsResult {
+		if vimColorScheme.UsesXtermColors {
+			colorCode = color.ConvertXtermToHexCode(colorCode)
+		}
+
 		vimColorSchemeColors = append(vimColorSchemeColors, repoHelper.VimColorSchemeGroup{
 			Name:    groupName,
-			HexCode: hexCode,
+			HexCode: colorCode,
 		})
 	}
 
@@ -260,20 +266,28 @@ func getVimColorSchemeColorData(colorSchemeName string, background repoHelper.Vi
 }
 
 // Starts a vim instance and auto commands to configure and start vcspg.vim on load
-func executePreviewGenerator(colorSchemeName string, background repoHelper.VimBackgroundValue) error {
+func executePreviewGenerator(vimColorScheme repoHelper.VimColorScheme, background repoHelper.VimBackgroundValue) error {
 	writeColorValuesAutoCmd := fmt.Sprintf("autocmd ColorScheme * :call WriteColorValues(\"%s/data.json\",\"%s\")", tmpDirectoryPath, background)
 	setBackground := fmt.Sprintf("set background=%s", background)
-	setColorScheme := fmt.Sprintf("silent! colorscheme %s", colorSchemeName)
+	setColorScheme := fmt.Sprintf("silent! colorscheme %s", vimColorScheme.Name)
 
-	cmd := exec.Command(
-		"vim",
+	args := []string{
 		"-u", vimrcPath,
 		"-c", writeColorValuesAutoCmd,
+	}
+
+	if !vimColorScheme.UsesXtermColors {
+		args = append(args, "-c set termguicolors")
+	}
+
+	args = append(args,
 		"-c", setBackground,
 		"-c", setColorScheme,
 		"-c", ":qa!",
 		"./vim/code_sample.vim",
 	)
+
+	cmd := exec.Command("vim", args...)
 
 	log.Printf("Running %s", cmd)
 
