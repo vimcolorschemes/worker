@@ -79,9 +79,10 @@ func getSupportsTermGuiColors(fileContent *string) bool {
 	// if 5 or more hex codes are found in the code, a support for termguicolors
 	// is assumed
 
-	hexCode := regexp.MustCompile(`#[a-zA-Z0-9]{6}`)
+	hexCode := regexp.MustCompile(`#?[0-9a-fA-F]{6}`)
 	matches := hexCode.FindAllString(*fileContent, 6)
-	return len(matches) > 5
+
+	return len(matches) >= 5
 }
 
 func containsURL(colorSchemes []repository.VimColorScheme, fileURL string) bool {
