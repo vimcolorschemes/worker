@@ -12,6 +12,7 @@ import (
 	"github.com/vimcolorschemes/worker/internal/repository"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -68,8 +69,8 @@ func GetRepository(repoKey string) (repository.Repository, error) {
 		return repository.Repository{}, errors.New("key not valid")
 	}
 
-	ownerName := matches[0]
-	name := matches[1]
+	ownerName := bson.M{"$regex": primitive.Regex{Pattern: matches[0], Options: "i"}}
+	name := bson.M{"$regex": primitive.Regex{Pattern: matches[1], Options: "i"}}
 
 	var repo repository.Repository
 
