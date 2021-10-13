@@ -52,7 +52,12 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 		return repository
 	}
 
-	repository.License = *githubRepository.License.SPDXID
+	license := githubRepository.License
+	if license != nil {
+		repository.License = *license.SPDXID
+	} else {
+		repository.License = ""
+	}
 
 	log.Print("Gathering basic infos")
 	repository.StargazersCount = *githubRepository.StargazersCount
