@@ -37,8 +37,8 @@ func TestGetVimColorSchemes(t *testing.T) {
 		}
 
 		expectedVimColorSchemes := []repository.VimColorScheme{
-			{Name: "test", FileURL: server1.URL, UsesXtermColors: true},
-			{Name: "hello", FileURL: server2.URL, UsesXtermColors: true},
+			{Name: "test", FileURL: server1.URL},
+			{Name: "hello", FileURL: server2.URL},
 		}
 
 		if !reflect.DeepEqual(colorSchemes, expectedVimColorSchemes) {
@@ -67,7 +67,7 @@ func TestGetVimColorSchemes(t *testing.T) {
 			t.Error("Incorrect result for GetVimColorSchemes, got error")
 		}
 
-		expectedVimColorSchemes := []repository.VimColorScheme{{Name: "hello", FileURL: server.URL, UsesXtermColors: true}}
+		expectedVimColorSchemes := []repository.VimColorScheme{{Name: "hello", FileURL: server.URL}}
 
 		if !reflect.DeepEqual(colorSchemes, expectedVimColorSchemes) {
 			var names []string
@@ -139,7 +139,7 @@ func TestGetVimColorSchemes(t *testing.T) {
 			t.Error("Incorrect result for GetVimColorSchemes, got error")
 		}
 
-		expectedVimColorSchemes := []repository.VimColorScheme{{Name: "test", FileURL: server.URL, UsesXtermColors: true}}
+		expectedVimColorSchemes := []repository.VimColorScheme{{Name: "test", FileURL: server.URL}}
 
 		if !reflect.DeepEqual(colorSchemes, expectedVimColorSchemes) {
 			var names []string
@@ -313,109 +313,6 @@ func TestIsVimColorScheme(t *testing.T) {
 			if isVimColorScheme(&fileContent) {
 				t.Errorf("Incorrect result for isVimColorScheme, got true for: %s", fileContent)
 			}
-		}
-	})
-}
-
-func TestGetSupportsTermGuiColors(t *testing.T) {
-	t.Run("should return true if 5 or more hex codes (with pound) are found", func(t *testing.T) {
-		content := `
-			hi clear
-			let g:colors_name = "test
-			syntax reset
-			normal ctermbg=254 ctermfg=237 guibg=#e8e9ec guifg=#33374c
-			normal ctermbg=254 ctermfg=237 guibg=#e8e9ec guifg=#33374c
-			normal ctermbg=254 ctermfg=237 guibg=#e8e9ec guifg=#33374c
-		`
-
-		result := getSupportsTermGuiColors(&content)
-
-		if result == false {
-			t.Errorf("Incorrect result for getSupportsTermGuiColors, got %v, want: %v", result, true)
-		}
-	})
-
-	t.Run("should return true if 5 or more hex codes (without pound) are found", func(t *testing.T) {
-		content := `
-			hi clear
-			let g:colors_name = "test
-			syntax reset
-
-			let s:gui00 = "263238"
-			let s:gui01 = "37474F"
-			let s:gui02 = "546E7A"
-			let s:gui03 = "5C7E8C"
-			let s:gui04 = "80CBC4"
-
-			call <sid>hi("Search",        s:gui03, s:gui0A, s:cterm03, s:cterm0A,  "")
-			call <sid>hi("SpecialKey",    s:gui03, "", s:cterm03, "", "")
-			call <sid>hi("TooLong",       s:gui08, "", s:cterm08, "", "")
-		`
-
-		result := getSupportsTermGuiColors(&content)
-
-		if result == false {
-			t.Errorf("Incorrect result for getSupportsTermGuiColors, got %v, want: %v", result, true)
-		}
-	})
-
-	t.Run("should return false if less than 5 hex codes are found", func(t *testing.T) {
-		content := `
-			hi clear
-			let g:colors_name = "test
-			syntax reset
-			normal ctermbg=254 ctermfg=237 guibg=#e8e9ec guifg=#33374c
-			normal ctermbg=254 ctermfg=237 guibg=#e8e9ec guifg=#33374c
-		`
-
-		result := getSupportsTermGuiColors(&content)
-
-		if result == true {
-			t.Errorf("Incorrect result for getSupportsTermGuiColors, got %v, want: %v", result, false)
-		}
-	})
-
-	t.Run("should return false if no hex codes are found", func(t *testing.T) {
-		content := `
-			hi clear
-			let g:colors_name = "test
-			syntax reset
-			normal ctermbg=254 ctermfg=237
-			normal ctermbg=254 ctermfg=237
-		`
-
-		result := getSupportsTermGuiColors(&content)
-
-		if result == true {
-			t.Errorf("Incorrect result for getSupportsTermGuiColors, got %v, want: %v", result, false)
-		}
-	})
-
-	t.Run("should return false if gui_running check is present", func(t *testing.T) {
-		content := `
-			hi clear
-			let g:colors_name = "test
-			syntax reset
-			normal ctermbg=254 ctermfg=237
-			normal ctermbg=254 ctermfg=237
-
-			let s:gui00 = "#263238"
-			let s:gui01 = "#37474F"
-			let s:gui02 = "#546E7A"
-			let s:gui03 = "#5C7E8C"
-			let s:gui04 = "#80CBC4"
-
-			if has('gui_running')
-				echo "yes"
-			else
-				echo "no"
-			endif
-		`
-
-		result := getSupportsTermGuiColors(&content)
-
-		if result == true {
-			t.Errorf("Incorrect result for getSupportsTermGuiColors, got %v, want: %v", result, false)
 		}
 	})
 }
