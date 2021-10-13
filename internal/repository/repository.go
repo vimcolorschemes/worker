@@ -13,20 +13,21 @@ import (
 // Repository represents a repository as it's stored in the database
 type Repository struct {
 	ID                     int64                        `bson:"_id,omitempty"`
-	Name                   string                       `bson:"name"`
 	Owner                  Owner                        `bson:"owner"`
+	Name                   string                       `bson:"name"`
 	GitHubURL              string                       `bson:"githubURL"`
 	HomepageURL            string                       `bson:"homepageURL"`
+	StargazersCount        int                          `bson:"stargazersCount"`
+	StargazersCountHistory []StargazersCountHistoryItem `bson:"stargazersCountHistory"`
+	WeekStargazersCount    int                          `bson:"weekStargazersCount"`
+	License                string                       `bson:"license"`
+	GitHubCreatedAt        time.Time                    `bson:"githubCreatedAt"`
+	LastCommitAt           time.Time                    `bson:"lastCommitAt"`
+	VimColorSchemes        []VimColorScheme             `bson:"vimColorSchemes,omitempty"`
 	UpdateValid            bool                         `bson:"updateValid"`
 	UpdatedAt              time.Time                    `bson:"updatedAt"`
 	GenerateValid          bool                         `bson:"generateValid"`
 	GeneratedAt            time.Time                    `bson:"generatedAt"`
-	LastCommitAt           time.Time                    `bson:"lastCommitAt"`
-	GitHubCreatedAt        time.Time                    `bson:"githubCreatedAt"`
-	StargazersCount        int                          `bson:"stargazersCount"`
-	StargazersCountHistory []StargazersCountHistoryItem `bson:"stargazersCountHistory"`
-	WeekStargazersCount    int                          `bson:"weekStargazersCount"`
-	VimColorSchemes        []VimColorScheme             `bson:"vimColorSchemes,omitempty"`
 }
 
 // Owner represents the owner of a repository

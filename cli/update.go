@@ -52,6 +52,8 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 		return repository
 	}
 
+	repository.License = *githubRepository.License.SPDXID
+
 	log.Print("Gathering basic infos")
 	repository.StargazersCount = *githubRepository.StargazersCount
 
@@ -92,6 +94,7 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 
 func getUpdateRepositoryObject(repository repoHelper.Repository) bson.M {
 	return bson.M{
+		"license":                repository.License,
 		"lastCommitAt":           repository.LastCommitAt,
 		"stargazersCount":        repository.StargazersCount,
 		"stargazersCountHistory": repository.StargazersCountHistory,
