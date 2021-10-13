@@ -181,7 +181,7 @@ func IsRepositoryValidAfterUpdate(repository Repository) bool {
 // IsRepositoryValidAfterGenerate returns true if a repository is considered
 // valid from our standards after a generate job
 func IsRepositoryValidAfterGenerate(repository Repository) bool {
-	if !IsRepositoryValidAfterUpdate(repository) {
+	if !repository.UpdateValid {
 		return false
 	}
 

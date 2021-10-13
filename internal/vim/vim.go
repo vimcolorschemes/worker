@@ -76,9 +76,14 @@ func getVimColorSchemeName(fileContent *string) (string, error) {
 }
 
 func getSupportsTermGuiColors(fileContent *string) bool {
+	// if a gui_running check is present, xterms colors are prefered
+	guiRunning := regexp.MustCompile(`if has\(.gui_running.\)`)
+	if guiRunning.MatchString(*fileContent) {
+		return false
+	}
+
 	// if 5 or more hex codes are found in the code, a support for termguicolors
 	// is assumed
-
 	hexCode := regexp.MustCompile(`#?[0-9a-fA-F]{6}`)
 	matches := hexCode.FindAllString(*fileContent, 6)
 

@@ -390,6 +390,34 @@ func TestGetSupportsTermGuiColors(t *testing.T) {
 			t.Errorf("Incorrect result for getSupportsTermGuiColors, got %v, want: %v", result, false)
 		}
 	})
+
+	t.Run("should return false if gui_running check is present", func(t *testing.T) {
+		content := `
+			hi clear
+			let g:colors_name = "test
+			syntax reset
+			normal ctermbg=254 ctermfg=237
+			normal ctermbg=254 ctermfg=237
+
+			let s:gui00 = "#263238"
+			let s:gui01 = "#37474F"
+			let s:gui02 = "#546E7A"
+			let s:gui03 = "#5C7E8C"
+			let s:gui04 = "#80CBC4"
+
+			if has('gui_running')
+				echo "yes"
+			else
+				echo "no"
+			endif
+		`
+
+		result := getSupportsTermGuiColors(&content)
+
+		if result == true {
+			t.Errorf("Incorrect result for getSupportsTermGuiColors, got %v, want: %v", result, false)
+		}
+	})
 }
 
 func TestContainsURL(t *testing.T) {

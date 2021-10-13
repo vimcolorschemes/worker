@@ -394,10 +394,8 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 func TestComputeRepositoryValidityAfterGenerate(t *testing.T) {
 	t.Run("should return valid for a repository that checks all boxes", func(t *testing.T) {
 		var repository Repository
-		repository.LastCommitAt = time.Now()
-		repository.StargazersCount = 1
-		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org", Valid: true}}
+		repository.UpdateValid = true
 
 		isValid := IsRepositoryValidAfterGenerate(repository)
 		if !isValid {
