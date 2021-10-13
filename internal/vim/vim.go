@@ -34,14 +34,11 @@ func GetVimColorSchemes(vimFileURLs []string) ([]repository.VimColorScheme, erro
 			continue
 		}
 
-		usesXtermColors := !getSupportsTermGuiColors(&fileContent)
-
 		log.Print("Found ", vimColorSchemeName, " at ", vimFileURL)
 
 		vimColorSchemes = append(vimColorSchemes, repository.VimColorScheme{
-			Name:            vimColorSchemeName,
-			FileURL:         vimFileURL,
-			UsesXtermColors: usesXtermColors,
+			Name:    vimColorSchemeName,
+			FileURL: vimFileURL,
 		})
 	}
 
@@ -73,21 +70,6 @@ func getVimColorSchemeName(fileContent *string) (string, error) {
 	cleanedName := expression.ReplaceAllString(matches[3], "")
 
 	return strings.ToLower(cleanedName), nil
-}
-
-func getSupportsTermGuiColors(fileContent *string) bool {
-	// if a gui_running check is present, xterms colors are prefered
-	guiRunning := regexp.MustCompile(`if has\(.gui_running.\)`)
-	if guiRunning.MatchString(*fileContent) {
-		return false
-	}
-
-	// if 5 or more hex codes are found in the code, a support for termguicolors
-	// is assumed
-	hexCode := regexp.MustCompile(`#?[0-9a-fA-F]{6}`)
-	matches := hexCode.FindAllString(*fileContent, 6)
-
-	return len(matches) >= 5
 }
 
 func containsURL(colorSchemes []repository.VimColorScheme, fileURL string) bool {

@@ -44,11 +44,10 @@ type StargazersCountHistoryItem struct {
 
 // VimColorScheme represents a vim color scheme's meta data
 type VimColorScheme struct {
-	FileURL         string             `bson:"fileURL"`
-	Name            string             `bson:"name"`
-	Data            VimColorSchemeData `bson:"data"`
-	Valid           bool               `bson:"valid"`
-	UsesXtermColors bool               `bson:"usesXtermColors"`
+	FileURL string             `bson:"fileURL"`
+	Name    string             `bson:"name"`
+	Data    VimColorSchemeData `bson:"data"`
+	Valid   bool               `bson:"valid"`
 }
 
 // VimColorSchemeData represents the color values for light and dark backgrounds
