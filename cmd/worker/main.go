@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -78,7 +79,7 @@ func getJobArgs(osArgs []string) (string, bool, string, error) {
 		return osArgs[1], force, "", nil
 	}
 
-	repoKey := args[repoIndex+1]
+	repoKey := strings.ToLower(args[repoIndex+1])
 
 	return osArgs[1], force, repoKey, nil
 }
