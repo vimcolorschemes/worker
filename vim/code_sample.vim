@@ -8,9 +8,5 @@ function! IsHexColorLight(color) abort
 
   let l:brightness = ((l:red * 299) + (l:green * 587) + (l:blue * 114)) / 1000
 
-  if l:brightness > 155
-    return 1
-  else
-    return 0
-  endif
+  return l:brightness > 155
 endfunction
