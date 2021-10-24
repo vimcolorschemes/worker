@@ -55,7 +55,7 @@ func TestAppendToStargazersCountHistory(t *testing.T) {
 		repository := Repository{
 			StargazersCount: 100,
 		}
-		history := AppendToStargazersCountHistory(repository)
+		history := repository.AppendToStargazersCountHistory()
 		today := dateUtil.Today()
 
 		expected := []StargazersCountHistoryItem{
@@ -77,7 +77,7 @@ func TestAppendToStargazersCountHistory(t *testing.T) {
 			},
 		}
 
-		history := AppendToStargazersCountHistory(repository)
+		history := repository.AppendToStargazersCountHistory()
 
 		today := dateUtil.Today()
 
@@ -105,7 +105,7 @@ func TestAppendToStargazersCountHistory(t *testing.T) {
 			},
 		}
 
-		history := AppendToStargazersCountHistory(repository)
+		history := repository.AppendToStargazersCountHistory()
 
 		today := dateUtil.Today()
 
@@ -135,7 +135,7 @@ func TestAppendToStargazersCountHistory(t *testing.T) {
 			},
 		}
 
-		history := AppendToStargazersCountHistory(repository)
+		history := repository.AppendToStargazersCountHistory()
 
 		expected := []StargazersCountHistoryItem{
 			{Date: today, StargazersCount: 101},
@@ -161,7 +161,7 @@ func TestAppendToStargazersCountHistory(t *testing.T) {
 			},
 		}
 
-		history := AppendToStargazersCountHistory(repository)
+		history := repository.AppendToStargazersCountHistory()
 
 		expected := []StargazersCountHistoryItem{
 			{Date: today, StargazersCount: 101},
@@ -187,7 +187,7 @@ func TestAppendToStargazersCountHistory(t *testing.T) {
 			StargazersCountHistory: history,
 		}
 
-		result := AppendToStargazersCountHistory(repository)
+		result := repository.AppendToStargazersCountHistory()
 
 		if len(result) != 31 {
 			t.Errorf("Incorrect result for AppendToStargazersCountHistory, got length: %d, want length: %d", len(result), 31)
@@ -208,7 +208,7 @@ func TestComputeTrendingStargazersCount(t *testing.T) {
 			StargazersCountHistory: history,
 		}
 
-		result := ComputeTrendingStargazersCount(repository, 2)
+		result := repository.ComputeTrendingStargazersCount(2)
 
 		if result != 20 {
 			t.Errorf("Incorrect result for ComputeTrendingStargazersCount, got: %d, want: %d", result, 20)
@@ -227,7 +227,7 @@ func TestComputeTrendingStargazersCount(t *testing.T) {
 			StargazersCountHistory: history,
 		}
 
-		result := ComputeTrendingStargazersCount(repository, 3)
+		result := repository.ComputeTrendingStargazersCount(3)
 
 		if result != 20 {
 			t.Errorf("Incorrect result for ComputeTrendingStargazersCount, got: %d, want: %d", result, 20)
@@ -250,7 +250,7 @@ func TestComputeTrendingStargazersCount(t *testing.T) {
 			StargazersCountHistory: history,
 		}
 
-		result := ComputeTrendingStargazersCount(repository, 2)
+		result := repository.ComputeTrendingStargazersCount(2)
 
 		if result != 10 {
 			t.Errorf("Incorrect result for ComputeTrendingStargazersCount, got: %d, want: %d", result, 10)
@@ -264,7 +264,7 @@ func TestComputeTrendingStargazersCount(t *testing.T) {
 			StargazersCountHistory: history,
 		}
 
-		result := ComputeTrendingStargazersCount(repository, 2)
+		result := repository.ComputeTrendingStargazersCount(2)
 
 		if result != 0 {
 			t.Errorf("Incorrect result for ComputeTrendingStargazersCount, got: %d, want: %d", result, 0)
@@ -283,7 +283,7 @@ func TestComputeTrendingStargazersCount(t *testing.T) {
 			StargazersCountHistory: history,
 		}
 
-		result := ComputeTrendingStargazersCount(repository, 2)
+		result := repository.ComputeTrendingStargazersCount(2)
 
 		if result != -20 {
 			t.Errorf("Incorrect result for ComputeTrendingStargazersCount, got: %d, want: %d", result, -20)
@@ -303,7 +303,7 @@ func TestComputeTrendingStargazersCount(t *testing.T) {
 			StargazersCountHistory: history,
 		}
 
-		result := ComputeTrendingStargazersCount(repository, 3)
+		result := repository.ComputeTrendingStargazersCount(3)
 
 		if result != 0 {
 			t.Errorf("Incorrect result for ComputeTrendingStargazersCount, got: %d, want: %d", result, 0)
@@ -319,7 +319,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
-		isValid := IsRepositoryValidAfterUpdate(repository)
+		isValid := repository.IsValidAfterUpdate()
 		if !isValid {
 			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, true)
 		}
@@ -331,7 +331,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
-		isValid := IsRepositoryValidAfterUpdate(repository)
+		isValid := repository.IsValidAfterUpdate()
 		if isValid {
 			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, false)
 		}
@@ -344,7 +344,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
-		isValid := IsRepositoryValidAfterUpdate(repository)
+		isValid := repository.IsValidAfterUpdate()
 		if isValid {
 			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, false)
 		}
@@ -357,7 +357,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
-		isValid := IsRepositoryValidAfterUpdate(repository)
+		isValid := repository.IsValidAfterUpdate()
 		if isValid {
 			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, false)
 		}
@@ -371,7 +371,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date, StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
-		isValid := IsRepositoryValidAfterUpdate(repository)
+		isValid := repository.IsValidAfterUpdate()
 		if isValid {
 			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, false)
 		}
@@ -384,7 +384,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{}
 
-		isValid := IsRepositoryValidAfterUpdate(repository)
+		isValid := repository.IsValidAfterUpdate()
 		if isValid {
 			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, false)
 		}
@@ -397,7 +397,7 @@ func TestComputeRepositoryValidityAfterGenerate(t *testing.T) {
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org", Valid: true}}
 		repository.UpdateValid = true
 
-		isValid := IsRepositoryValidAfterGenerate(repository)
+		isValid := repository.IsValidAfterGenerate()
 		if !isValid {
 			t.Errorf("Incorrect result for IsRepositoryValidAfterGenerate, got: %v, want: %v", isValid, true)
 		}
@@ -409,7 +409,7 @@ func TestComputeRepositoryValidityAfterGenerate(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org", Valid: false}}
 
-		isValid := IsRepositoryValidAfterGenerate(repository)
+		isValid := repository.IsValidAfterGenerate()
 		if isValid {
 			t.Errorf("Incorrect result for IsRepositoryValidAfterGenerate, got: %v, want: %v", isValid, false)
 		}
@@ -421,7 +421,7 @@ func TestComputeRepositoryValidityAfterGenerate(t *testing.T) {
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{}
 
-		isValid := IsRepositoryValidAfterGenerate(repository)
+		isValid := repository.IsValidAfterGenerate()
 		if isValid {
 			t.Errorf("Incorrect result for IsRepositoryValidAfterGenerate, got: %v, want: %v", isValid, false)
 		}

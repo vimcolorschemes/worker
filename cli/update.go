@@ -66,10 +66,10 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 	repository.LastCommitAt = github.GetLastCommitAt(githubRepository)
 
 	log.Print("Building stargazers count history")
-	repository.StargazersCountHistory = repoHelper.AppendToStargazersCountHistory(repository)
+	repository.StargazersCountHistory = repository.AppendToStargazersCountHistory()
 
 	log.Print("Computing week stargazers count")
-	repository.WeekStargazersCount = repoHelper.ComputeTrendingStargazersCount(repository, 7)
+	repository.WeekStargazersCount = repository.ComputeTrendingStargazersCount(7)
 
 	if !force && repository.UpdatedAt.After(repository.LastCommitAt) {
 		log.Print("Repository is not due for a full update")
@@ -91,7 +91,7 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 	}
 
 	log.Print("Checking if ", repository.Owner.Name, "/", repository.Name, " is valid")
-	repository.UpdateValid = repoHelper.IsRepositoryValidAfterUpdate(repository)
+	repository.UpdateValid = repository.IsValidAfterUpdate()
 	log.Printf("Update valid: %v", repository.UpdateValid)
 
 	return repository

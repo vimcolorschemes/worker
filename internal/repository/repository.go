@@ -89,7 +89,7 @@ func UniquifyRepositories(repositories []*gogithub.Repository) []*gogithub.Repos
 }
 
 // AppendToStargazersCountHistory appends today's item to the stargazers count history
-func AppendToStargazersCountHistory(repository Repository) []StargazersCountHistoryItem {
+func (repository Repository) AppendToStargazersCountHistory() []StargazersCountHistoryItem {
 	history := repository.StargazersCountHistory
 	if history == nil {
 		history = []StargazersCountHistoryItem{}
@@ -130,7 +130,7 @@ func AppendToStargazersCountHistory(repository Repository) []StargazersCountHist
 }
 
 // ComputeTrendingStargazersCount adds up the stargazers counts from the last days
-func ComputeTrendingStargazersCount(repository Repository, dayCount int) int {
+func (repository Repository) ComputeTrendingStargazersCount(dayCount int) int {
 	if repository.StargazersCountHistory == nil || len(repository.StargazersCountHistory) == 0 {
 		return 0
 	}
@@ -146,9 +146,9 @@ func ComputeTrendingStargazersCount(repository Repository, dayCount int) int {
 	return lastDayCount - firstDayCount
 }
 
-// IsRepositoryValidAfterUpdate returns true if a repository is considered
+// IsValidAfterUpdate returns true if a repository is considered
 // valid from our standards after an update job
-func IsRepositoryValidAfterUpdate(repository Repository) bool {
+func (repository Repository) IsValidAfterUpdate() bool {
 	var defaultTime time.Time
 	if repository.LastCommitAt == defaultTime {
 		log.Print("Repository last commit at is not valid")
@@ -178,9 +178,9 @@ func IsRepositoryValidAfterUpdate(repository Repository) bool {
 	return true
 }
 
-// IsRepositoryValidAfterGenerate returns true if a repository is considered
+// IsValidAfterGenerate returns true if a repository is considered
 // valid from our standards after a generate job
-func IsRepositoryValidAfterGenerate(repository Repository) bool {
+func (repository Repository) IsValidAfterGenerate() bool {
 	if !repository.UpdateValid {
 		return false
 	}

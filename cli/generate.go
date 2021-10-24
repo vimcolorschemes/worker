@@ -97,7 +97,7 @@ func Generate(force bool, repoKey string) bson.M {
 		}
 
 		repository.VimColorSchemes = newVimColorSchemes
-		repository.GenerateValid = repoHelper.IsRepositoryValidAfterGenerate(repository)
+		repository.GenerateValid = repository.IsValidAfterGenerate()
 
 		generateObject := getGenerateRepositoryObject(repository)
 		database.UpsertRepository(repository.ID, generateObject)
