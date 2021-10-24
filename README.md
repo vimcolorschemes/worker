@@ -7,7 +7,7 @@
 
 ## Getting started
 
-The worker is a CLI used to import and manage the data for [vimcolorschemes](https://github.com/reobin/vimcolorschemes).
+The worker is a CLI used to import and manage the data for [vimcolorschemes](https://github.com/vimcolorschemes/vimcolorschemes).
 
 ### Requirements:
 
@@ -17,11 +17,9 @@ _Note_: The MongoDB database can also be ran from [the app docker setup](https:/
 
 ### Set up the environment variables
 
-A template dotenv file (`.env.example`) is available at root.
+Update the values in `.env` to your needs.
 
-Copy it using `cp .env.example .env` and update the values to your needs.
-
-> TIP: Read the comments on the template dotenv file.
+> TIP: Read the comments on the dotenv file.
 
 The `.env` is automatically picked up by CLI when it runs.
 
