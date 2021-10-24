@@ -71,12 +71,12 @@ func Generate(force bool, repoKey string) bson.M {
 
 			lightVimColorSchemeColors, lightErr := getVimColorSchemeColorData(vimColorScheme, repoHelper.LightBackground)
 			if lightErr != nil {
-				log.Print(err)
+				log.Print(lightErr)
 			}
 
 			darkVimColorSchemeColors, darkErr := getVimColorSchemeColorData(vimColorScheme, repoHelper.DarkBackground)
 			if darkErr != nil {
-				log.Print(err)
+				log.Print(darkErr)
 			}
 
 			if lightErr != nil && darkErr != nil {
