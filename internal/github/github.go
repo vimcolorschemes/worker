@@ -19,7 +19,7 @@ import (
 
 var client *gogithub.Client
 
-const fileQueryLimit = 50
+const fileQueryLimit = 500
 
 const searchResultCountHardLimit = 1000
 
