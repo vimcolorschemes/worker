@@ -362,28 +362,36 @@ function! IsHexColorDark(color) abort
   endif
 endfunction
 
-" Gets all color values of the current file and stores them in a file as JSON
-function WriteColorValues(filename, background) abort
-  if trim(execute('colorscheme')) == 'default'
-    return 0
+" Sets up colorscheme config through trial and error
+function! SetUpColorScheme(colorscheme) abort
+  set termguicolors
+  execute 'colorscheme' a:colorscheme
+  let l:background = synIDattr(hlID('Normal'), 'bg#')
+  let l:foreground = synIDattr(hlID('Normal'), 'fg#')
+  if l:background == "" || l:foreground == ""
+    set notermguicolors
+    execute 'colorscheme' a:colorscheme
+    let l:background = synIDattr(hlID('Normal'), 'bg#')
+    let l:foreground = synIDattr(hlID('Normal'), 'fg#')
   endif
 
-  try
+  if l:background == "" || l:foreground == ""
     set termguicolors
+    execute 'colorscheme' a:colorscheme
+  endif
+endfunction
+
+" Gets all color values of the current file and stores them in a file as JSON
+function WriteColorValues(filename, colorscheme, background) abort
+  try
+    call SetUpColorScheme(a:colorscheme)
+    if trim(execute('colorscheme')) == 'default'
+      return 0
+    endif
+
     let l:background = synIDattr(hlID('Normal'), 'bg#')
     let l:foreground = synIDattr(hlID('Normal'), 'fg#')
 
-    if l:background == "" || l:foreground == ""
-      set notermguicolors
-      let l:background = synIDattr(hlID('Normal'), 'bg#')
-      let l:foreground = synIDattr(hlID('Normal'), 'fg#')
-    endif
-
-    if l:background == "" || l:foreground == ""
-      set termguicolors
-      let l:background = synIDattr(hlID('Normal'), 'bg#')
-      let l:foreground = synIDattr(hlID('Normal'), 'fg#')
-    endif
 
     let l:background = ConvertToHex(l:background)
     let l:foreground = ConvertToHex(l:foreground)
@@ -405,7 +413,7 @@ function WriteColorValues(filename, background) abort
 
     let l:encodeddata = json_encode(l:data)
     call writefile([l:encodeddata], a:filename)
-  catch
-    echo 'error'
+  catch /.*/
+    echo v:exception
   endtry
 endfunction

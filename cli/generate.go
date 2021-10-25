@@ -280,7 +280,13 @@ func getVimColorSchemeColorData(vimColorScheme repoHelper.VimColorScheme, backgr
 
 // Starts a vim instance and auto commands to configure and start vcspg.vim on load
 func executePreviewGenerator(vimColorScheme repoHelper.VimColorScheme, background repoHelper.VimBackgroundValue) error {
-	writeColorValuesAutoCmd := fmt.Sprintf("autocmd ColorScheme * :call WriteColorValues(\"%s/data.json\",\"%s\")", tmpDirectoryPath, background)
+	writeColorValuesAutoCmd := fmt.Sprintf(
+		"autocmd ColorScheme * :call WriteColorValues(\"%s/data.json\", \"%s\", \"%s\")",
+		tmpDirectoryPath,
+		vimColorScheme.Name,
+		background,
+	)
+
 	setBackground := fmt.Sprintf("set background=%s", background)
 	setColorScheme := fmt.Sprintf("silent! colorscheme %s", vimColorScheme.Name)
 
