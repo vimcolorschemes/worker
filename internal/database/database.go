@@ -106,6 +106,7 @@ func UpsertRepository(id int64, updateObject bson.M) {
 	filter := bson.M{"_id": id}
 
 	update := bson.M{"$set": updateObject}
+	delete(updateObject, "_id")
 
 	upsertOptions := options.Update().SetUpsert(true)
 
