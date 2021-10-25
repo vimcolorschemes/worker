@@ -70,15 +70,7 @@ func Generate(force bool, repoKey string) bson.M {
 			file.DownloadFile(vimColorScheme.FileURL, fmt.Sprintf("%s/colors/%s.vim", tmpDirectoryPath, vimColorScheme.Name))
 
 			lightVimColorSchemeColors, lightErr := getVimColorSchemeColorData(vimColorScheme, repoHelper.LightBackground)
-			if lightErr != nil {
-				log.Print(lightErr)
-			}
-
 			darkVimColorSchemeColors, darkErr := getVimColorSchemeColorData(vimColorScheme, repoHelper.DarkBackground)
-			if darkErr != nil {
-				log.Print(darkErr)
-			}
-
 			if lightErr != nil && darkErr != nil {
 				continue
 			}
@@ -94,6 +86,7 @@ func Generate(force bool, repoKey string) bson.M {
 				Data:    vimColorSchemeData,
 				Valid:   true,
 			}
+
 		}
 
 		repository.VimColorSchemes = newVimColorSchemes
@@ -101,6 +94,8 @@ func Generate(force bool, repoKey string) bson.M {
 
 		generateObject := getGenerateRepositoryObject(repository)
 		database.UpsertRepository(repository.ID, generateObject)
+
+		deletePlugin(pluginPath)
 	}
 
 	cleanUp()
@@ -196,6 +191,24 @@ func installPlugin(gitRepositoryURL string, path string) error {
 	return nil
 }
 
+// Clears all installation traces of the vim plugin
+func deletePlugin(path string) error {
+	// Remove plugin specific runtimepath from .vimrc
+	err := file.RemoveLinesInFile("let &runtimepath.*\" plugin runtimepath", vimrcPath)
+	if err != nil {
+		return err
+	}
+
+	// Remove downloaded files
+	target := fmt.Sprintf("%s/colors", tmpDirectoryPath)
+	err = os.RemoveAll(target)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func addSubdirectoriesToRuntimepath(path string) error {
 	var paths []string
 
@@ -216,7 +229,7 @@ func addSubdirectoriesToRuntimepath(path string) error {
 		return err
 	}
 
-	runtimepath := fmt.Sprintf("let &runtimepath.=',%s'\n\n", strings.Join(paths, ","))
+	runtimepath := fmt.Sprintf("let &runtimepath.=',%s' \" plugin runtimepath\n\n", strings.Join(paths, ","))
 
 	err = file.AppendToFile(runtimepath, vimrcPath)
 	if err != nil {
