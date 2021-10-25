@@ -95,7 +95,11 @@ func Generate(force bool, repoKey string) bson.M {
 		generateObject := getGenerateRepositoryObject(repository)
 		database.UpsertRepository(repository.ID, generateObject)
 
-		deletePlugin(pluginPath)
+		err = deletePlugin(pluginPath)
+		if err != nil {
+			log.Print(err)
+			continue
+		}
 	}
 
 	cleanUp()
