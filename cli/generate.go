@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/vimcolorschemes/worker/internal/database"
+	"github.com/vimcolorschemes/worker/internal/dotenv"
 	file "github.com/vimcolorschemes/worker/internal/file"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
+	"github.com/vimcolorschemes/worker/internal/request"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -103,6 +105,11 @@ func Generate(force bool, repoKey string) bson.M {
 	}
 
 	cleanUp()
+
+	webhook, exists := dotenv.Get("WEBSITE_BUILD_WEBHOOK")
+	if exists {
+		request.Post(webhook, map[string]string{})
+	}
 
 	return bson.M{"repositoryCount": generateCount}
 }
