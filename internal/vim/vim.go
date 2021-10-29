@@ -49,6 +49,42 @@ func GetVimColorSchemes(vimFileURLs []string) ([]repository.VimColorScheme, erro
 	return vimColorSchemes, nil
 }
 
+// NormalizeVimColorSchemeColors fixes issues with colors such as background
+// and foreground being the same color for a color group
+func NormalizeVimColorSchemeColors(colors []repository.VimColorSchemeGroup) []repository.VimColorSchemeGroup {
+	colorMap := make(map[string]string)
+	for i := 0; i < len(colors); i++ {
+		colorMap[colors[i].Name] = colors[i].HexCode
+	}
+
+	normalizeStatusLineColors(&colorMap)
+
+	result := make([]repository.VimColorSchemeGroup, 0, len(colors))
+
+	for _, color := range colors {
+		result = append(result, repository.VimColorSchemeGroup{
+			Name:    color.Name,
+			HexCode: colorMap[color.Name],
+		})
+	}
+
+	return result
+}
+
+func normalizeStatusLineColors(colorMap *map[string]string) {
+	if (*colorMap)["StatusLineBg"] != (*colorMap)["StatusLineFg"] {
+		return
+	}
+
+	if (*colorMap)["NormalBg"] != "" {
+		(*colorMap)["StatusLineBg"] = (*colorMap)["NormalBg"]
+	}
+
+	if (*colorMap)["NormalFg"] != "" {
+		(*colorMap)["StatusLineFg"] = (*colorMap)["NormalFg"]
+	}
+}
+
 func isVimColorScheme(fileContent *string) bool {
 	vimNormalHighlight := regexp.MustCompile("Normal")
 	isAVimColorScheme := vimNormalHighlight.MatchString(*fileContent)

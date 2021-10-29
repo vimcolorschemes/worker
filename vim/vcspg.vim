@@ -389,15 +389,10 @@ function WriteColorValues(filename, colorscheme, background) abort
       return 0
     endif
 
-    let l:background = synIDattr(hlID('Normal'), 'bg#')
-    let l:foreground = synIDattr(hlID('Normal'), 'fg#')
-
-
-    let l:background = ConvertToHex(l:background)
-    let l:foreground = ConvertToHex(l:foreground)
+    let l:background = ConvertToHex(synIDattr(hlID('Normal'), 'bg#'))
+    let l:foreground = ConvertToHex(synIDattr(hlID('Normal'), 'fg#'))
 
     let l:iscolorschemedark = 1
-
     if l:background != ""
       let l:iscolorschemedark = IsHexColorDark(l:background)
     elseif l:foreground != ""

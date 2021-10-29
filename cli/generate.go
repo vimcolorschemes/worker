@@ -15,6 +15,7 @@ import (
 	file "github.com/vimcolorschemes/worker/internal/file"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
 	"github.com/vimcolorschemes/worker/internal/request"
+	"github.com/vimcolorschemes/worker/internal/vim"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -282,7 +283,7 @@ func getVimColorSchemeColorData(vimColorScheme repoHelper.VimColorScheme, backgr
 		})
 	}
 
-	return vimColorSchemeColors, nil
+	return vim.NormalizeVimColorSchemeColors(vimColorSchemeColors), nil
 }
 
 // Starts a vim instance and auto commands to configure and start vcspg.vim on load

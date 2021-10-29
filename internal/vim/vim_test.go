@@ -348,3 +348,49 @@ func TestContainsURL(t *testing.T) {
 		}
 	})
 }
+
+func TestNormalizeVimColorSchemeColors(t *testing.T) {
+	t.Run("should normalise status line if it has the same background and foreground", func(t *testing.T) {
+		var colors = []repository.VimColorSchemeGroup{
+			{
+				Name:    "NormalBg",
+				HexCode: "#000000",
+			},
+			{
+				Name:    "NormalFg",
+				HexCode: "#ffffff",
+			},
+			{
+				Name:    "StatusLineBg",
+				HexCode: "#cccccc",
+			},
+			{
+				Name:    "StatusLineFg",
+				HexCode: "#cccccc",
+			},
+		}
+
+		normalizedColors := NormalizeVimColorSchemeColors(colors)
+
+		var statusLineBg repository.VimColorSchemeGroup
+		var statusLineFg repository.VimColorSchemeGroup
+
+		for i := 0; i < len(normalizedColors); i++ {
+			color := normalizedColors[i]
+			if color.Name == "StatusLineBg" {
+				statusLineBg = color
+			}
+			if color.Name == "StatusLineFg" {
+				statusLineFg = color
+			}
+		}
+
+		if statusLineBg.HexCode != "#000000" {
+			t.Errorf("Incorrect result for NormalizeVimColorSchemeColors, got %s, want: %s", statusLineBg.HexCode, "#000000")
+		}
+
+		if statusLineFg.HexCode != "#ffffff" {
+			t.Errorf("Incorrect result for NormalizeVimColorSchemeColors , got %s, want: %s", statusLineFg.HexCode, "#ffffff")
+		}
+	})
+}
