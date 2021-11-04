@@ -7,6 +7,7 @@ import (
 
 	"github.com/vimcolorschemes/worker/internal/database"
 	"github.com/vimcolorschemes/worker/internal/dotenv"
+	"github.com/vimcolorschemes/worker/internal/emoji"
 	"github.com/vimcolorschemes/worker/internal/github"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -70,12 +71,13 @@ func Import(_force bool, repoKey string) bson.M {
 }
 
 func getImportRepositoryObject(repository *gogithub.Repository) bson.M {
+	description := emoji.ConvertColonEmojis(repository.GetDescription())
 	return bson.M{
 		"_id":             repository.GetID(),
 		"owner.name":      repository.GetOwner().GetLogin(),
 		"owner.avatarURL": repository.GetOwner().GetAvatarURL(),
 		"name":            repository.GetName(),
-		"description":     repository.GetDescription(),
+		"description":     description,
 		"githubURL":       repository.GetHTMLURL(),
 		"githubCreatedAt": repository.GetCreatedAt().Time,
 		"homepageURL":     repository.GetHomepage(),
