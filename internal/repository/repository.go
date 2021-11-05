@@ -21,6 +21,7 @@ type Repository struct {
 	StargazersCountHistory []StargazersCountHistoryItem `bson:"stargazersCountHistory"`
 	WeekStargazersCount    int                          `bson:"weekStargazersCount"`
 	License                string                       `bson:"license"`
+	Size                   int                          `bson:"size"`
 	GitHubCreatedAt        time.Time                    `bson:"githubCreatedAt"`
 	LastCommitAt           time.Time                    `bson:"lastCommitAt"`
 	VimColorSchemes        []VimColorScheme             `bson:"vimColorSchemes,omitempty"`

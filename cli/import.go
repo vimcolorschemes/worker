@@ -81,5 +81,6 @@ func getImportRepositoryObject(repository *gogithub.Repository) bson.M {
 		"githubURL":       repository.GetHTMLURL(),
 		"githubCreatedAt": repository.GetCreatedAt().Time,
 		"homepageURL":     repository.GetHomepage(),
+		"size":            repository.GetSize(),
 	}
 }
