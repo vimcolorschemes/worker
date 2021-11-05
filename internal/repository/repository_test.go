@@ -427,3 +427,290 @@ func TestComputeRepositoryValidityAfterGenerate(t *testing.T) {
 		}
 	})
 }
+
+func TestSynchronizeVimColorSchemes(t *testing.T) {
+	t.Run("should erase the original list given an empty list", func(t *testing.T) {
+		originalList := []VimColorScheme{{Name: "test"}}
+		newList := []VimColorScheme{}
+
+		repository := Repository{VimColorSchemes: originalList}
+
+		repository.SyncVimColorSchemes(newList)
+
+		if len(repository.VimColorSchemes) != 0 {
+			t.Errorf(
+				"Incorrect result for SyncVimColorSchemes, got length: %d, want length: %d",
+				len(repository.VimColorSchemes),
+				0,
+			)
+		}
+	})
+
+	t.Run("should replace the whole list given a list with different vim color scheme names", func(t *testing.T) {
+		originalList := []VimColorScheme{
+			{
+				Name:    "test",
+				Valid:   true,
+				FileURL: "test.url",
+				Data: VimColorSchemeData{
+					Dark: []VimColorSchemeGroup{
+						{HexCode: "#000000", Name: "NormalBg"},
+					},
+					Light: nil,
+				},
+			},
+		}
+
+		newList := []VimColorScheme{
+			{
+				Name: "test_2",
+			},
+		}
+
+		repository := Repository{VimColorSchemes: originalList}
+
+		repository.SyncVimColorSchemes(newList)
+
+		if !reflect.DeepEqual(repository.VimColorSchemes, newList) {
+			t.Errorf(
+				"Incorrect result for SyncVimColorSchemes, got: %v, want length: %v",
+				repository.VimColorSchemes,
+				newList,
+			)
+		}
+	})
+
+	t.Run("should update the corresponding list items", func(t *testing.T) {
+		originalList := []VimColorScheme{
+			{
+				Name:    "test",
+				Valid:   true,
+				FileURL: "old.url",
+				Data: VimColorSchemeData{
+					Dark: []VimColorSchemeGroup{
+						{HexCode: "#000000", Name: "NormalBg"},
+					},
+					Light: nil,
+				},
+			},
+		}
+
+		newList := []VimColorScheme{
+			{
+				Name:    "test",
+				FileURL: "new.url",
+			},
+		}
+
+		expectedList := []VimColorScheme{
+			{
+				Name:    "test",
+				Valid:   true,
+				FileURL: "new.url",
+				Data: VimColorSchemeData{
+					Dark: []VimColorSchemeGroup{
+						{HexCode: "#000000", Name: "NormalBg"},
+					},
+					Light: nil,
+				},
+			},
+		}
+
+		repository := Repository{VimColorSchemes: originalList}
+
+		repository.SyncVimColorSchemes(newList)
+
+		if !reflect.DeepEqual(repository.VimColorSchemes, expectedList) {
+			t.Errorf(
+				"Incorrect result for SyncVimColorSchemes, got: %v, want length: %v",
+				repository.VimColorSchemes,
+				expectedList,
+			)
+		}
+	})
+
+	t.Run("should update the corresponding list items and insert new ones", func(t *testing.T) {
+		originalList := []VimColorScheme{
+			{
+				Name:    "test",
+				Valid:   true,
+				FileURL: "old.url",
+				Data: VimColorSchemeData{
+					Dark: []VimColorSchemeGroup{
+						{HexCode: "#000000", Name: "NormalBg"},
+					},
+					Light: nil,
+				},
+			},
+		}
+
+		newList := []VimColorScheme{
+			{
+				Name:    "test",
+				FileURL: "new.url",
+			},
+			{
+				Name:    "new",
+				FileURL: "new.url",
+			},
+		}
+
+		expectedList := []VimColorScheme{
+			{
+				Name:    "test",
+				Valid:   true,
+				FileURL: "new.url",
+				Data: VimColorSchemeData{
+					Dark: []VimColorSchemeGroup{
+						{HexCode: "#000000", Name: "NormalBg"},
+					},
+					Light: nil,
+				},
+			},
+			{
+				Name:    "new",
+				FileURL: "new.url",
+			},
+		}
+
+		repository := Repository{VimColorSchemes: originalList}
+
+		repository.SyncVimColorSchemes(newList)
+
+		if !reflect.DeepEqual(repository.VimColorSchemes, expectedList) {
+			t.Errorf(
+				"Incorrect result for SyncVimColorSchemes, got: %v, want length: %v",
+				repository.VimColorSchemes,
+				expectedList,
+			)
+		}
+	})
+
+	t.Run("should update the corresponding list items and erase old ones", func(t *testing.T) {
+		originalList := []VimColorScheme{
+			{
+				Name:    "test",
+				Valid:   true,
+				FileURL: "old.url",
+				Data: VimColorSchemeData{
+					Dark: []VimColorSchemeGroup{
+						{HexCode: "#000000", Name: "NormalBg"},
+					},
+					Light: nil,
+				},
+			},
+			{
+				Name:    "old",
+				Valid:   true,
+				FileURL: "old.url",
+				Data: VimColorSchemeData{
+					Dark: []VimColorSchemeGroup{
+						{HexCode: "#000000", Name: "NormalBg"},
+					},
+					Light: nil,
+				},
+			},
+		}
+
+		newList := []VimColorScheme{
+			{
+				Name:    "test",
+				FileURL: "new.url",
+			},
+		}
+
+		expectedList := []VimColorScheme{
+			{
+				Name:    "test",
+				Valid:   true,
+				FileURL: "new.url",
+				Data: VimColorSchemeData{
+					Dark: []VimColorSchemeGroup{
+						{HexCode: "#000000", Name: "NormalBg"},
+					},
+					Light: nil,
+				},
+			},
+		}
+
+		repository := Repository{VimColorSchemes: originalList}
+
+		repository.SyncVimColorSchemes(newList)
+
+		if !reflect.DeepEqual(repository.VimColorSchemes, expectedList) {
+			t.Errorf(
+				"Incorrect result for SyncVimColorSchemes, got: %v, want length: %v",
+				repository.VimColorSchemes,
+				expectedList,
+			)
+		}
+	})
+
+	t.Run("should update the corresponding list items, insert new ones and erase old ones", func(t *testing.T) {
+		originalList := []VimColorScheme{
+			{
+				Name:    "test",
+				Valid:   true,
+				FileURL: "old.url",
+				Data: VimColorSchemeData{
+					Dark: []VimColorSchemeGroup{
+						{HexCode: "#000000", Name: "NormalBg"},
+					},
+					Light: nil,
+				},
+			},
+			{
+				Name:    "old",
+				Valid:   true,
+				FileURL: "old.url",
+				Data: VimColorSchemeData{
+					Dark: []VimColorSchemeGroup{
+						{HexCode: "#000000", Name: "NormalBg"},
+					},
+					Light: nil,
+				},
+			},
+		}
+
+		newList := []VimColorScheme{
+			{
+				Name:    "test",
+				FileURL: "new.url",
+			},
+			{
+				Name:    "new",
+				FileURL: "new.url",
+			},
+		}
+
+		expectedList := []VimColorScheme{
+			{
+				Name:    "test",
+				Valid:   true,
+				FileURL: "new.url",
+				Data: VimColorSchemeData{
+					Dark: []VimColorSchemeGroup{
+						{HexCode: "#000000", Name: "NormalBg"},
+					},
+					Light: nil,
+				},
+			},
+			{
+				Name:    "new",
+				FileURL: "new.url",
+			},
+		}
+
+		repository := Repository{VimColorSchemes: originalList}
+
+		repository.SyncVimColorSchemes(newList)
+
+		if !reflect.DeepEqual(repository.VimColorSchemes, expectedList) {
+			t.Errorf(
+				"Incorrect result for SyncVimColorSchemes, got: %v, want length: %v",
+				repository.VimColorSchemes,
+				expectedList,
+			)
+		}
+	})
+}
