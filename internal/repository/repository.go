@@ -199,3 +199,30 @@ func (repository Repository) IsValidAfterGenerate() bool {
 
 	return true
 }
+
+// SyncVimColorSchemes replaces the vim color scheme list of a repository with
+// a new one while keeping as much data from the old list as possible
+func (repository *Repository) SyncVimColorSchemes(vimColorSchemes []VimColorScheme) {
+	var newList []VimColorScheme
+
+	for _, vimColorScheme := range vimColorSchemes {
+		match, exists := repository.getMatchingVimColorScheme(vimColorScheme.Name)
+		if !exists {
+			newList = append(newList, vimColorScheme)
+		} else {
+			match.FileURL = vimColorScheme.FileURL
+			newList = append(newList, match)
+		}
+	}
+
+	repository.VimColorSchemes = newList
+}
+
+func (repository Repository) getMatchingVimColorScheme(name string) (VimColorScheme, bool) {
+	for _, vimColorScheme := range repository.VimColorSchemes {
+		if vimColorScheme.Name == name {
+			return vimColorScheme, true
+		}
+	}
+	return VimColorScheme{}, false
+}

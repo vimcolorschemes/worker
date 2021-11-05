@@ -87,7 +87,7 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 		if err != nil {
 			log.Print("Did not find any vim color schemes")
 		}
-		repository.VimColorSchemes = vimColorSchemes
+		repository.SyncVimColorSchemes(vimColorSchemes)
 	}
 
 	log.Print("Checking if ", repository.Owner.Name, "/", repository.Name, " is valid")
