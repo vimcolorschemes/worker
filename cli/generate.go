@@ -72,8 +72,18 @@ func Generate(force bool, repoKey string) bson.M {
 		for index, vimColorScheme := range newVimColorSchemes {
 			file.DownloadFile(vimColorScheme.FileURL, fmt.Sprintf("%s/colors/%s.vim", tmpDirectoryPath, vimColorScheme.Name))
 
+			var backgrounds []string
+
 			lightVimColorSchemeColors, lightErr := getVimColorSchemeColorData(vimColorScheme, repoHelper.LightBackground)
+			if lightErr == nil {
+				backgrounds = append(backgrounds, "light")
+			}
+
 			darkVimColorSchemeColors, darkErr := getVimColorSchemeColorData(vimColorScheme, repoHelper.DarkBackground)
+			if darkErr == nil {
+				backgrounds = append(backgrounds, "dark")
+			}
+
 			if lightErr != nil && darkErr != nil {
 				continue
 			}
@@ -84,10 +94,11 @@ func Generate(force bool, repoKey string) bson.M {
 			}
 
 			newVimColorSchemes[index] = repoHelper.VimColorScheme{
-				Name:    vimColorScheme.Name,
-				FileURL: vimColorScheme.FileURL,
-				Data:    vimColorSchemeData,
-				Valid:   true,
+				Name:        vimColorScheme.Name,
+				FileURL:     vimColorScheme.FileURL,
+				Data:        vimColorSchemeData,
+				Backgrounds: backgrounds,
+				Valid:       true,
 			}
 
 		}
