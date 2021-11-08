@@ -70,7 +70,10 @@ func Generate(force bool, repoKey string) bson.M {
 		}
 
 		for index, vimColorScheme := range newVimColorSchemes {
-			file.DownloadFile(vimColorScheme.FileURL, fmt.Sprintf("%s/colors/%s.vim", tmpDirectoryPath, vimColorScheme.Name))
+			err = file.DownloadFile(vimColorScheme.FileURL, fmt.Sprintf("%s/colors/%s.vim", tmpDirectoryPath, vimColorScheme.Name))
+			if err != nil {
+				continue
+			}
 
 			var backgrounds []string
 
