@@ -218,7 +218,10 @@ func TestAppendToFile(t *testing.T) {
 		defer cleanUp(t)
 
 		content := "test"
-		AppendToFile(content, target)
+		err := AppendToFile(content, target)
+		if err != nil {
+			t.Errorf("Error during AppendToFile, %s", err)
+		}
 
 		if _, err := os.Stat(target); os.IsNotExist(err) {
 			t.Error("Incorrect result for AppendToFile, did not create file")
@@ -248,7 +251,10 @@ func TestAppendToFile(t *testing.T) {
 		}
 
 		content := "test"
-		AppendToFile(content, target)
+		err = AppendToFile(content, target)
+		if err != nil {
+			t.Errorf("Error during AppendToFile, %s", err)
+		}
 
 		actualContent, err := ioutil.ReadFile(target)
 		if err != nil {
@@ -279,7 +285,10 @@ func TestAppendToFile(t *testing.T) {
 		}
 
 		content := "world"
-		AppendToFile(content, target)
+		err = AppendToFile(content, target)
+		if err != nil {
+			t.Errorf("Error during AppendToFile, %s", err)
+		}
 
 		expectedContent := "hello, world"
 

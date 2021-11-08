@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 )
@@ -9,6 +10,9 @@ import (
 func MockServer(response string, statusCode int) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(statusCode)
-		rw.Write([]byte(response))
+		_, err := rw.Write([]byte(response))
+		if err != nil {
+			fmt.Println("Error creating response")
+		}
 	}))
 }

@@ -121,12 +121,21 @@ func Generate(force bool, repoKey string) bson.M {
 
 	cleanUp()
 
-	webhook, exists := dotenv.Get("WEBSITE_BUILD_WEBHOOK")
-	if exists {
-		request.Post(webhook, map[string]string{})
-	}
+	buildWebsite()
 
 	return bson.M{"repositoryCount": generateCount}
+}
+
+// Sends a post request to the website build webhook
+func buildWebsite() {
+	webhook, exists := dotenv.Get("WEBSITE_BUILD_WEBHOOK")
+	if exists {
+		response, err := request.Post(webhook, map[string]string{})
+		if err != nil {
+			log.Println("Error during website build webhook request", err)
+		}
+		log.Println(response)
+	}
 }
 
 // Initializes a temporary directory for vim configuration files

@@ -116,14 +116,12 @@ func getRepositoryFileUrlsAtPath(ownerName string, name string, path string) ([]
 		switch content.GetType() {
 		case "file":
 			fileURLs = append(fileURLs, content.GetDownloadURL())
-			break
 		case "dir":
 			newFileURLs, err := getRepositoryFileUrlsAtPath(ownerName, name, content.GetPath())
 			if err != nil {
 				return []string{}, err
 			}
 			fileURLs = append(fileURLs, newFileURLs...)
-			break
 		default:
 			break
 		}
@@ -193,7 +191,7 @@ func waitForRateLimitReset(resetTime gogithub.Timestamp) {
 	log.Printf("Sleep until rate limit reset at %s", resetTime)
 
 	for {
-		timeLeft := resetTime.Time.Sub(time.Now())
+		timeLeft := time.Until(resetTime.Time)
 		log.Printf("Time left until reset: %s", timeLeft)
 
 		time.Sleep(time.Second)

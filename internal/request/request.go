@@ -8,7 +8,7 @@ import (
 )
 
 // Post sends a POST HTTP request and returns the response body
-func Post(url string, data map[string]string) interface{} {
+func Post(url string, data map[string]string) (interface{}, error) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		log.Fatal(err)
@@ -21,7 +21,10 @@ func Post(url string, data map[string]string) interface{} {
 
 	var result map[string]interface{}
 
-	json.NewDecoder(response.Body).Decode(&result)
+	err = json.NewDecoder(response.Body).Decode(&result)
+	if err != nil {
+		return result, err
+	}
 
-	return result["json"]
+	return result["json"], nil
 }
