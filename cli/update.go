@@ -90,6 +90,8 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 		repository.SyncVimColorSchemes(vimColorSchemes)
 	}
 
+	repository.AssignRepositoryType()
+
 	log.Print("Checking if ", repository.Owner.Name, "/", repository.Name, " is valid")
 	repository.UpdateValid = repository.IsValidAfterUpdate()
 	log.Printf("Update valid: %v", repository.UpdateValid)
@@ -105,6 +107,8 @@ func getUpdateRepositoryObject(repository repoHelper.Repository) bson.M {
 		"stargazersCountHistory": repository.StargazersCountHistory,
 		"weekStargazersCount":    repository.WeekStargazersCount,
 		"vimColorSchemes":        repository.VimColorSchemes,
+		"isLua":                  repository.IsLua,
+		"isVim":                  repository.IsVim,
 		"updateValid":            repository.UpdateValid,
 		"updatedAt":              time.Now(),
 	}

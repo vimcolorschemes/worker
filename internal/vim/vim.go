@@ -25,20 +25,21 @@ func GetVimColorSchemes(vimFileURLs []string) ([]repository.VimColorScheme, erro
 			continue
 		}
 
-		if !isVimColorScheme(&fileContent) {
-			continue
-		}
-
-		vimColorSchemeName, err := getVimColorSchemeName(&fileContent)
+		vimColorSchemeName, isLua, err := getColorSchemeName(&fileContent)
 		if err != nil || vimColorSchemeName == "" {
 			continue
 		}
 
 		log.Print("Found ", vimColorSchemeName, " at ", vimFileURL)
 
+		if isLua {
+			log.Print(vimColorSchemeName, " is a lua color scheme")
+		}
+
 		vimColorSchemes = append(vimColorSchemes, repository.VimColorScheme{
 			Name:    vimColorSchemeName,
 			FileURL: vimFileURL,
+			IsLua:   isLua,
 		})
 	}
 
@@ -85,27 +86,52 @@ func normalizeStatusLineColors(colorMap *map[string]string) {
 	}
 }
 
-func isVimColorScheme(fileContent *string) bool {
-	vimNormalHighlight := regexp.MustCompile("Normal")
-	isAVimColorScheme := vimNormalHighlight.MatchString(*fileContent)
+func getColorSchemeName(fileContent *string) (string, bool, error) {
+	luaName, err := getLuaColorSchemeName(fileContent)
+	if luaName != "" && err == nil {
+		return luaName, true, nil
+	}
 
-	return isAVimColorScheme
+	vimName, err := getVimColorSchemeName(fileContent)
+	if err != nil {
+		return "", false, err
+	}
+
+	return vimName, false, nil
+
 }
 
 func getVimColorSchemeName(fileContent *string) (string, error) {
-	vimColorSchemeName := regexp.MustCompile(`(let g?:?|vim\.g\.)colors?_name ?= ?('|")([a-zA-Z0-9-_ \(\)]+)('|")`)
+	vimColorSchemeName := regexp.MustCompile(`(let g?:?|vim\.g\.)colors?_name ?= ?['"]([a-zA-Z0-9-_ \(\)]+)['"]`)
 
 	matches := vimColorSchemeName.FindStringSubmatch(*fileContent)
 
-	// name match is at index 3
-	if len(matches) < 4 {
+	// name match is at index 2
+	if len(matches) < 3 {
 		return "", errors.New("no vim color scheme match")
 	}
 
 	expression := regexp.MustCompile(`[() ]`)
-	cleanedName := expression.ReplaceAllString(matches[3], "")
+	cleanedName := expression.ReplaceAllString(matches[2], "")
 
 	return strings.ToLower(cleanedName), nil
+}
+
+func getLuaColorSchemeName(fileContent *string) (string, error) {
+	lua := regexp.MustCompile("lua")
+	if !lua.MatchString(*fileContent) {
+		return "", errors.New("No lua mentions")
+	}
+
+	vimColorSchemeName := regexp.MustCompile(`require\(['"]([a-zA-Z0-9-_ \(\)]+)['"]\)`)
+	matches := vimColorSchemeName.FindStringSubmatch(*fileContent)
+
+	// name match is at index 1
+	if len(matches) < 2 {
+		return "", errors.New("no lua color scheme match")
+	}
+
+	return matches[1], nil
 }
 
 func containsURL(colorSchemes []repository.VimColorScheme, fileURL string) bool {

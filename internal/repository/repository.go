@@ -25,6 +25,8 @@ type Repository struct {
 	GitHubCreatedAt        time.Time                    `bson:"githubCreatedAt"`
 	LastCommitAt           time.Time                    `bson:"lastCommitAt"`
 	VimColorSchemes        []VimColorScheme             `bson:"vimColorSchemes,omitempty"`
+	IsVim                  bool                         `bson:"isVim"`
+	IsLua                  bool                         `bson:"isLua"`
 	UpdateValid            bool                         `bson:"updateValid"`
 	UpdatedAt              time.Time                    `bson:"updatedAt"`
 	GenerateValid          bool                         `bson:"generateValid"`
@@ -50,6 +52,7 @@ type VimColorScheme struct {
 	Data        VimColorSchemeData `bson:"data"`
 	Valid       bool               `bson:"valid"`
 	Backgrounds []string           `bson:"backgrounds"`
+	IsLua       bool               `bson:"isLua"`
 }
 
 // VimColorSchemeData represents the color values for light and dark backgrounds
@@ -213,11 +216,27 @@ func (repository *Repository) SyncVimColorSchemes(vimColorSchemes []VimColorSche
 			newList = append(newList, vimColorScheme)
 		} else {
 			match.FileURL = vimColorScheme.FileURL
+			match.IsLua = vimColorScheme.IsLua
 			newList = append(newList, match)
 		}
 	}
 
 	repository.VimColorSchemes = newList
+}
+
+// AssignRepositoryType defines is a repository is vim, lua, or both
+func (repository *Repository) AssignRepositoryType() {
+	for _, vimColorScheme := range repository.VimColorSchemes {
+		if repository.IsLua && repository.IsVim {
+			break
+		}
+
+		if vimColorScheme.IsLua {
+			repository.IsLua = true
+		} else {
+			repository.IsVim = true
+		}
+	}
 }
 
 func (repository Repository) getMatchingVimColorScheme(name string) (VimColorScheme, bool) {

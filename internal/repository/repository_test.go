@@ -714,3 +714,69 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 		}
 	})
 }
+
+func TestAssignRepositoryType(t *testing.T) {
+	t.Run("should set type vim when a vim color scheme exists", func(t *testing.T) {
+		vimColorSchemes := []VimColorScheme{
+			{
+				Name:  "vim",
+				IsLua: false,
+			},
+		}
+
+		repository := Repository{VimColorSchemes: vimColorSchemes}
+		repository.AssignRepositoryType()
+
+		if !repository.IsVim {
+			t.Error("Incorrect result for AssignRepositoryType, got: IsVim=false, want: true")
+		}
+
+		if repository.IsLua {
+			t.Error("Incorrect result for AssignRepositoryType, got: IsLua=true, want: false")
+		}
+	})
+
+	t.Run("should set type lua when a lua color scheme exists", func(t *testing.T) {
+		vimColorSchemes := []VimColorScheme{
+			{
+				Name:  "lua",
+				IsLua: true,
+			},
+		}
+
+		repository := Repository{VimColorSchemes: vimColorSchemes}
+		repository.AssignRepositoryType()
+
+		if repository.IsVim {
+			t.Error("Incorrect result for AssignRepositoryType, got: IsVim=true, want: false")
+		}
+
+		if !repository.IsLua {
+			t.Error("Incorrect result for AssignRepositoryType, got: IsLua=false, want: true")
+		}
+	})
+
+	t.Run("should set both types when vim lua color schemes exist", func(t *testing.T) {
+		vimColorSchemes := []VimColorScheme{
+			{
+				Name:  "vim",
+				IsLua: false,
+			},
+			{
+				Name:  "lua",
+				IsLua: true,
+			},
+		}
+
+		repository := Repository{VimColorSchemes: vimColorSchemes}
+		repository.AssignRepositoryType()
+
+		if !repository.IsVim {
+			t.Error("Incorrect result for AssignRepositoryType, got: IsVim=false, want: true")
+		}
+
+		if !repository.IsLua {
+			t.Error("Incorrect result for AssignRepositoryType, got: IsLua=false, want: true")
+		}
+	})
+}
