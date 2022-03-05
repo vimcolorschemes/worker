@@ -51,6 +51,11 @@ func Generate(force bool, repoKey string) bson.M {
 	for _, repository := range repositories {
 		fmt.Println()
 
+		if repository.IsLua && !repository.IsVim {
+			log.Print("Skipping lua repository ", repository.Owner.Name, "/", repository.Name)
+			continue
+		}
+
 		log.Print("Generating vim previews for ", repository.Owner.Name, "/", repository.Name)
 
 		if !force && repository.GeneratedAt.After(repository.LastCommitAt) {
@@ -70,6 +75,11 @@ func Generate(force bool, repoKey string) bson.M {
 		}
 
 		for index, vimColorScheme := range newVimColorSchemes {
+			if vimColorScheme.IsLua {
+				log.Print("Skipping lua color scheme ", vimColorScheme.Name)
+				continue
+			}
+
 			err = file.DownloadFile(vimColorScheme.FileURL, fmt.Sprintf("%s/colors/%s.vim", tmpDirectoryPath, vimColorScheme.Name))
 			if err != nil {
 				continue
@@ -128,6 +138,7 @@ func Generate(force bool, repoKey string) bson.M {
 
 // Sends a post request to the website build webhook
 func buildWebsite() {
+	fmt.Println()
 	webhook, exists := dotenv.Get("WEBSITE_BUILD_WEBHOOK")
 	if exists {
 		response, err := request.Post(webhook, map[string]string{})

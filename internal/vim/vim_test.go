@@ -151,94 +151,96 @@ func TestGetVimColorSchemes(t *testing.T) {
 	})
 }
 
-var validTests = []struct {
-	fileContent string
-	name        string
-}{
-	{fileContent: `
+func TestGetColorSchemeName(t *testing.T) {
+	var validVimTests = []struct {
+		fileContent string
+		name        string
+	}{
+		{fileContent: `
 		hi clear
 		let g:colors_name = "test"
 		syntax reset`, name: "test"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let g:color_name = "hello-world"
 		syntax reset`, name: "hello-world"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let g:colors_name="hello_world"
 		syntex reset`, name: "hello_world"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let g:color_name="hello (world)"
 		syntex reset`, name: "helloworld"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let colors_name = "abcd1234"
 		syntex reset`, name: "abcd1234"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let color_name = "TEST"
 		syntex reset`, name: "test"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let colors_name="TEst"
 		syntex reset`, name: "test"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let color_name="test"
 		syntex reset`, name: "test"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let g:colors_name = 'test'
 		syntex reset`, name: "test"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let g:color_name = 'test'
 		syntex reset`, name: "test"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let g:colors_name='test'
 		syntex reset`, name: "test"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let g:color_name='test'
 		syntex reset`, name: "test"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let colors_name = 'test'
 		syntex reset`, name: "test"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let color_name = 'test'
 		syntex reset`, name: "test"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let colors_name='test'
 		syntex reset`, name: "test"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		let color_name='test'
 		syntex reset`, name: "test"},
-	{fileContent: `
+		{fileContent: `
 		hi clear
 		vim.g.colors_name = 'highlite'
 		syntex reset`, name: "highlite"},
-}
-
-func TestGetVimColorSchemeName(t *testing.T) {
+	}
 	t.Run("should return the vim color scheme name if the file is valid", func(t *testing.T) {
-		for _, item := range validTests {
-			name, err := getVimColorSchemeName(&item.fileContent)
+		for _, item := range validVimTests {
+			name, isLua, err := getColorSchemeName(&item.fileContent)
 			if err != nil {
-				t.Error("Incorrect result for getVimColorSchemeName, got error")
+				t.Error("Incorrect result for getColorSchemeName, got error")
 			}
 			if name != item.name {
-				t.Errorf("Incorrect result for getVimColorSchemeName, got: %s, want: %s", name, item.name)
+				t.Errorf("Incorrect result for getColorSchemeName, got: %s, want: %s", name, item.name)
+			}
+			if isLua {
+				t.Error("Incorrect result for getColorSchemeName, got: isLua=true, want: false")
 			}
 		}
 	})
 
-	invalid := []string{
+	invalidVimTests := []string{
 		`
 			hi clear
 			let g:colors_name = "test
@@ -271,47 +273,86 @@ func TestGetVimColorSchemeName(t *testing.T) {
 		`,
 	}
 	t.Run("should return an error if the file is invalid", func(t *testing.T) {
-		for _, fileContent := range invalid {
-			name, err := getVimColorSchemeName(&fileContent)
+		for _, fileContent := range invalidVimTests {
+			name, isLua, err := getColorSchemeName(&fileContent)
 			if err == nil {
-				t.Error("Incorrect result for getVimColorSchemeName, got no error")
+				t.Error("Incorrect result for getColorSchemeName, got no error")
 			}
 			if name != "" {
-				t.Errorf("Incorrect result for getVimColorSchemeName, got: %s, want: %s", name, "")
+				t.Errorf("Incorrect result for getColorSchemeName, got: %s, want: %s", name, "")
 			}
-		}
-	})
-}
-
-func TestIsVimColorScheme(t *testing.T) {
-	valid := []string{
-		`
-			exe "hi! Normal"        .s:fg_foreground  .s:bg_normal      .s:fmt_none
-		`,
-		`
-			hi Normal ctermbg=254 ctermfg=237 guibg=#e8e9ec guifg=#33374c
-		`,
-		`
-			gitrebaseSummary = 'Normal'
-		`,
-	}
-	t.Run("should return true if the file has necessary content", func(t *testing.T) {
-		for _, fileContent := range valid {
-			if !isVimColorScheme(&fileContent) {
-				t.Errorf("Incorrect result for isVimColorScheme, got false for: %s", fileContent)
+			if isLua {
+				t.Error("Incorrect result for getColorSchemeName, got: isLua=true, want: false")
 			}
 		}
 	})
 
-	invalid := []string{
+	var validLuaTests = []struct {
+		fileContent string
+		name        string
+	}{
+		{fileContent: `
+    lua << EOF
+    -- Useful for me when I am trying to debug and reload my changes
+    if vim.g.nightfox_debug == true then
+      package.loaded['nightfox'] = nil
+      package.loaded['nightfox.colors'] = nil
+      package.loaded["nightfox.colors.dawnfox"] = nil
+      package.loaded['nightfox.theme'] = nil
+      package.loaded['nightfox.util'] = nil
+    end
+
+    local nightfox = require('nightfox')
+    nightfox.setup({fox = "dawnfox"})
+    nightfox._colorscheme_load()
+    EOF`, name: "nightfox"},
+		{fileContent: `
+		" Theme: zephyr
+    " Author: Glepnir
+    " License: MIT
+    " Source: http://github.com/glepnir/zephyr-nvim
+
+    lua require('zephyr')`, name: "zephyr"},
+	}
+	t.Run("should return the lua color scheme name if the file is valid", func(t *testing.T) {
+		for _, item := range validLuaTests {
+			name, isLua, err := getColorSchemeName(&item.fileContent)
+			if err != nil {
+				t.Error("Incorrect result for getColorSchemeName, got error")
+			}
+			if name != item.name {
+				t.Errorf("Incorrect result for getColorSchemeName, got: %s, want: %s", name, item.name)
+			}
+			if !isLua {
+				t.Error("Incorrect result for getColorSchemeName, got: isLua=false, want: true")
+			}
+		}
+	})
+
+	invalidLuaTests := []string{
 		`
-			normal ctermbg=254 ctermfg=237 guibg=#e8e9ec guifg=#33374c
+      lua << EOF
+      -- Useful for me when I am trying to debug and reload my changes
+      if vim.g.nightfox_debug == true then
+        package.loaded['nightfox'] = nil
+        package.loaded['nightfox.colors'] = nil
+        package.loaded["nightfox.colors.dawnfox"] = nil
+        package.loaded['nightfox.theme'] = nil
+        package.loaded['nightfox.util'] = nil
+      end
+		`,
+		`
+      require('nightfox')
 		`,
 	}
-	t.Run("should return false if the file does not have necessary content", func(t *testing.T) {
-		for _, fileContent := range invalid {
-			if isVimColorScheme(&fileContent) {
-				t.Errorf("Incorrect result for isVimColorScheme, got true for: %s", fileContent)
+	t.Run("should return an error if the file is invalid", func(t *testing.T) {
+		for _, fileContent := range invalidLuaTests {
+			name, _, err := getColorSchemeName(&fileContent)
+			if err == nil {
+				t.Error("Incorrect result for getColorSchemeName, got no error")
+			}
+			if name != "" {
+				t.Errorf("Incorrect result for getColorSchemeName, got: %s, want: %s", name, "")
 			}
 		}
 	})
