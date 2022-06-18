@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-github/v32/github"
 	"github.com/vimcolorschemes/worker/internal/repository"
 	"github.com/vimcolorschemes/worker/internal/test"
 )
@@ -30,7 +31,8 @@ func TestGetVimColorSchemes(t *testing.T) {
 		server2 := test.MockServer(fileContent2, http.StatusOK)
 		defer server2.Close()
 
-		colorSchemes, err := GetVimColorSchemes([]string{server1.URL, server2.URL})
+		repo := github.Repository{}
+		colorSchemes, err := GetVimColorSchemes(&repo, []*github.RepositoryContent{{DownloadURL: &server1.URL}, {DownloadURL: &server2.URL}})
 
 		if err != nil {
 			t.Errorf("Incorrect result for GetVimColorSchemes, got error: %s", err)
@@ -61,7 +63,8 @@ func TestGetVimColorSchemes(t *testing.T) {
 		server := test.MockServer(fileContent, http.StatusOK)
 		defer server.Close()
 
-		colorSchemes, err := GetVimColorSchemes([]string{server.URL, server.URL})
+		repo := github.Repository{}
+		colorSchemes, err := GetVimColorSchemes(&repo, []*github.RepositoryContent{{DownloadURL: &server.URL}, {DownloadURL: &server.URL}})
 
 		if err != nil {
 			t.Error("Incorrect result for GetVimColorSchemes, got error")
@@ -105,7 +108,8 @@ func TestGetVimColorSchemes(t *testing.T) {
 		server3 := test.MockServer(fileContent3, http.StatusOK)
 		defer server3.Close()
 
-		colorSchemes, err := GetVimColorSchemes([]string{server1.URL, server2.URL, server3.URL})
+		repo := github.Repository{}
+		colorSchemes, err := GetVimColorSchemes(&repo, []*github.RepositoryContent{{DownloadURL: &server1.URL}, {DownloadURL: &server2.URL}, {DownloadURL: &server3.URL}})
 
 		expectedVimColorSchemes := []repository.VimColorScheme{}
 
@@ -133,7 +137,9 @@ func TestGetVimColorSchemes(t *testing.T) {
 		server := test.MockServer(fileContent, http.StatusOK)
 		defer server.Close()
 
-		colorSchemes, err := GetVimColorSchemes([]string{server.URL, "wrong url"})
+		wrongUrl := "wrong url"
+		repo := github.Repository{}
+		colorSchemes, err := GetVimColorSchemes(&repo, []*github.RepositoryContent{{DownloadURL: &server.URL}, {DownloadURL: &wrongUrl}})
 
 		if err != nil {
 			t.Error("Incorrect result for GetVimColorSchemes, got error")

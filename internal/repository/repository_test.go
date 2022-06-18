@@ -780,3 +780,13 @@ func TestAssignRepositoryType(t *testing.T) {
 		}
 	})
 }
+
+func TestUniquifyVimColorSchemes(t *testing.T) {
+	t.Run("should return the same list if it has no duplicate name", func(t *testing.T) {
+		vimColorSchemes := []VimColorScheme{{Name: "vim"}, {Name: "lua"}}
+		uniqueList := uniquifyVimColorSchemes(vimColorSchemes)
+		if !reflect.DeepEqual(vimColorSchemes, uniqueList) {
+			t.Errorf("Incorrect result for getUniqueVimColorSchemeList, got %d color schemes, expected %d", len(uniqueList), len(vimColorSchemes))
+		}
+	})
+}

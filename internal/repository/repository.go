@@ -47,12 +47,13 @@ type StargazersCountHistoryItem struct {
 
 // VimColorScheme represents a vim color scheme's meta data
 type VimColorScheme struct {
-	FileURL     string             `bson:"fileURL"`
-	Name        string             `bson:"name"`
-	Data        VimColorSchemeData `bson:"data"`
-	Valid       bool               `bson:"valid"`
-	Backgrounds []string           `bson:"backgrounds"`
-	IsLua       bool               `bson:"isLua"`
+	FileURL      string             `bson:"fileURL"`
+	Name         string             `bson:"name"`
+	Data         VimColorSchemeData `bson:"data"`
+	Valid        bool               `bson:"valid"`
+	Backgrounds  []string           `bson:"backgrounds"`
+	IsLua        bool               `bson:"isLua"`
+	LastCommitAt time.Time          `bson:"lastCommitAt"`
 }
 
 // VimColorSchemeData represents the color values for light and dark backgrounds
@@ -210,13 +211,14 @@ func (repository Repository) IsValidAfterGenerate() bool {
 func (repository *Repository) SyncVimColorSchemes(vimColorSchemes []VimColorScheme) {
 	var newList []VimColorScheme
 
-	for _, vimColorScheme := range vimColorSchemes {
+	for _, vimColorScheme := range uniquifyVimColorSchemes(vimColorSchemes) {
 		match, exists := repository.getMatchingVimColorScheme(vimColorScheme.Name)
 		if !exists {
 			newList = append(newList, vimColorScheme)
 		} else {
 			match.FileURL = vimColorScheme.FileURL
 			match.IsLua = vimColorScheme.IsLua
+			match.LastCommitAt = vimColorScheme.LastCommitAt
 			newList = append(newList, match)
 		}
 	}
@@ -237,6 +239,30 @@ func (repository *Repository) AssignRepositoryType() {
 			repository.IsVim = true
 		}
 	}
+}
+
+func uniquifyVimColorSchemes(vimColorSchemes []VimColorScheme) []VimColorScheme {
+	groups := make(map[string][]VimColorScheme)
+
+	for _, vimColorScheme := range vimColorSchemes {
+		groups[vimColorScheme.Name] = append(groups[vimColorScheme.Name], vimColorScheme)
+	}
+
+	var uniqueList []VimColorScheme
+
+	for _, group := range groups {
+		chosen := group[0]
+
+		for _, vimColorScheme := range group {
+			if vimColorScheme.LastCommitAt.After(chosen.LastCommitAt) {
+				chosen = vimColorScheme
+			}
+		}
+
+		uniqueList = append(uniqueList, chosen)
+	}
+
+	return uniqueList
 }
 
 func (repository Repository) getMatchingVimColorScheme(name string) (VimColorScheme, bool) {
