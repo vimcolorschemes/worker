@@ -242,7 +242,7 @@ func queryRepositories(query string, repositoryCountLimit int, repositoryCountLi
 
 func waitForRateLimitReset(resetTime gogithub.Timestamp) {
 	if strings.HasSuffix(os.Args[0], ".test") {
-    return
+		return
 	}
 
 	log.Printf("Sleep until rate limit reset at %s", resetTime)
