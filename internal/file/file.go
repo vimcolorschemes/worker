@@ -9,19 +9,21 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/google/go-github/v32/github"
 )
 
 // GetFileURLsWithExtensions returns all URLs with a certain extension given a URL list
-func GetFileURLsWithExtensions(fileURLs []string, extensions []string) []string {
-	result := []string{}
+func GetFilesWithExtensions(files []*github.RepositoryContent, extensions []string) []*github.RepositoryContent {
+	result := []*github.RepositoryContent{}
 
 	fileExtensionExpression := strings.Join(extensions, "|")
 	expression := fmt.Sprintf(`(?i)^.*\.(%s)$`, fileExtensionExpression)
 	fileURLWithExtensions := regexp.MustCompile(expression)
 
-	for _, fileURL := range fileURLs {
-		if fileURLWithExtensions.MatchString(fileURL) {
-			result = append(result, fileURL)
+	for _, file := range files {
+		if fileURLWithExtensions.MatchString(*file.DownloadURL) {
+			result = append(result, file)
 		}
 	}
 

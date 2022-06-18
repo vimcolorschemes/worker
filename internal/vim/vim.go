@@ -6,22 +6,24 @@ import (
 	"regexp"
 	"strings"
 
+	gogithub "github.com/google/go-github/v32/github"
 	"github.com/vimcolorschemes/worker/internal/file"
+	"github.com/vimcolorschemes/worker/internal/github"
 	"github.com/vimcolorschemes/worker/internal/repository"
 )
 
 // GetVimColorSchemes returns vim color schemes found given a list of vim file URLs
-func GetVimColorSchemes(vimFileURLs []string) ([]repository.VimColorScheme, error) {
+func GetVimColorSchemes(githubRepository *gogithub.Repository, vimFiles []*gogithub.RepositoryContent) ([]repository.VimColorScheme, error) {
 	vimColorSchemes := []repository.VimColorScheme{}
 
-	for _, vimFileURL := range vimFileURLs {
-		if containsURL(vimColorSchemes, vimFileURL) {
+	for _, vimFile := range vimFiles {
+		if containsURL(vimColorSchemes, *vimFile.DownloadURL) {
 			continue
 		}
 
-		fileContent, err := file.GetRemoteFileContent(vimFileURL)
+		fileContent, err := file.GetRemoteFileContent(*vimFile.DownloadURL)
 		if err != nil {
-			log.Print("Error downloading file: ", vimFileURL)
+			log.Print("Error downloading file: ", *vimFile.DownloadURL)
 			continue
 		}
 
@@ -30,17 +32,22 @@ func GetVimColorSchemes(vimFileURLs []string) ([]repository.VimColorScheme, erro
 			continue
 		}
 
-		log.Print("Found ", vimColorSchemeName, " at ", vimFileURL)
+		log.Print("Found ", vimColorSchemeName, " at ", *vimFile.DownloadURL)
 
 		if isLua {
 			log.Print(vimColorSchemeName, " is a lua color scheme")
 		}
 
-		vimColorSchemes = append(vimColorSchemes, repository.VimColorScheme{
-			Name:    vimColorSchemeName,
-			FileURL: vimFileURL,
-			IsLua:   isLua,
-		})
+		lastCommitAt := github.GetFileLastCommitAt(githubRepository, vimFile)
+
+		vimColorSchemes = append(vimColorSchemes,
+			repository.VimColorScheme{
+				Name:         vimColorSchemeName,
+				FileURL:      *vimFile.DownloadURL,
+				IsLua:        isLua,
+				LastCommitAt: lastCommitAt,
+			},
+		)
 	}
 
 	if len(vimColorSchemes) == 0 {

@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-github/v32/github"
 	"github.com/vimcolorschemes/worker/internal/test"
 )
 
@@ -23,108 +24,121 @@ func setUp(t *testing.T) func(t *testing.T) {
 	return cleanUp
 }
 
-func TestGetFileURLsWithExtensions(t *testing.T) {
+func TestGetFilesWithExtensions(t *testing.T) {
 	t.Run("should not match a non-suffix substring", func(t *testing.T) {
-		fileURLs := []string{"http://example.com/test.vim/test.txt"}
+		url := "http://example.com/test.vim/test.txt"
+		files := []*github.RepositoryContent{{DownloadURL: &url}}
 		extensions := []string{"vim"}
-		result := GetFileURLsWithExtensions(fileURLs, extensions)
-		if !reflect.DeepEqual(result, []string{}) {
-			t.Error("Incorrect result for GetFileURLsWithExtensions, got non empty result")
+		result := GetFilesWithExtensions(files, extensions)
+		if len(result) != 0 {
+			t.Error("Incorrect result for GetFilesWithExtensions, got non empty result")
 		}
 	})
 
 	t.Run("should match differences in casing", func(t *testing.T) {
-		fileURLs := []string{"http://example.com/test.ViM"}
+		url := "http://example.com/test.ViM"
+		files := []*github.RepositoryContent{{DownloadURL: &url}}
 		extensions := []string{"vim"}
-		result := GetFileURLsWithExtensions(fileURLs, extensions)
-		if !reflect.DeepEqual(result, fileURLs) {
-			t.Errorf("Incorrect result for GetFileURLsWithExtensions, got: empty result, want: %s", fileURLs)
+		result := GetFilesWithExtensions(files, extensions)
+		if !reflect.DeepEqual(result, files) {
+			t.Errorf("Incorrect result for GetFilesWithExtensions, got: empty result, want: %s, got: %s", files, result)
 		}
 	})
 
-	t.Run("should return all file URLs matching the extension", func(t *testing.T) {
+	t.Run("should return all file s matching the extension", func(t *testing.T) {
 		match1 := "http://example.com/test.ViM"
 		match2 := "https://helloworld.ca/file.vim"
-		fileURLs := []string{match1, match2, "https://example.com/hello/world.html"}
+		url3 := "https://example.com/hello/world.html"
+		files := []*github.RepositoryContent{{DownloadURL: &match1}, {DownloadURL: &match2}, {DownloadURL: &url3}}
 		extensions := []string{"vim"}
-		result := GetFileURLsWithExtensions(fileURLs, extensions)
-		if !reflect.DeepEqual(result, []string{match1, match2}) {
-			t.Errorf("Incorrect result for GetFileURLsWithExtensions, got: empty result, want: %s", []string{match1, match2})
+		result := GetFilesWithExtensions(files, extensions)
+		expectedResult := []*github.RepositoryContent{{DownloadURL: &match1}, {DownloadURL: &match2}}
+		if len(result) != len(expectedResult) {
+			t.Errorf("Incorrect result for GetFilesWithExtensions, got: empty result, want: %s, got: %s", expectedResult, result)
 		}
 	})
 
-	t.Run("should return all file URLs matching any of the extensions", func(t *testing.T) {
+	t.Run("should return all file s matching any of the extensions", func(t *testing.T) {
 		match1 := "http://example.com/test.ViM"
 		match2 := "http://example.com/test.vim"
 		match3 := "https://helloworld.ca/file.erb"
-		fileURLs := []string{match1, match2, match3, "https://example.com/hello/world.html"}
+		url4 := "https://example.com/hello/world.html"
+		files := []*github.RepositoryContent{{DownloadURL: &match1}, {DownloadURL: &match2}, {DownloadURL: &match3}, {DownloadURL: &url4}}
 		extensions := []string{"vim", "erb"}
-		result := GetFileURLsWithExtensions(fileURLs, extensions)
-		if !reflect.DeepEqual(result, []string{match1, match2, match3}) {
-			t.Errorf("Incorrect result for GetFileURLsWithExtensions, got: empty result, want: %s", []string{match1, match2, match3})
+		result := GetFilesWithExtensions(files, extensions)
+		expectedResult := []*github.RepositoryContent{{DownloadURL: &match1}, {DownloadURL: &match2}, {DownloadURL: &match3}}
+		if len(result) != len(expectedResult) {
+			t.Errorf("Incorrect result for GetFilesWithExtensions, got: empty result, want: %s, got: %s", expectedResult, result)
 		}
 	})
 
 	t.Run("should return an empty array when given empty values", func(t *testing.T) {
-		fileURLs := []string{}
+		files := []*github.RepositoryContent{}
 		extensions := []string{}
-		result := GetFileURLsWithExtensions(fileURLs, extensions)
-		if !reflect.DeepEqual(result, []string{}) {
-			t.Error("Incorrect result for GetFileURLsWithExtensions, got non empty result")
+		result := GetFilesWithExtensions(files, extensions)
+		if len(result) != 0 {
+			t.Error("Incorrect result for GetFilesWithExtensions, got non empty result")
 		}
 	})
 
-	t.Run("should return an empty array when given an empty file URLs array", func(t *testing.T) {
-		fileURLs := []string{}
+	t.Run("should return an empty array when given an empty file s array", func(t *testing.T) {
+		files := []*github.RepositoryContent{}
 		extensions := []string{"txt"}
-		result := GetFileURLsWithExtensions(fileURLs, extensions)
-		if !reflect.DeepEqual(result, []string{}) {
-			t.Error("Incorrect result for GetFileURLsWithExtensions, got non empty result")
+		result := GetFilesWithExtensions(files, extensions)
+		if len(result) != 0 {
+			t.Error("Incorrect result for GetFilesWithExtensions, got non empty result")
 		}
 	})
 
 	t.Run("should return an empty array when given an empty extensions array", func(t *testing.T) {
-		fileURLs := []string{"http://example.com/test/test.txt"}
+		url := "http://example.com/test/test.txt"
+		files := []*github.RepositoryContent{{DownloadURL: &url}}
 		extensions := []string{}
-		result := GetFileURLsWithExtensions(fileURLs, extensions)
-		if !reflect.DeepEqual(result, []string{}) {
-			t.Error("Incorrect result for GetFileURLsWithExtensions, got non empty result")
+		result := GetFilesWithExtensions(files, extensions)
+		if len(result) != 0 {
+			t.Error("Incorrect result for GetFilesWithExtensions, got non empty result")
 		}
 	})
 
-	t.Run("should return an empty array when the file URL does not match the given extension", func(t *testing.T) {
-		fileURLs := []string{"http://example.com/test/test.txt"}
+	t.Run("should return an empty array when the file  does not match the given extension", func(t *testing.T) {
+		url := "http://example.com/test/test.txt"
+		files := []*github.RepositoryContent{{DownloadURL: &url}}
 		extensions := []string{"vim"}
-		result := GetFileURLsWithExtensions(fileURLs, extensions)
-		if !reflect.DeepEqual(result, []string{}) {
-			t.Error("Incorrect result for GetFileURLsWithExtensions, got non empty result")
+		result := GetFilesWithExtensions(files, extensions)
+		if len(result) != 0 {
+			t.Error("Incorrect result for GetFilesWithExtensions, got non empty result")
 		}
 	})
 
-	t.Run("should return an empty array when the file URL does not match any of the given extensions", func(t *testing.T) {
-		fileURLs := []string{"http://example.com/test/test.txt"}
+	t.Run("should return an empty array when the file  does not match any of the given extensions", func(t *testing.T) {
+		url := "http://example.com/test/test.txt"
+		files := []*github.RepositoryContent{{DownloadURL: &url}}
 		extensions := []string{"vim", "erb"}
-		result := GetFileURLsWithExtensions(fileURLs, extensions)
-		if !reflect.DeepEqual(result, []string{}) {
-			t.Error("Incorrect result for GetFileURLsWithExtensions, got non empty result")
+		result := GetFilesWithExtensions(files, extensions)
+		if len(result) != 0 {
+			t.Error("Incorrect result for GetFilesWithExtensions, got non empty result")
 		}
 	})
 
-	t.Run("should return an empty array when none of the file URLs match the given extension", func(t *testing.T) {
-		fileURLs := []string{"http://example.com/test/test.txt", "https://helloworld.ca/file.html"}
+	t.Run("should return an empty array when none of the file s match the given extension", func(t *testing.T) {
+		url1 := "http://example.com/test/test.txt"
+		url2 := "https://helloworld.ca/file.html"
+		files := []*github.RepositoryContent{{DownloadURL: &url1}, {DownloadURL: &url2}}
 		extensions := []string{"vim"}
-		result := GetFileURLsWithExtensions(fileURLs, extensions)
-		if !reflect.DeepEqual(result, []string{}) {
-			t.Error("Incorrect result for GetFileURLsWithExtensions, got non empty result")
+		result := GetFilesWithExtensions(files, extensions)
+		if len(result) != 0 {
+			t.Error("Incorrect result for GetFilesWithExtensions, got non empty result")
 		}
 	})
 
-	t.Run("should return an empty array when none of the file URLs match any of the given extensions", func(t *testing.T) {
-		fileURLs := []string{"http://example.com/test/test.txt", "https://helloworld.ca/file.html"}
+	t.Run("should return an empty array when none of the file s match any of the given extensions", func(t *testing.T) {
+		url1 := "http://example.com/test/test.txt"
+		url2 := "https://helloworld.ca/file.html"
+		files := []*github.RepositoryContent{{DownloadURL: &url1}, {DownloadURL: &url2}}
 		extensions := []string{"vim", "md"}
-		result := GetFileURLsWithExtensions(fileURLs, extensions)
-		if !reflect.DeepEqual(result, []string{}) {
-			t.Error("Incorrect result for GetFileURLsWithExtensions, got non empty result")
+		result := GetFilesWithExtensions(files, extensions)
+		if len(result) != 0 {
+			t.Error("Incorrect result for GetFilesWithExtensions, got non empty result")
 		}
 	})
 }
@@ -160,7 +174,7 @@ func TestGetRemoteFileContent(t *testing.T) {
 		}
 	})
 
-	t.Run("should return error when URL is not valid", func(t *testing.T) {
+	t.Run("should return error when  is not valid", func(t *testing.T) {
 		_, err := GetRemoteFileContent("test")
 		if err == nil {
 			t.Error("Incorrect result for GetRemoteFileContent, got no error")
@@ -416,7 +430,7 @@ func TestRemoveLinesInFile(t *testing.T) {
 }
 
 func TestDownloadFile(t *testing.T) {
-	t.Run("should download the file locally if the URL is valid", func(t *testing.T) {
+	t.Run("should download the file locally if the  is valid", func(t *testing.T) {
 		cleanUp := setUp(t)
 		defer cleanUp(t)
 
@@ -442,14 +456,14 @@ func TestDownloadFile(t *testing.T) {
 		}
 	})
 
-	t.Run("should return error if the URL is invalid", func(t *testing.T) {
+	t.Run("should return error if the  is invalid", func(t *testing.T) {
 		cleanUp := setUp(t)
 		defer cleanUp(t)
 
-		err := DownloadFile("Wrong URL", target)
+		err := DownloadFile("Wrong ", target)
 
 		if err == nil {
-			t.Error("Incorrect result for DownloadFile, got no error when URL was invalid")
+			t.Error("Incorrect result for DownloadFile, got no error when  was invalid")
 		}
 	})
 

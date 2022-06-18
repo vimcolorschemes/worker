@@ -77,13 +77,13 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 	}
 
 	log.Print("Getting vim color scheme names")
-	fileURLs := github.GetRepositoryFileURLs(githubRepository)
-	log.Print(len(fileURLs), " files found")
-	vimFileURLs := file.GetFileURLsWithExtensions(fileURLs, []string{"erb", "vim"})
-	log.Print(len(vimFileURLs), " vim files found")
-	if len(vimFileURLs) > 0 {
+	files := github.GetRepositoryFiles(githubRepository)
+	log.Print(len(files), " files found")
+	vimFiles := file.GetFilesWithExtensions(files, []string{"erb", "vim"})
+	log.Print(len(vimFiles), " vim files found")
+	if len(vimFiles) > 0 {
 		log.Print("Checking for vim color scheme names")
-		vimColorSchemes, err := vim.GetVimColorSchemes(vimFileURLs)
+		vimColorSchemes, err := vim.GetVimColorSchemes(githubRepository, vimFiles)
 		if err != nil {
 			log.Print("Did not find any vim color schemes")
 		}

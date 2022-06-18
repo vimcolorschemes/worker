@@ -780,3 +780,31 @@ func TestAssignRepositoryType(t *testing.T) {
 		}
 	})
 }
+
+func TestUniquifyVimColorSchemes(t *testing.T) {
+	t.Run("should return the same list if it has no duplicate name", func(t *testing.T) {
+		vimColorSchemes := []VimColorScheme{{Name: "vim"}, {Name: "lua"}}
+		uniqueList := uniquifyVimColorSchemes(vimColorSchemes)
+		if !reflect.DeepEqual(vimColorSchemes, uniqueList) {
+			t.Errorf("Incorrect result for getUniqueVimColorSchemeList, got %d color schemes, expected %d", len(uniqueList), len(vimColorSchemes))
+		}
+	})
+
+	t.Run("should remove duplicate items keeping most recent LastCommitAt", func(t *testing.T) {
+		vimColorSchemes := []VimColorScheme{
+			{Name: "vim", LastCommitAt: time.Date(2022, time.Month(2), 21, 1, 0, 0, 0, time.UTC)},
+			{Name: "lua", LastCommitAt: time.Date(2023, time.Month(2), 21, 1, 0, 0, 0, time.UTC)},
+			{Name: "vim", LastCommitAt: time.Date(2021, time.Month(2), 21, 1, 0, 0, 0, time.UTC)},
+		}
+
+		result := uniquifyVimColorSchemes(vimColorSchemes)
+		expectedResult := []VimColorScheme{
+			{Name: "vim", LastCommitAt: time.Date(2022, time.Month(2), 21, 1, 0, 0, 0, time.UTC)},
+			{Name: "lua", LastCommitAt: time.Date(2023, time.Month(2), 21, 1, 0, 0, 0, time.UTC)},
+		}
+
+		if !reflect.DeepEqual(result, expectedResult) {
+			t.Errorf("Incorrect result for getUniqueVimColorSchemeList, got %d color schemes, expected %d", len(result), len(expectedResult))
+		}
+	})
+}
