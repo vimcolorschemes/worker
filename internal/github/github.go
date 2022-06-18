@@ -45,6 +45,10 @@ func init() {
 
 // GetRepository gets a repository from the GitHub API using a repository's owner and name
 func GetRepository(ownerName string, name string) (*gogithub.Repository, error) {
+	if strings.HasSuffix(os.Args[0], ".test") {
+		return nil, errors.New("Running in test mode")
+	}
+
 	repository, response, err := client.Repositories.Get(context.Background(), ownerName, name)
 
 	if _, ok := err.(*gogithub.RateLimitError); ok {
@@ -60,6 +64,10 @@ func GetRepository(ownerName string, name string) (*gogithub.Repository, error) 
 
 // GetLastCommitAt gets the date of the last commit done in a repository's default branch
 func GetLastCommitAt(repository *gogithub.Repository) time.Time {
+	if strings.HasSuffix(os.Args[0], ".test") {
+		return time.Time{}
+	}
+
 	ownerName := *repository.Owner.Login
 	name := *repository.Name
 	defaultBranch := *repository.DefaultBranch
@@ -82,6 +90,10 @@ func GetLastCommitAt(repository *gogithub.Repository) time.Time {
 }
 
 func GetFileLastCommitAt(repository *gogithub.Repository, file *gogithub.RepositoryContent) time.Time {
+	if strings.HasSuffix(os.Args[0], ".test") {
+		return time.Time{}
+	}
+
 	ownerName := *repository.Owner.Login
 	name := *repository.Name
 	defaultBranch := *repository.DefaultBranch
@@ -105,6 +117,10 @@ func GetFileLastCommitAt(repository *gogithub.Repository, file *gogithub.Reposit
 
 // GetRepositoryFileURLs returns all file URLs in a repository
 func GetRepositoryFiles(repository *gogithub.Repository) []*gogithub.RepositoryContent {
+	if strings.HasSuffix(os.Args[0], ".test") {
+		return []*gogithub.RepositoryContent{}
+	}
+
 	ownerName := *repository.Owner.Login
 	name := *repository.Name
 	basePath := ""
@@ -119,6 +135,10 @@ func GetRepositoryFiles(repository *gogithub.Repository) []*gogithub.RepositoryC
 }
 
 func getRepositoryFilesAtPath(ownerName string, name string, path string) ([]*gogithub.RepositoryContent, error) {
+	if strings.HasSuffix(os.Args[0], ".test") {
+		return []*gogithub.RepositoryContent{}, errors.New("Running in test mode")
+	}
+
 	options := &gogithub.RepositoryContentGetOptions{}
 	_, contents, response, err := client.Repositories.GetContents(context.Background(), ownerName, name, path, options)
 	if _, ok := err.(*gogithub.RateLimitError); ok {
@@ -157,6 +177,10 @@ func getRepositoryFilesAtPath(ownerName string, name string, path string) ([]*go
 
 // SearchRepositories returns all repositories from GitHub API matching some queries
 func SearchRepositories(queries []string, repositoryCountLimit int, repositoryCountLimitPerPage int) []*gogithub.Repository {
+	if strings.HasSuffix(os.Args[0], ".test") {
+		return []*gogithub.Repository{}
+	}
+
 	log.Print("Search repositories")
 
 	var repositories []*gogithub.Repository
@@ -180,6 +204,10 @@ func SearchRepositories(queries []string, repositoryCountLimit int, repositoryCo
 }
 
 func queryRepositories(query string, repositoryCountLimit int, repositoryCountLimitPerPage int) []*gogithub.Repository {
+	if strings.HasSuffix(os.Args[0], ".test") {
+		return []*gogithub.Repository{}
+	}
+
 	page := 1
 	totalCount := -1
 	repositories := []*gogithub.Repository{}
@@ -213,6 +241,10 @@ func queryRepositories(query string, repositoryCountLimit int, repositoryCountLi
 }
 
 func waitForRateLimitReset(resetTime gogithub.Timestamp) {
+	if strings.HasSuffix(os.Args[0], ".test") {
+    return
+	}
+
 	log.Printf("Sleep until rate limit reset at %s", resetTime)
 
 	for {

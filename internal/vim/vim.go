@@ -3,10 +3,8 @@ package vim
 import (
 	"errors"
 	"log"
-	"os"
 	"regexp"
 	"strings"
-	"time"
 
 	gogithub "github.com/google/go-github/v32/github"
 	"github.com/vimcolorschemes/worker/internal/file"
@@ -40,10 +38,7 @@ func GetVimColorSchemes(githubRepository *gogithub.Repository, vimFiles []*gogit
 			log.Print(vimColorSchemeName, " is a lua color scheme")
 		}
 
-		var lastCommitAt time.Time
-		if !strings.HasSuffix(os.Args[0], ".test") {
-			lastCommitAt = github.GetFileLastCommitAt(githubRepository, vimFile)
-		}
+		lastCommitAt := github.GetFileLastCommitAt(githubRepository, vimFile)
 
 		vimColorSchemes = append(vimColorSchemes,
 			repository.VimColorScheme{
