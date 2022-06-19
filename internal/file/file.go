@@ -22,7 +22,7 @@ func GetFilesWithExtensions(files []*github.RepositoryContent, extensions []stri
 	fileURLWithExtensions := regexp.MustCompile(expression)
 
 	for _, file := range files {
-    downloadURL := file.GetDownloadURL()
+		downloadURL := file.GetDownloadURL()
 		if downloadURL != "" && fileURLWithExtensions.MatchString(downloadURL) {
 			result = append(result, file)
 		}
