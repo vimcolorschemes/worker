@@ -18,7 +18,6 @@ func GetVimColorSchemes(githubRepository *gogithub.Repository, vimFiles []*gogit
 
 	for _, vimFile := range vimFiles {
 		downloadURL := vimFile.GetDownloadURL()
-    log.Print(downloadURL)
 
 		if downloadURL == "" {
 			continue
