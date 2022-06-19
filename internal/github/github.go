@@ -97,7 +97,13 @@ func GetFileLastCommitAt(repository *gogithub.Repository, file *gogithub.Reposit
 	ownerName := *repository.Owner.Login
 	name := *repository.Name
 	defaultBranch := *repository.DefaultBranch
-	options := &gogithub.CommitsListOptions{SHA: defaultBranch, Path: *file.Path}
+
+	filePath := file.GetPath()
+	if filePath == "" {
+		return time.Time{}
+	}
+
+	options := &gogithub.CommitsListOptions{SHA: defaultBranch, Path: filePath}
 
 	commits, response, err := client.Repositories.ListCommits(context.Background(), ownerName, name, options)
 	if _, ok := err.(*gogithub.RateLimitError); ok {
@@ -105,10 +111,10 @@ func GetFileLastCommitAt(repository *gogithub.Repository, file *gogithub.Reposit
 		waitForRateLimitReset(response.Rate.Reset)
 		return GetFileLastCommitAt(repository, file)
 	} else if err != nil {
-		log.Printf("Error getting last commit of %s/%s (%s): %s", ownerName, name, *file.Path, err)
+		log.Printf("Error getting last commit of %s/%s (%s): %s", ownerName, name, filePath, err)
 		return time.Time{}
 	} else if len(commits) == 0 {
-		log.Printf("Error getting last commit of %s/%s (%s): no commits founds", ownerName, name, *file.Path)
+		log.Printf("Error getting last commit of %s/%s (%s): no commits founds", ownerName, name, filePath)
 		return time.Time{}
 	}
 
@@ -160,7 +166,10 @@ func getRepositoryFilesAtPath(ownerName string, name string, path string) ([]*go
 
 		switch content.GetType() {
 		case "file":
-			files = append(files, content)
+			if content.GetDownloadURL() != "" {
+				// the file might be a symbolic link if it does not have a download URL
+				files = append(files, content)
+			}
 		case "dir":
 			newFiles, err := getRepositoryFilesAtPath(ownerName, name, content.GetPath())
 			if err != nil {

@@ -17,13 +17,19 @@ func GetVimColorSchemes(githubRepository *gogithub.Repository, vimFiles []*gogit
 	vimColorSchemes := []repository.VimColorScheme{}
 
 	for _, vimFile := range vimFiles {
-		if containsURL(vimColorSchemes, *vimFile.DownloadURL) {
+		downloadURL := vimFile.GetDownloadURL()
+
+		if downloadURL == "" {
 			continue
 		}
 
-		fileContent, err := file.GetRemoteFileContent(*vimFile.DownloadURL)
+		if containsURL(vimColorSchemes, downloadURL) {
+			continue
+		}
+
+		fileContent, err := file.GetRemoteFileContent(downloadURL)
 		if err != nil {
-			log.Print("Error downloading file: ", *vimFile.DownloadURL)
+			log.Print("Error downloading file: ", downloadURL)
 			continue
 		}
 
@@ -32,7 +38,7 @@ func GetVimColorSchemes(githubRepository *gogithub.Repository, vimFiles []*gogit
 			continue
 		}
 
-		log.Print("Found ", vimColorSchemeName, " at ", *vimFile.DownloadURL)
+		log.Print("Found ", vimColorSchemeName, " at ", downloadURL)
 
 		if isLua {
 			log.Print(vimColorSchemeName, " is a lua color scheme")
@@ -43,7 +49,7 @@ func GetVimColorSchemes(githubRepository *gogithub.Repository, vimFiles []*gogit
 		vimColorSchemes = append(vimColorSchemes,
 			repository.VimColorScheme{
 				Name:         vimColorSchemeName,
-				FileURL:      *vimFile.DownloadURL,
+				FileURL:      downloadURL,
 				IsLua:        isLua,
 				LastCommitAt: lastCommitAt,
 			},
