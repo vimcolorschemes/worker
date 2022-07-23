@@ -647,7 +647,7 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 	})
 
 	t.Run("should update the corresponding list items, insert new ones and erase old ones", func(t *testing.T) {
-    time := time.Now()
+		time := time.Now()
 		originalList := []VimColorScheme{
 			{
 				Name:    "test",
@@ -659,8 +659,8 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 					},
 					Light: nil,
 				},
-        IsLua: false,
-        LastCommitAt: time,
+				IsLua:        false,
+				LastCommitAt: time,
 			},
 			{
 				Name:    "old",
@@ -672,23 +672,23 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 					},
 					Light: nil,
 				},
-        IsLua: false,
-        LastCommitAt: time,
+				IsLua:        false,
+				LastCommitAt: time,
 			},
 		}
 
 		newList := []VimColorScheme{
 			{
-				Name:    "test",
-				FileURL: "new.url",
-        IsLua: false,
-        LastCommitAt: time,
+				Name:         "test",
+				FileURL:      "new.url",
+				IsLua:        false,
+				LastCommitAt: time,
 			},
 			{
-				Name:    "new",
-				FileURL: "new.url",
-        IsLua: false,
-        LastCommitAt: time,
+				Name:         "new",
+				FileURL:      "new.url",
+				IsLua:        false,
+				LastCommitAt: time,
 			},
 		}
 
@@ -703,14 +703,14 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 					},
 					Light: nil,
 				},
-        IsLua: false,
-        LastCommitAt: time,
+				IsLua:        false,
+				LastCommitAt: time,
 			},
 			{
-				Name:    "new",
-				FileURL: "new.url",
-        IsLua: false,
-        LastCommitAt: time,
+				Name:         "new",
+				FileURL:      "new.url",
+				IsLua:        false,
+				LastCommitAt: time,
 			},
 		}
 
