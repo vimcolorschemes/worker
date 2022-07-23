@@ -647,6 +647,7 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 	})
 
 	t.Run("should update the corresponding list items, insert new ones and erase old ones", func(t *testing.T) {
+		time := time.Now()
 		originalList := []VimColorScheme{
 			{
 				Name:    "test",
@@ -658,6 +659,8 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 					},
 					Light: nil,
 				},
+				IsLua:        false,
+				LastCommitAt: time,
 			},
 			{
 				Name:    "old",
@@ -669,17 +672,23 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 					},
 					Light: nil,
 				},
+				IsLua:        false,
+				LastCommitAt: time,
 			},
 		}
 
 		newList := []VimColorScheme{
 			{
-				Name:    "test",
-				FileURL: "new.url",
+				Name:         "test",
+				FileURL:      "new.url",
+				IsLua:        false,
+				LastCommitAt: time,
 			},
 			{
-				Name:    "new",
-				FileURL: "new.url",
+				Name:         "new",
+				FileURL:      "new.url",
+				IsLua:        false,
+				LastCommitAt: time,
 			},
 		}
 
@@ -694,10 +703,14 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 					},
 					Light: nil,
 				},
+				IsLua:        false,
+				LastCommitAt: time,
 			},
 			{
-				Name:    "new",
-				FileURL: "new.url",
+				Name:         "new",
+				FileURL:      "new.url",
+				IsLua:        false,
+				LastCommitAt: time,
 			},
 		}
 
@@ -707,7 +720,7 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 
 		if !reflect.DeepEqual(repository.VimColorSchemes, expectedList) {
 			t.Errorf(
-				"Incorrect result for SyncVimColorSchemes, got: %v, want length: %v",
+				"Incorrect result for SyncVimColorSchemes, got: %v, want: %v",
 				repository.VimColorSchemes,
 				expectedList,
 			)
