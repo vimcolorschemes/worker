@@ -51,11 +51,6 @@ func Generate(force bool, repoKey string) bson.M {
 	for _, repository := range repositories {
 		fmt.Println()
 
-		if repository.IsLua && !repository.IsVim {
-			log.Print("Skipping lua repository ", repository.Owner.Name, "/", repository.Name)
-			continue
-		}
-
 		log.Print("Generating vim previews for ", repository.Owner.Name, "/", repository.Name)
 
 		if !force && repository.GeneratedAt.After(repository.LastCommitAt) {
@@ -74,12 +69,7 @@ func Generate(force bool, repoKey string) bson.M {
 			continue
 		}
 
-		for index, vimColorScheme := range newVimColorSchemes {
-			if vimColorScheme.IsLua {
-				log.Print("Skipping lua color scheme ", vimColorScheme.Name)
-				continue
-			}
-
+		for index, vimColorScheme := range repository.VimColorSchemes {
 			err = file.DownloadFile(vimColorScheme.FileURL, fmt.Sprintf("%s/colors/%s.vim", tmpDirectoryPath, vimColorScheme.Name))
 			if err != nil {
 				continue
@@ -107,11 +97,13 @@ func Generate(force bool, repoKey string) bson.M {
 			}
 
 			newVimColorSchemes[index] = repoHelper.VimColorScheme{
-				Name:        vimColorScheme.Name,
-				FileURL:     vimColorScheme.FileURL,
-				Data:        vimColorSchemeData,
-				Backgrounds: backgrounds,
-				Valid:       true,
+				Name:         vimColorScheme.Name,
+				FileURL:      vimColorScheme.FileURL,
+				Data:         vimColorSchemeData,
+				Backgrounds:  backgrounds,
+				Valid:        true,
+				IsLua:        vimColorScheme.IsLua,
+				LastCommitAt: vimColorScheme.LastCommitAt,
 			}
 
 		}
@@ -344,7 +336,12 @@ func executePreviewGenerator(vimColorScheme repoHelper.VimColorScheme, backgroun
 		"./vim/code_sample.vim",
 	)
 
-	cmd := exec.Command("vim", args...)
+	executable := "vim"
+	if vimColorScheme.IsLua {
+		executable = "nvim"
+	}
+
+	cmd := exec.Command(executable, args...)
 
 	log.Printf("Running %s", cmd)
 
