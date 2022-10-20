@@ -12,6 +12,7 @@ The worker is a CLI used to import and manage the data for [vimcolorschemes](htt
 ### Requirements:
 
 - [mongodb-community](https://docs.mongodb.com/manual/installation/#mongodb-community-edition-installation-tutorials)
+- [golang](https://go.dev)
 
 _Note_: The MongoDB database can also be ran from [the app docker setup](https://docs.vimcolorschemes.com/#/installation-guide?id=_1-docker).
 
