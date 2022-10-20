@@ -38,7 +38,7 @@ echo "${BREAK_LINE}Logging in to ECR"
 aws ecr get-login-password --region us-east-1 --profile $AWS_PROFILE | docker login --username AWS --password-stdin $AWS_REGISTRY_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
 echo "${BREAK_LINE}Building the docker image"
-docker build -t vimcolorschemes/worker .
+docker build --platform linux/amd64 -t vimcolorschemes/worker .
 
 echo "${BREAK_LINE}Tagging the image"
 docker tag vimcolorschemes/worker:latest $AWS_REGISTRY_ID.dkr.ecr.$AWS_REGION.amazonaws.com/vimcolorschemes/worker:latest
