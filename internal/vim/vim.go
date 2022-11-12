@@ -124,8 +124,8 @@ func getVimColorSchemeName(fileContent *string) (string, error) {
 		return "", errors.New("no vim color scheme match")
 	}
 
-	expression := regexp.MustCompile(`[() ]`)
-	cleanedName := expression.ReplaceAllString(matches[2], "")
+	cleanedName := regexp.MustCompile(`[()]`).ReplaceAllString(matches[2], "")
+	cleanedName = regexp.MustCompile(` `).ReplaceAllString(cleanedName, "-")
 
 	return strings.ToLower(cleanedName), nil
 }

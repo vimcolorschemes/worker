@@ -176,8 +176,12 @@ func TestGetColorSchemeName(t *testing.T) {
 		syntex reset`, name: "hello_world"},
 		{fileContent: `
 		hi clear
+		let g:color_name="hello world"
+		syntex reset`, name: "hello-world"},
+		{fileContent: `
+		hi clear
 		let g:color_name="hello (world)"
-		syntex reset`, name: "helloworld"},
+		syntex reset`, name: "hello-world"},
 		{fileContent: `
 		hi clear
 		let colors_name = "abcd1234"
