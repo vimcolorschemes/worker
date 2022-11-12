@@ -652,7 +652,7 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 			{
 				Name:    "test",
 				Valid:   true,
-				FileURL: "old.url",
+				FileURL: "old.test.url",
 				Data: VimColorSchemeData{
 					Dark: []VimColorSchemeGroup{
 						{HexCode: "#000000", Name: "NormalBg"},
@@ -663,7 +663,7 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 				LastCommitAt: time,
 			},
 			{
-				Name:    "old",
+				Name:    "test.old",
 				Valid:   true,
 				FileURL: "old.url",
 				Data: VimColorSchemeData{
@@ -680,12 +680,12 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 		newList := []VimColorScheme{
 			{
 				Name:         "test",
-				FileURL:      "new.url",
+				FileURL:      "new.test.url",
 				IsLua:        false,
 				LastCommitAt: time,
 			},
 			{
-				Name:         "new",
+				Name:         "test.new",
 				FileURL:      "new.url",
 				IsLua:        false,
 				LastCommitAt: time,
@@ -696,7 +696,7 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 			{
 				Name:    "test",
 				Valid:   true,
-				FileURL: "new.url",
+				FileURL: "new.test.url",
 				Data: VimColorSchemeData{
 					Dark: []VimColorSchemeGroup{
 						{HexCode: "#000000", Name: "NormalBg"},
@@ -707,7 +707,7 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 				LastCommitAt: time,
 			},
 			{
-				Name:         "new",
+				Name:         "test.new",
 				FileURL:      "new.url",
 				IsLua:        false,
 				LastCommitAt: time,
