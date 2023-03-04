@@ -237,7 +237,7 @@ func TestGetColorSchemeName(t *testing.T) {
 	}
 	t.Run("should return the vim color scheme name if the file is valid", func(t *testing.T) {
 		for _, item := range validVimTests {
-			name, isLua, err := getColorSchemeName(&item.fileContent)
+			name, isLua, err := getColorSchemeName("test.vim", &item.fileContent)
 			if err != nil {
 				t.Error("Incorrect result for getColorSchemeName, got error")
 			}
@@ -284,7 +284,7 @@ func TestGetColorSchemeName(t *testing.T) {
 	}
 	t.Run("should return an error if the file is invalid", func(t *testing.T) {
 		for _, fileContent := range invalidVimTests {
-			name, isLua, err := getColorSchemeName(&fileContent)
+			name, isLua, err := getColorSchemeName("test.vim", &fileContent)
 			if err == nil {
 				t.Error("Incorrect result for getColorSchemeName, got no error")
 			}
@@ -298,10 +298,11 @@ func TestGetColorSchemeName(t *testing.T) {
 	})
 
 	var validLuaTests = []struct {
+		fileName    string
 		fileContent string
 		name        string
 	}{
-		{fileContent: `
+		{fileName: "test.vim", fileContent: `
     lua << EOF
     -- Useful for me when I am trying to debug and reload my changes
     if vim.g.nightfox_debug == true then
@@ -316,17 +317,20 @@ func TestGetColorSchemeName(t *testing.T) {
     nightfox.setup({fox = "dawnfox"})
     nightfox._colorscheme_load()
     EOF`, name: "nightfox"},
-		{fileContent: `
+		{fileName: "test.vim",
+			fileContent: `
 		" Theme: zephyr
     " Author: Glepnir
     " License: MIT
     " Source: http://github.com/glepnir/zephyr-nvim
 
     lua require('zephyr')`, name: "zephyr"},
+		{fileName: "test.lua",
+			fileContent: `vim.g.colors_name = 'melange'`, name: "melange"},
 	}
 	t.Run("should return the lua color scheme name if the file is valid", func(t *testing.T) {
 		for _, item := range validLuaTests {
-			name, isLua, err := getColorSchemeName(&item.fileContent)
+			name, isLua, err := getColorSchemeName(item.fileName, &item.fileContent)
 			if err != nil {
 				t.Error("Incorrect result for getColorSchemeName, got error")
 			}
@@ -357,7 +361,7 @@ func TestGetColorSchemeName(t *testing.T) {
 	}
 	t.Run("should return an error if the file is invalid", func(t *testing.T) {
 		for _, fileContent := range invalidLuaTests {
-			name, _, err := getColorSchemeName(&fileContent)
+			name, _, err := getColorSchemeName("test.vim", &fileContent)
 			if err == nil {
 				t.Error("Incorrect result for getColorSchemeName, got no error")
 			}
