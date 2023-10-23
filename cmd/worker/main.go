@@ -21,7 +21,7 @@ var jobRunnerMap = map[string]interface{}{
 }
 
 func main() {
-	job, force, repoKey, err := getJobArgs(os.Args)
+	job, force, debug, repoKey, err := getJobArgs(os.Args)
 
 	log.Printf("Running %s", job)
 
@@ -48,7 +48,7 @@ func main() {
 
 	fmt.Println()
 
-	data := runner.(func(force bool, repoKey string) bson.M)(force, repoKey)
+	data := runner.(func(force bool, debug bool, repoKey string) bson.M)(force, debug, repoKey)
 
 	elapsedTime := time.Since(startTime)
 	database.CreateReport(job, elapsedTime.Seconds(), data)
@@ -58,15 +58,15 @@ func main() {
 	log.Print(":wq")
 }
 
-func getJobArgs(osArgs []string) (string, bool, string, error) {
+func getJobArgs(osArgs []string) (string, bool, bool, string, error) {
 	if len(osArgs) < 2 {
-		return "", false, "", errors.New("Please provide an argument")
+		return "", false, false, "", errors.New("Please provide an argument")
 	}
 
 	job := osArgs[1]
 
 	if len(osArgs) < 3 {
-		return job, false, "", nil
+		return job, false, false, "", nil
 	}
 
 	args := osArgs[2:]
@@ -74,14 +74,16 @@ func getJobArgs(osArgs []string) (string, bool, string, error) {
 	forceIndex := getArgIndex(args, "--force")
 	force := forceIndex != -1
 
+	debugIndex := getArgIndex(args, "--debug")
+	debug := debugIndex != -1
+
 	repoIndex := getArgIndex(args, "--repo")
 	if repoIndex == -1 || len(args) < repoIndex+1 {
-		return osArgs[1], force, "", nil
+		return osArgs[1], force, debug, "", nil
 	}
 
 	repoKey := strings.ToLower(args[repoIndex+1])
-
-	return osArgs[1], force, repoKey, nil
+	return osArgs[1], force, debug, repoKey, nil
 }
 
 func getArgIndex(args []string, target string) int {

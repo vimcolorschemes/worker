@@ -24,9 +24,12 @@ var tmpDirectoryPath string
 var vimrcPath string
 var vimFilesPath string
 var colorDataFilePath string
+var debugMode bool
 
 // Generate vim color scheme data for all valid repositories
-func Generate(force bool, repoKey string) bson.M {
+func Generate(force bool, debug bool, repoKey string) bson.M {
+	debugMode = debug
+
 	initVimFiles()
 
 	setupVim()
@@ -330,14 +333,15 @@ func executePreviewGenerator(vimColorScheme repoHelper.VimColorScheme, backgroun
 	args := []string{
 		"-u", vimrcPath,
 		"-c", writeColorValuesAutoCmd,
-	}
-
-	args = append(args,
 		"-c", setBackground,
 		"-c", setColorScheme,
-		"-c", ":qa!",
-		"./vim/code_sample.vim",
-	)
+	}
+
+	if !debugMode {
+		args = append(args, "-c", ":qa!")
+	}
+
+	args = append(args, "./vim/code_sample.vim")
 
 	executable := "vim"
 	if vimColorScheme.IsLua {
