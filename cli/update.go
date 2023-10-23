@@ -15,7 +15,7 @@ import (
 )
 
 // Update the imported repositories with all kinds of useful information
-func Update(force bool, repoKey string) bson.M {
+func Update(force bool, _debug bool, repoKey string) bson.M {
 	var repositories []repoHelper.Repository
 	if repoKey != "" {
 		repository, err := database.GetRepository(repoKey)
