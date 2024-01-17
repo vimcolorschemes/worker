@@ -209,6 +209,11 @@ func setupVim() {
 	if err != nil {
 		log.Panic(err)
 	}
+
+	err = installPlugin("https://github.com/rktjmp/lush.nvim", "lush.nvim")
+	if err != nil {
+		log.Panic(err)
+	}
 }
 
 // Installs a plugin/color scheme on the vim configuration from a GitHub URL
