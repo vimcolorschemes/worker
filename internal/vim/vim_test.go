@@ -31,7 +31,8 @@ func TestGetVimColorSchemes(t *testing.T) {
 		server2 := test.MockServer(fileContent2, http.StatusOK)
 		defer server2.Close()
 
-		repo := github.Repository{}
+		repoName := "test"
+		repo := github.Repository{Name: &repoName}
 		colorSchemes, err := GetVimColorSchemes(&repo, []*github.RepositoryContent{{DownloadURL: &server1.URL}, {DownloadURL: &server2.URL}})
 
 		if err != nil {
@@ -63,7 +64,8 @@ func TestGetVimColorSchemes(t *testing.T) {
 		server := test.MockServer(fileContent, http.StatusOK)
 		defer server.Close()
 
-		repo := github.Repository{}
+		repoName := "hello"
+		repo := github.Repository{Name: &repoName}
 		colorSchemes, err := GetVimColorSchemes(&repo, []*github.RepositoryContent{{DownloadURL: &server.URL}, {DownloadURL: &server.URL}})
 
 		if err != nil {
@@ -108,7 +110,8 @@ func TestGetVimColorSchemes(t *testing.T) {
 		server3 := test.MockServer(fileContent3, http.StatusOK)
 		defer server3.Close()
 
-		repo := github.Repository{}
+		repoName := "test"
+		repo := github.Repository{Name: &repoName}
 		colorSchemes, err := GetVimColorSchemes(&repo, []*github.RepositoryContent{{DownloadURL: &server1.URL}, {DownloadURL: &server2.URL}, {DownloadURL: &server3.URL}})
 
 		expectedVimColorSchemes := []repository.VimColorScheme{}
@@ -138,7 +141,8 @@ func TestGetVimColorSchemes(t *testing.T) {
 		defer server.Close()
 
 		wrongUrl := "wrong url"
-		repo := github.Repository{}
+		repoName := "test"
+		repo := github.Repository{Name: &repoName}
 		colorSchemes, err := GetVimColorSchemes(&repo, []*github.RepositoryContent{{DownloadURL: &server.URL}, {DownloadURL: &wrongUrl}})
 
 		if err != nil {
@@ -153,6 +157,49 @@ func TestGetVimColorSchemes(t *testing.T) {
 				names = append(names, colorScheme.Name)
 			}
 			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", names, []string{"test"})
+		}
+	})
+
+	t.Run("should add the repository name as a color scheme if it is not already present", func(t *testing.T) {
+		fileContent1 := `
+			hi clear
+			syntax reset
+			let g:colors_name = "name1"
+			hi Normal cterm=97
+		`
+		fileContent2 := `
+			hi clear
+			syntax reset
+			let g:colors_name = "name2"
+			hi Normal cterm=97
+		`
+
+		server1 := test.MockServer(fileContent1, http.StatusOK)
+		defer server1.Close()
+
+		server2 := test.MockServer(fileContent2, http.StatusOK)
+		defer server2.Close()
+
+		repoName := "name3"
+		repo := github.Repository{Name: &repoName}
+		colorSchemes, err := GetVimColorSchemes(&repo, []*github.RepositoryContent{{DownloadURL: &server1.URL}, {DownloadURL: &server2.URL}})
+
+		if err != nil {
+			t.Errorf("Incorrect result for GetVimColorSchemes, got error: %s", err)
+		}
+
+		expectedVimColorSchemes := []repository.VimColorScheme{
+			{Name: "name1", FileURL: server1.URL},
+			{Name: "name2", FileURL: server2.URL},
+			{Name: "name3", FileURL: server1.URL},
+		}
+
+		if !reflect.DeepEqual(colorSchemes, expectedVimColorSchemes) {
+			var names []string
+			for _, colorScheme := range colorSchemes {
+				names = append(names, colorScheme.Name)
+			}
+			t.Errorf("Incorrect result for GetVimColorSchemes, got: %s, want: %s", names, []string{"test", "hello"})
 		}
 	})
 }

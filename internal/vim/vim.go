@@ -15,6 +15,8 @@ import (
 // GetVimColorSchemes returns vim color schemes found given a list of vim file URLs
 func GetVimColorSchemes(githubRepository *gogithub.Repository, vimFiles []*gogithub.RepositoryContent) ([]repository.VimColorScheme, error) {
 	vimColorSchemes := []repository.VimColorScheme{}
+	repositoryName := strings.ToLower(githubRepository.GetName())
+	hasDefaultColorScheme := false
 
 	for _, vimFile := range vimFiles {
 		downloadURL := vimFile.GetDownloadURL()
@@ -47,6 +49,8 @@ func GetVimColorSchemes(githubRepository *gogithub.Repository, vimFiles []*gogit
 
 		lastCommitAt := github.GetFileLastCommitAt(githubRepository, vimFile)
 
+		hasDefaultColorScheme = hasDefaultColorScheme || strings.ToLower(vimColorSchemeName) == repositoryName
+
 		vimColorSchemes = append(vimColorSchemes,
 			repository.VimColorScheme{
 				Name:         vimColorSchemeName,
@@ -59,6 +63,17 @@ func GetVimColorSchemes(githubRepository *gogithub.Repository, vimFiles []*gogit
 
 	if len(vimColorSchemes) == 0 {
 		return []repository.VimColorScheme{}, errors.New("no vim color schemes found")
+	}
+
+	if !hasDefaultColorScheme {
+		vimColorSchemes = append(vimColorSchemes,
+			repository.VimColorScheme{
+				Name:         repositoryName,
+				FileURL:      vimColorSchemes[0].FileURL,
+				IsLua:        vimColorSchemes[0].IsLua,
+				LastCommitAt: github.GetLastCommitAt(githubRepository),
+			},
+		)
 	}
 
 	return vimColorSchemes, nil
@@ -132,7 +147,7 @@ func getVimColorSchemeName(fileContent *string) (string, error) {
 func getLuaColorSchemeName(fileName string, fileContent *string) (string, error) {
 	lua := regexp.MustCompile("lua ")
 	if !lua.MatchString(*fileContent) && !strings.Contains(fileName, ".lua") {
-		return "", errors.New("No lua mentions")
+		return "", errors.New("no lua mentions")
 	}
 
 	requireColorSchemeName := regexp.MustCompile(`require\(['"]([a-zA-Z0-9-_ \(\)]+)['"]\)`)
