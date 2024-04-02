@@ -73,14 +73,6 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 		}
 
 		for index, vimColorScheme := range repository.VimColorSchemes {
-			err = file.DownloadFile(
-				vimColorScheme.FileURL,
-				fmt.Sprintf("%s/colors/%s%s", tmpDirectoryPath, vimColorScheme.Name, filepath.Ext(vimColorScheme.FileURL)),
-			)
-			if err != nil {
-				continue
-			}
-
 			var backgrounds []string
 
 			lightVimColorSchemeColors, lightErr := getVimColorSchemeColorData(vimColorScheme, repoHelper.LightBackground)
@@ -120,7 +112,7 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 		generateObject := getGenerateRepositoryObject(repository)
 		database.UpsertRepository(repository.ID, generateObject)
 
-		err = deletePlugin(pluginPath)
+		err = deletePlugin()
 		if err != nil {
 			log.Print(err)
 			continue
@@ -236,7 +228,7 @@ func installPlugin(gitRepositoryURL string, path string) error {
 }
 
 // Clears all installation traces of the vim plugin
-func deletePlugin(path string) error {
+func deletePlugin() error {
 	// Remove plugin specific runtimepath from .vimrc
 	err := file.RemoveLinesInFile("let &runtimepath.*\" plugin runtimepath", vimrcPath)
 	if err != nil {

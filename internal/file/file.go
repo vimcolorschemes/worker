@@ -2,7 +2,6 @@ package file
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -29,28 +28,6 @@ func GetFilesWithExtensions(files []*github.RepositoryContent, extensions []stri
 	}
 
 	return result
-}
-
-// DownloadFile downloads a file from a URL at a local target path
-func DownloadFile(fileURL string, target string) error {
-	out, err := os.Create(target)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	resp, err := http.Get(fileURL)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // GetRemoteFileContent returns the file content of a file at a URL
