@@ -8,3 +8,4 @@ silent! colorscheme default
 
 " Necessary custom settings for some color schemes
 let g:solarized_termcolors=256
+let g:zenbones_compat = 1

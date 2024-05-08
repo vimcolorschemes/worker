@@ -11,10 +11,8 @@ import (
 	"time"
 
 	"github.com/vimcolorschemes/worker/internal/database"
-	"github.com/vimcolorschemes/worker/internal/dotenv"
 	file "github.com/vimcolorschemes/worker/internal/file"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
-	"github.com/vimcolorschemes/worker/internal/request"
 	"github.com/vimcolorschemes/worker/internal/vim"
 
 	"go.mongodb.org/mongo-driver/bson"
