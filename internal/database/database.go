@@ -70,7 +70,9 @@ func GetRepository(repoKey string) (repository.Repository, error) {
 
 	var repo repository.Repository
 
-	err := repositoriesCollection.FindOne(ctx, bson.M{"owner.name": matches[0], "name": matches[1]}).Decode(&repo)
+	ownerName := bson.M{"$regex": matches[0], "$options": "i"}
+	name := bson.M{"$regex": matches[1], "$options": "i"}
+	err := repositoriesCollection.FindOne(ctx, bson.M{"owner.name": ownerName, "name": name}).Decode(&repo)
 	if err != nil {
 		return repository.Repository{}, err
 	}
