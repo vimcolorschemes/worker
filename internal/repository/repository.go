@@ -98,7 +98,12 @@ func UniquifyRepositories(repositories []*gogithub.Repository) []*gogithub.Repos
 func (repository Repository) AppendToStargazersCountHistory() []StargazersCountHistoryItem {
 	history := repository.StargazersCountHistory
 	if history == nil {
-		history = []StargazersCountHistoryItem{}
+		history = []StargazersCountHistoryItem{
+			{
+				Date:            repository.GitHubCreatedAt,
+				StargazersCount: 0,
+			},
+		}
 	} // sort: newest first
 	if len(history) > 0 {
 		sort.Slice(history, func(i int, j int) bool {

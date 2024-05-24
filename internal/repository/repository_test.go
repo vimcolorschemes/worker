@@ -53,6 +53,7 @@ func TestUniquifyRepositories(t *testing.T) {
 func TestAppendToStargazersCountHistory(t *testing.T) {
 	t.Run("should initialize history when it's empty", func(t *testing.T) {
 		repository := Repository{
+			GitHubCreatedAt: time.Date(1990, time.November, 1, 0, 0, 0, 0, time.UTC),
 			StargazersCount: 100,
 		}
 		history := repository.AppendToStargazersCountHistory()
@@ -60,6 +61,7 @@ func TestAppendToStargazersCountHistory(t *testing.T) {
 
 		expected := []StargazersCountHistoryItem{
 			{Date: today, StargazersCount: 100},
+			{Date: repository.GitHubCreatedAt, StargazersCount: 0},
 		}
 
 		if !reflect.DeepEqual(history, expected) {
