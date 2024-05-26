@@ -13,7 +13,7 @@ import (
 	"github.com/vimcolorschemes/worker/internal/dotenv"
 	"github.com/vimcolorschemes/worker/internal/repository"
 
-	gogithub "github.com/google/go-github/v32/github"
+	gogithub "github.com/google/go-github/v62/github"
 	"golang.org/x/oauth2"
 )
 
@@ -86,7 +86,7 @@ func GetLastCommitAt(repository *gogithub.Repository) time.Time {
 		return time.Time{}
 	}
 
-	return commits[0].Commit.Author.GetDate()
+	return commits[0].Commit.Author.Date.Time
 }
 
 func GetFileLastCommitAt(repository *gogithub.Repository, file *gogithub.RepositoryContent) time.Time {
@@ -118,7 +118,7 @@ func GetFileLastCommitAt(repository *gogithub.Repository, file *gogithub.Reposit
 		return time.Time{}
 	}
 
-	return commits[0].Commit.Author.GetDate()
+	return commits[0].Commit.Author.Date.Time
 }
 
 // GetRepositoryFileURLs returns all file URLs in a repository

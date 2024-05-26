@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	gogithub "github.com/google/go-github/v32/github"
+	gogithub "github.com/google/go-github/v62/github"
 
 	"github.com/vimcolorschemes/worker/internal/date"
 )

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	gogithub "github.com/google/go-github/v32/github"
+	gogithub "github.com/google/go-github/v62/github"
 	dateUtil "github.com/vimcolorschemes/worker/internal/date"
 )
 

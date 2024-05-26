@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/go-github/v32/github"
+	"github.com/google/go-github/v62/github"
 	"github.com/vimcolorschemes/worker/internal/repository"
 	"github.com/vimcolorschemes/worker/internal/test"
 )

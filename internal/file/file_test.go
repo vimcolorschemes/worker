@@ -1,13 +1,12 @@
 package file
 
 import (
-	"io/ioutil"
 	"net/http"
 	"os"
 	"reflect"
 	"testing"
 
-	"github.com/google/go-github/v32/github"
+	"github.com/google/go-github/v62/github"
 	"github.com/vimcolorschemes/worker/internal/test"
 )
 
@@ -241,7 +240,7 @@ func TestAppendToFile(t *testing.T) {
 			t.Error("Incorrect result for AppendToFile, did not create file")
 		}
 
-		actualContent, err := ioutil.ReadFile(target)
+		actualContent, err := os.ReadFile(target)
 		if err != nil {
 			t.Error("Incorrect result for AppendToFile, error reading file")
 		}
@@ -270,7 +269,7 @@ func TestAppendToFile(t *testing.T) {
 			t.Errorf("Error during AppendToFile, %s", err)
 		}
 
-		actualContent, err := ioutil.ReadFile(target)
+		actualContent, err := os.ReadFile(target)
 		if err != nil {
 			t.Error("Incorrect result for AppendToFile, error reading file")
 		}
@@ -306,7 +305,7 @@ func TestAppendToFile(t *testing.T) {
 
 		expectedContent := "hello, world"
 
-		actualContent, err := ioutil.ReadFile(target)
+		actualContent, err := os.ReadFile(target)
 		if err != nil {
 			t.Error("Incorrect result for AppendToFile, error reading file")
 		}
@@ -343,7 +342,7 @@ func TestRemoveLinesInFile(t *testing.T) {
 			t.Errorf("Incorrect result for RemoveLinesInFile, got error: %s", err)
 		}
 
-		fileContent, err := ioutil.ReadFile(target)
+		fileContent, err := os.ReadFile(target)
 		if err != nil {
 			t.Error("Incorrect result for RemoveLinesInFile, error reading file")
 		}
@@ -380,7 +379,7 @@ func TestRemoveLinesInFile(t *testing.T) {
 			t.Errorf("Incorrect result for RemoveLinesInFile, got error: %s", err)
 		}
 
-		fileContent, err := ioutil.ReadFile(target)
+		fileContent, err := os.ReadFile(target)
 		if err != nil {
 			t.Error("Incorrect result for RemoveLinesInFile, error reading file")
 		}
@@ -418,7 +417,7 @@ func TestRemoveLinesInFile(t *testing.T) {
 			t.Errorf("Incorrect result for RemoveLinesInFile, got error: %s", err)
 		}
 
-		fileContent, err := ioutil.ReadFile(target)
+		fileContent, err := os.ReadFile(target)
 		if err != nil {
 			t.Error("Incorrect result for RemoveLinesInFile, error reading file")
 		}
