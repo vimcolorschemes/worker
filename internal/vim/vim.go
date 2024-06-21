@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	gogithub "github.com/google/go-github/v32/github"
+	gogithub "github.com/google/go-github/v62/github"
 	"github.com/vimcolorschemes/worker/internal/file"
 	"github.com/vimcolorschemes/worker/internal/github"
 	"github.com/vimcolorschemes/worker/internal/repository"

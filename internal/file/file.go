@@ -2,14 +2,14 @@ package file
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"regexp"
 	"strings"
 
-	"github.com/google/go-github/v32/github"
+	"github.com/google/go-github/v62/github"
 )
 
 // GetFileURLsWithExtensions returns all URLs with a certain extension given a URL list
@@ -43,7 +43,7 @@ func GetRemoteFileContent(fileURL string) (string, error) {
 		return "", fmt.Errorf("status code: %d", response.StatusCode)
 	}
 
-	bodyBytes, err := ioutil.ReadAll(response.Body)
+	bodyBytes, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", err
 	}
@@ -53,7 +53,7 @@ func GetRemoteFileContent(fileURL string) (string, error) {
 
 // GetLocalFileContent returns the file content of a local file at a path
 func GetLocalFileContent(path string) (string, error) {
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
@@ -100,7 +100,7 @@ func RemoveLinesInFile(expression string, path string) error {
 
 	newFileContent := strings.Join(newLines, "\n")
 
-	err = ioutil.WriteFile(path, []byte(newFileContent), 0600)
+	err = os.WriteFile(path, []byte(newFileContent), 0600)
 	if err != nil {
 		return err
 	}
