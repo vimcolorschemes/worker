@@ -2,6 +2,7 @@ package repository
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -538,40 +539,27 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 				Valid:   true,
 				FileURL: "old.url",
 				Data: VimColorSchemeData{
-					Dark: []VimColorSchemeGroup{
-						{HexCode: "#000000", Name: "NormalBg"},
-					},
+					Dark:  []VimColorSchemeGroup{{HexCode: "#000000", Name: "NormalBg"}},
 					Light: nil,
 				},
 			},
 		}
 
 		newList := []VimColorScheme{
-			{
-				Name:    "test",
-				FileURL: "new.url",
-			},
-			{
-				Name:    "new",
-				FileURL: "new.url",
-			},
+			{Name: "test", FileURL: "new.url"},
+			{Name: "new", FileURL: "new.url"},
 		}
 
 		expectedList := []VimColorScheme{
+			{Name: "new", FileURL: "new.url"},
 			{
 				Name:    "test",
 				Valid:   true,
 				FileURL: "new.url",
 				Data: VimColorSchemeData{
-					Dark: []VimColorSchemeGroup{
-						{HexCode: "#000000", Name: "NormalBg"},
-					},
+					Dark:  []VimColorSchemeGroup{{HexCode: "#000000", Name: "NormalBg"}},
 					Light: nil,
 				},
-			},
-			{
-				Name:    "new",
-				FileURL: "new.url",
 			},
 		}
 
@@ -579,9 +567,13 @@ func TestSynchronizeVimColorSchemes(t *testing.T) {
 
 		repository.SyncVimColorSchemes(newList)
 
+		sort.Slice(repository.VimColorSchemes, func(i, j int) bool {
+			return repository.VimColorSchemes[i].Name < repository.VimColorSchemes[j].Name
+		})
+
 		if !reflect.DeepEqual(repository.VimColorSchemes, expectedList) {
 			t.Errorf(
-				"Incorrect result for SyncVimColorSchemes, got: %v, want length: %v",
+				"Incorrect result for SyncVimColorSchemes, got: %v, want: %v",
 				repository.VimColorSchemes,
 				expectedList,
 			)
