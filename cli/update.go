@@ -6,10 +6,8 @@ import (
 	"time"
 
 	"github.com/vimcolorschemes/worker/internal/database"
-	"github.com/vimcolorschemes/worker/internal/file"
 	"github.com/vimcolorschemes/worker/internal/github"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
-	"github.com/vimcolorschemes/worker/internal/vim"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -52,13 +50,6 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 		return repository
 	}
 
-	license := githubRepository.License
-	if license != nil {
-		repository.License = *license.SPDXID
-	} else {
-		repository.License = ""
-	}
-
 	log.Print("Gathering basic infos")
 	repository.StargazersCount = *githubRepository.StargazersCount
 
@@ -76,22 +67,6 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 		return repository
 	}
 
-	log.Print("Getting vim color scheme names")
-	files := github.GetRepositoryFiles(githubRepository)
-	log.Print(len(files), " files found")
-	vimFiles := file.GetFilesWithExtensions(files, []string{"erb", "vim", "lua"})
-	log.Print(len(vimFiles), " vim/lua files found")
-	if len(vimFiles) > 0 {
-		log.Print("Checking for vim color scheme names")
-		vimColorSchemes, err := vim.GetVimColorSchemes(githubRepository, vimFiles)
-		if err != nil {
-			log.Print("Did not find any vim color schemes")
-		}
-		repository.SyncVimColorSchemes(vimColorSchemes)
-	}
-
-	repository.AssignRepositoryType()
-
 	log.Print("Checking if ", repository.Owner.Name, "/", repository.Name, " is valid")
 	repository.UpdateValid = repository.IsValidAfterUpdate()
 	log.Printf("Update valid: %v", repository.UpdateValid)
@@ -101,14 +76,10 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 
 func getUpdateRepositoryObject(repository repoHelper.Repository) bson.M {
 	return bson.M{
-		"license":                repository.License,
 		"lastCommitAt":           repository.LastCommitAt,
 		"stargazersCount":        repository.StargazersCount,
 		"stargazersCountHistory": repository.StargazersCountHistory,
 		"weekStargazersCount":    repository.WeekStargazersCount,
-		"vimColorSchemes":        repository.VimColorSchemes,
-		"isLua":                  repository.IsLua,
-		"isVim":                  repository.IsVim,
 		"updateValid":            repository.UpdateValid,
 		"updatedAt":              time.Now(),
 	}

@@ -16,17 +16,13 @@ type Repository struct {
 	Owner                  Owner                        `bson:"owner"`
 	Name                   string                       `bson:"name"`
 	GitHubURL              string                       `bson:"githubURL"`
-	HomepageURL            string                       `bson:"homepageURL"`
 	StargazersCount        int                          `bson:"stargazersCount"`
 	StargazersCountHistory []StargazersCountHistoryItem `bson:"stargazersCountHistory"`
 	WeekStargazersCount    int                          `bson:"weekStargazersCount"`
-	License                string                       `bson:"license"`
 	Size                   int                          `bson:"size"`
 	GitHubCreatedAt        time.Time                    `bson:"githubCreatedAt"`
 	LastCommitAt           time.Time                    `bson:"lastCommitAt"`
 	VimColorSchemes        []VimColorScheme             `bson:"vimColorSchemes,omitempty"`
-	IsVim                  bool                         `bson:"isVim"`
-	IsLua                  bool                         `bson:"isLua"`
 	UpdateValid            bool                         `bson:"updateValid"`
 	UpdatedAt              time.Time                    `bson:"updatedAt"`
 	GenerateValid          bool                         `bson:"generateValid"`
@@ -47,13 +43,9 @@ type StargazersCountHistoryItem struct {
 
 // VimColorScheme represents a vim color scheme's meta data
 type VimColorScheme struct {
-	FileURL      string             `bson:"fileURL"`
-	Name         string             `bson:"name"`
-	Data         VimColorSchemeData `bson:"data"`
-	Valid        bool               `bson:"valid"`
-	Backgrounds  []string           `bson:"backgrounds"`
-	IsLua        bool               `bson:"isLua"`
-	LastCommitAt time.Time          `bson:"lastCommitAt"`
+	Name        string               `bson:"name"`
+	Data        VimColorSchemeData   `bson:"data"`
+	Backgrounds []VimBackgroundValue `bson:"backgrounds"`
 }
 
 // VimColorSchemeData represents the color values for light and dark backgrounds
@@ -101,7 +93,7 @@ func (repository Repository) AppendToStargazersCountHistory() []StargazersCountH
 		history = []StargazersCountHistoryItem{
 			{
 				Date:            repository.GitHubCreatedAt,
-				StargazersCount: 0,
+				StargazersCount: repository.StargazersCount,
 			},
 		}
 	} // sort: newest first
@@ -142,7 +134,7 @@ func (repository Repository) AppendToStargazersCountHistory() []StargazersCountH
 
 // ComputeTrendingStargazersCount adds up the stargazers counts from the last days
 func (repository Repository) ComputeTrendingStargazersCount(dayCount int) int {
-	if repository.StargazersCountHistory == nil || len(repository.StargazersCountHistory) == 0 {
+	if len(repository.StargazersCountHistory) == 0 {
 		return 0
 	}
 
@@ -181,11 +173,6 @@ func (repository Repository) IsValidAfterUpdate() bool {
 		return false
 	}
 
-	if len(repository.VimColorSchemes) < 1 {
-		log.Print("Repository does not have vim color schemes")
-		return false
-	}
-
 	return true
 }
 
@@ -196,85 +183,10 @@ func (repository Repository) IsValidAfterGenerate() bool {
 		return false
 	}
 
-	var hasValidVimColorScheme = false
-	for _, vimColorScheme := range repository.VimColorSchemes {
-		if vimColorScheme.Valid {
-			hasValidVimColorScheme = true
-		}
-	}
-
-	if !hasValidVimColorScheme {
-		log.Print("Repository does not have a valid vim color scheme")
+	if len(repository.VimColorSchemes) == 0 {
+		log.Print("Repository does not have a valid colorscheme")
 		return false
 	}
 
 	return true
-}
-
-// SyncVimColorSchemes replaces the vim color scheme list of a repository with
-// a new one while keeping as much data from the old list as possible
-func (repository *Repository) SyncVimColorSchemes(vimColorSchemes []VimColorScheme) {
-	var newList []VimColorScheme
-
-	for _, vimColorScheme := range uniquifyVimColorSchemes(vimColorSchemes) {
-		match, exists := repository.getMatchingVimColorScheme(vimColorScheme.Name)
-		if !exists {
-			newList = append(newList, vimColorScheme)
-		} else {
-			match.FileURL = vimColorScheme.FileURL
-			match.IsLua = vimColorScheme.IsLua
-			match.LastCommitAt = vimColorScheme.LastCommitAt
-			newList = append(newList, match)
-		}
-	}
-
-	repository.VimColorSchemes = newList
-}
-
-// AssignRepositoryType defines is a repository is vim, lua, or both
-func (repository *Repository) AssignRepositoryType() {
-	for _, vimColorScheme := range repository.VimColorSchemes {
-		if repository.IsLua && repository.IsVim {
-			break
-		}
-
-		if vimColorScheme.IsLua {
-			repository.IsLua = true
-		} else {
-			repository.IsVim = true
-		}
-	}
-}
-
-func uniquifyVimColorSchemes(vimColorSchemes []VimColorScheme) []VimColorScheme {
-	groups := make(map[string][]VimColorScheme)
-
-	for _, vimColorScheme := range vimColorSchemes {
-		groups[vimColorScheme.Name] = append(groups[vimColorScheme.Name], vimColorScheme)
-	}
-
-	var uniqueList []VimColorScheme
-
-	for _, group := range groups {
-		chosen := group[0]
-
-		for _, vimColorScheme := range group {
-			if vimColorScheme.LastCommitAt.After(chosen.LastCommitAt) {
-				chosen = vimColorScheme
-			}
-		}
-
-		uniqueList = append(uniqueList, chosen)
-	}
-
-	return uniqueList
-}
-
-func (repository Repository) getMatchingVimColorScheme(name string) (VimColorScheme, bool) {
-	for _, vimColorScheme := range repository.VimColorSchemes {
-		if vimColorScheme.Name == name {
-			return vimColorScheme, true
-		}
-	}
-	return VimColorScheme{}, false
 }

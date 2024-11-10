@@ -2,14 +2,15 @@ FROM golang:1
 
 WORKDIR /app
 
+# Install git
 RUN apt-get update
-RUN apt-get install -y \
-  vim \
-  git
+RUN apt-get install -y git
 
-RUN mkdir /neovim
-RUN wget -q "https://github.com/neovim/neovim/releases/download/v0.7.2/nvim-linux64.deb" -O /neovim/nvim-linux64.deb
-RUN apt install /neovim/nvim-linux64.deb
+# Install nvim
+RUN curl -LO https://github.com/neovim/neovim/releases/download/v0.10.4/nvim-linux-x86_64.tar.gz
+RUN tar -C /opt -xzf nvim-linux-x86_64.tar.gz
+ENV PATH="/opt/nvim-linux-x86_64/bin:$PATH"
+RUN nvim --version
 
 ENV TERM xterm-256color
 
