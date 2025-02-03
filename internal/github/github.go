@@ -13,7 +13,7 @@ import (
 	"github.com/vimcolorschemes/worker/internal/dotenv"
 	"github.com/vimcolorschemes/worker/internal/repository"
 
-	gogithub "github.com/google/go-github/v62/github"
+	gogithub "github.com/google/go-github/v68/github"
 	"golang.org/x/oauth2"
 )
 
