@@ -68,6 +68,7 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 		}
 
 		var data, dataError = getVimColorSchemeColorData()
+		deletePlugin(key)
 		if dataError != nil {
 			log.Print(dataError)
 			continue
@@ -99,15 +100,9 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 
 		repository.VimColorSchemes = vimColorSchemes
 		repository.GenerateValid = len(repository.VimColorSchemes) > 0
+		log.Printf("Generate valid: %v", repository.GenerateValid)
 		generateObject := getGenerateRepositoryObject(repository)
 		database.UpsertRepository(repository.ID, generateObject)
-
-		err = deletePlugin(key)
-		if err != nil {
-			log.Print(err)
-			continue
-		}
-
 	}
 
 	cleanUp()

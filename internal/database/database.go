@@ -50,7 +50,12 @@ func init() {
 		panic(err)
 	}
 
-	database := client.Database("vimcolorschemes")
+	databaseName, databaseNameExists := dotenv.Get("MONGODB_DATABASE")
+	if !databaseNameExists {
+		databaseName = "vimcolorschemes"
+	}
+
+	database := client.Database(databaseName)
 	repositoriesCollection = database.Collection("repositories")
 	reportsCollection = database.Collection("reports")
 }
