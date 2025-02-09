@@ -63,14 +63,21 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 		key := fmt.Sprintf("%s__%s", repository.Owner.Name, repository.Name)
 		err := installPlugin(repository.GitHubURL, key)
 		if err != nil {
-			log.Print(err)
+			log.Printf("Error installing plugin: %s", err)
+			repository.GenerateValid = false
+			updateRepositoryAfterGenerate(repository)
 			continue
 		}
 
 		var data, dataError = getVimColorSchemeColorData()
-		deletePlugin(key)
+		err = deletePlugin(key)
+		if err != nil {
+			log.Printf("Error deleting plugin: %s", err)
+		}
 		if dataError != nil {
-			log.Print(dataError)
+			log.Printf("Error getting color data: %s", dataError)
+			repository.GenerateValid = false
+			updateRepositoryAfterGenerate(repository)
 			continue
 		}
 
@@ -100,14 +107,18 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 
 		repository.VimColorSchemes = vimColorSchemes
 		repository.GenerateValid = len(repository.VimColorSchemes) > 0
-		log.Printf("Generate valid: %v", repository.GenerateValid)
-		generateObject := getGenerateRepositoryObject(repository)
-		database.UpsertRepository(repository.ID, generateObject)
+		updateRepositoryAfterGenerate(repository)
 	}
 
 	cleanUp()
 
 	return bson.M{"repositoryCount": generateCount}
+}
+
+func updateRepositoryAfterGenerate(repository repoHelper.Repository) {
+	log.Printf("Generate valid: %v", repository.GenerateValid)
+	generateObject := getGenerateRepositoryObject(repository)
+	database.UpsertRepository(repository.ID, generateObject)
 }
 
 // Initializes a temporary directory for vim configuration files
@@ -194,7 +205,7 @@ func setupVim() {
 func removeDefaultColorschemes() error {
 	tmpRuntimeFilePath := fmt.Sprintf("%s/runtime", tmpDirectoryPath)
 
-	args := []string{"-es", "-c", fmt.Sprintf("redir! > %s", tmpRuntimeFilePath), "-c", "echo $VIMRUNTIME", "-c", "redir END", "-c", "quit"}
+	args := []string{"-es", "--headless", "-c", fmt.Sprintf("redir! > %s", tmpRuntimeFilePath), "-c", "echo $VIMRUNTIME", "-c", "redir END", "-c", "quit"}
 	cmd := exec.Command("nvim", args...)
 
 	log.Printf("Running %s", cmd)
@@ -261,13 +272,13 @@ func deletePlugin(key string) error {
 func getVimColorSchemeColorData() (map[string]repoHelper.VimColorSchemeData, error) {
 	err := executePreviewGenerator()
 	if err != nil {
-		log.Print("Error executing nvim")
+		log.Printf("Error executing nvim: %s", err)
 		return nil, err
 	}
 
 	vimColorSchemeOutput, err := file.GetLocalFileContent(colorDataFilePath)
 	if err != nil {
-		log.Printf("Error getting local file content from \"%s\"- %s", colorDataFilePath, err)
+		log.Printf("Error getting local file content from \"%s\": %s", colorDataFilePath, err)
 		return nil, err
 	}
 
@@ -292,7 +303,7 @@ func executePreviewGenerator() error {
 	args := []string{"-u", vimrcPath}
 
 	if !debugMode {
-		args = append(args, "-c", ":qa!")
+		args = append(args, "--headless", "-c", ":qa!")
 	}
 
 	args = append(args, "./vim/code_sample.vim")

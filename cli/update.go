@@ -13,7 +13,7 @@ import (
 )
 
 // Update the imported repositories with all kinds of useful information
-func Update(force bool, _debug bool, repoKey string) bson.M {
+func Update(_force bool, _debug bool, repoKey string) bson.M {
 	var repositories []repoHelper.Repository
 	if repoKey != "" {
 		repository, err := database.GetRepository(repoKey)
@@ -32,7 +32,7 @@ func Update(force bool, _debug bool, repoKey string) bson.M {
 
 		log.Print("Updating ", repository.Owner.Name, "/", repository.Name)
 
-		updatedRepository := updateRepository(repository, force)
+		updatedRepository := updateRepository(repository)
 
 		updateObject := getUpdateRepositoryObject(updatedRepository)
 
@@ -42,7 +42,7 @@ func Update(force bool, _debug bool, repoKey string) bson.M {
 	return bson.M{"repositoryCount": len(repositories)}
 }
 
-func updateRepository(repository repoHelper.Repository, force bool) repoHelper.Repository {
+func updateRepository(repository repoHelper.Repository) repoHelper.Repository {
 	githubRepository, err := github.GetRepository(repository.Owner.Name, repository.Name)
 	if err != nil {
 		log.Print("Error fetching ", repository.Owner.Name, "/", repository.Name)
@@ -55,11 +55,6 @@ func updateRepository(repository repoHelper.Repository, force bool) repoHelper.R
 
 	log.Print("Fetching date of last commit")
 	repository.LastCommitAt = github.GetLastCommitAt(githubRepository)
-
-	if !force && repository.UpdatedAt.After(repository.LastCommitAt) {
-		log.Print("Repository is not due for a full update")
-		return repository
-	}
 
 	log.Print("Building stargazers count history")
 	repository.StargazersCountHistory = repository.AppendToStargazersCountHistory()
