@@ -53,7 +53,7 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 
 		log.Print("Generating vim previews for ", repository.Owner.Name, "/", repository.Name)
 
-		if !force && repository.GeneratedAt.After(repository.LastCommitAt) {
+		if !force && repository.GeneratedAt.After(repository.GithubUpdatedAt) {
 			log.Print("Repository is not due for a generate")
 			continue
 		}
@@ -61,7 +61,7 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 		generateCount++
 
 		key := fmt.Sprintf("%s__%s", repository.Owner.Name, repository.Name)
-		err := installPlugin(repository.GitHubURL, key)
+		err := installPlugin(repository.GithubURL, key)
 		if err != nil {
 			log.Printf("Error installing plugin: %s", err)
 			repository.GenerateValid = false
@@ -245,7 +245,7 @@ func removeDefaultColorschemes() error {
 	return nil
 }
 
-// Installs a plugin/color scheme on the vim configuration from a GitHub URL
+// Installs a plugin/color scheme on the vim configuration from a Github URL
 func installPlugin(gitRepositoryURL string, path string) error {
 	log.Printf("Installing %s", path)
 

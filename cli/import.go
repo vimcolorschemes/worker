@@ -40,7 +40,7 @@ func init() {
 	repositoryCountLimitPerPage = int(math.Min(float64(repositoryCountLimit), 100))
 }
 
-// Import potential vim color scheme repositories from GitHub
+// Import potential vim color scheme repositories from Github
 func Import(_force bool, _debug bool, repoKey string) bson.M {
 	log.Printf("Repository limit: %d", repositoryCountLimit)
 
