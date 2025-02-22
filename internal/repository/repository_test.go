@@ -53,7 +53,7 @@ func TestUniquifyRepositories(t *testing.T) {
 func TestAppendToStargazersCountHistory(t *testing.T) {
 	t.Run("should initialize history when it's empty", func(t *testing.T) {
 		repository := Repository{
-			GitHubCreatedAt: time.Date(1990, time.November, 1, 0, 0, 0, 0, time.UTC),
+			GithubCreatedAt: time.Date(1990, time.November, 1, 0, 0, 0, 0, time.UTC),
 			StargazersCount: 100,
 		}
 		history := repository.AppendToStargazersCountHistory()
@@ -61,7 +61,7 @@ func TestAppendToStargazersCountHistory(t *testing.T) {
 
 		expected := []StargazersCountHistoryItem{
 			{Date: today, StargazersCount: 100},
-			{Date: repository.GitHubCreatedAt, StargazersCount: 100},
+			{Date: repository.GithubCreatedAt, StargazersCount: 100},
 		}
 
 		if !reflect.DeepEqual(history, expected) {
@@ -316,7 +316,7 @@ func TestComputeTrendingStargazersCount(t *testing.T) {
 func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 	t.Run("should return valid for a repository that checks all boxes", func(t *testing.T) {
 		var repository Repository
-		repository.LastCommitAt = time.Now()
+		repository.GithubUpdatedAt = time.Now()
 		repository.StargazersCount = 1
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
 
@@ -340,7 +340,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 
 	t.Run("should return invalid for a repository with a non strictly positive stargazers count", func(t *testing.T) {
 		var repository Repository
-		repository.LastCommitAt = time.Now()
+		repository.GithubUpdatedAt = time.Now()
 		repository.StargazersCount = 0
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test"}}
@@ -353,7 +353,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 
 	t.Run("should return invalid for a repository with an empty stargazers count history", func(t *testing.T) {
 		var repository Repository
-		repository.LastCommitAt = time.Now()
+		repository.GithubUpdatedAt = time.Now()
 		repository.StargazersCount = 1
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{}
 		repository.VimColorSchemes = []VimColorScheme{{Name: "test"}}
@@ -366,7 +366,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 
 	t.Run("should return invalid for a repository with an outdated stargazers count history", func(t *testing.T) {
 		var repository Repository
-		repository.LastCommitAt = time.Now()
+		repository.GithubUpdatedAt = time.Now()
 		repository.StargazersCount = 1
 		date := time.Date(1990, time.November, 01, 0, 0, 0, 0, time.UTC)
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date, StargazersCount: 1}}

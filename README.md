@@ -24,9 +24,9 @@ Update the values in `.env` to your needs.
 
 The `.env` is automatically picked up by CLI when it runs.
 
-#### GitHub queries
+#### Github queries
 
-Since GitHub's API has a quite short rate limit for unauthenticated calls (60 for core API calls).
+Since Github's API has a quite short rate limit for unauthenticated calls (60 for core API calls).
 I highly recommend setting up authentication (5000 calls for core API calls) to avoid wait times when you reach the limit.
 
 To do that, you first need to create your personal access token with permissions to read public repositories. Follow instructions on how to do that [here](https://help.github.com/en/github/authenticating-to-github/creating-a-personal-access-token-for-the-command-line).

@@ -15,13 +15,13 @@ type Repository struct {
 	ID                     int64                        `bson:"_id,omitempty"`
 	Owner                  Owner                        `bson:"owner"`
 	Name                   string                       `bson:"name"`
-	GitHubURL              string                       `bson:"githubURL"`
+	GithubURL              string                       `bson:"githubURL"`
 	StargazersCount        int                          `bson:"stargazersCount"`
 	StargazersCountHistory []StargazersCountHistoryItem `bson:"stargazersCountHistory"`
 	WeekStargazersCount    int                          `bson:"weekStargazersCount"`
 	Size                   int                          `bson:"size"`
-	GitHubCreatedAt        time.Time                    `bson:"githubCreatedAt"`
-	LastCommitAt           time.Time                    `bson:"lastCommitAt"`
+	GithubCreatedAt        time.Time                    `bson:"githubCreatedAt"`
+	GithubUpdatedAt        time.Time                    `bson:"githubUpdatedAt"`
 	VimColorSchemes        []VimColorScheme             `bson:"vimColorSchemes,omitempty"`
 	UpdateValid            bool                         `bson:"updateValid"`
 	UpdatedAt              time.Time                    `bson:"updatedAt"`
@@ -92,7 +92,7 @@ func (repository Repository) AppendToStargazersCountHistory() []StargazersCountH
 	if history == nil {
 		history = []StargazersCountHistoryItem{
 			{
-				Date:            repository.GitHubCreatedAt,
+				Date:            repository.GithubCreatedAt,
 				StargazersCount: repository.StargazersCount,
 			},
 		}
@@ -153,7 +153,7 @@ func (repository Repository) ComputeTrendingStargazersCount(dayCount int) int {
 // valid from our standards after an update job
 func (repository Repository) IsValidAfterUpdate() bool {
 	var defaultTime time.Time
-	if repository.LastCommitAt == defaultTime {
+	if repository.GithubUpdatedAt == defaultTime {
 		log.Print("Repository last commit at is not valid")
 		return false
 	}

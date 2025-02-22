@@ -27,10 +27,10 @@ func Update(_force bool, _debug bool, repoKey string) bson.M {
 
 	log.Print(len(repositories), " repositories to update")
 
-	for _, repository := range repositories {
+	for index, repository := range repositories {
 		fmt.Println()
 
-		log.Print("Updating ", repository.Owner.Name, "/", repository.Name)
+		log.Print("Updating ", index, " of ", len(repositories), ": ", repository.Owner.Name, "/", repository.Name)
 
 		updatedRepository := updateRepository(repository)
 
@@ -50,11 +50,10 @@ func updateRepository(repository repoHelper.Repository) repoHelper.Repository {
 		return repository
 	}
 
+	repository.GithubUpdatedAt = githubRepository.UpdatedAt.Time
+
 	log.Print("Gathering basic infos")
 	repository.StargazersCount = *githubRepository.StargazersCount
-
-	log.Print("Fetching date of last commit")
-	repository.LastCommitAt = github.GetLastCommitAt(githubRepository)
 
 	log.Print("Building stargazers count history")
 	repository.StargazersCountHistory = repository.AppendToStargazersCountHistory()
@@ -71,7 +70,7 @@ func updateRepository(repository repoHelper.Repository) repoHelper.Repository {
 
 func getUpdateRepositoryObject(repository repoHelper.Repository) bson.M {
 	return bson.M{
-		"lastCommitAt":           repository.LastCommitAt,
+		"githubUpdatedAt":        repository.GithubUpdatedAt,
 		"stargazersCount":        repository.StargazersCount,
 		"stargazersCountHistory": repository.StargazersCountHistory,
 		"weekStargazersCount":    repository.WeekStargazersCount,
