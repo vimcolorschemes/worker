@@ -11,7 +11,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 
-	gogithub "github.com/google/go-github/v62/github"
+	gogithub "github.com/google/go-github/v68/github"
 )
 
 var repositoryCountLimit int
@@ -78,7 +78,6 @@ func getImportRepositoryObject(repository *gogithub.Repository) bson.M {
 		"description":     repository.GetDescription(),
 		"githubURL":       repository.GetHTMLURL(),
 		"githubCreatedAt": repository.GetCreatedAt().Time,
-		"homepageURL":     repository.GetHomepage(),
 		"size":            repository.GetSize(),
 	}
 }

@@ -13,13 +13,11 @@ import (
 	"github.com/vimcolorschemes/worker/internal/dotenv"
 	"github.com/vimcolorschemes/worker/internal/repository"
 
-	gogithub "github.com/google/go-github/v62/github"
+	gogithub "github.com/google/go-github/v68/github"
 	"golang.org/x/oauth2"
 )
 
 var client *gogithub.Client
-
-const fileQueryLimit = 500
 
 const searchResultCountHardLimit = 1000
 
@@ -87,101 +85,6 @@ func GetLastCommitAt(repository *gogithub.Repository) time.Time {
 	}
 
 	return commits[0].Commit.Author.Date.Time
-}
-
-func GetFileLastCommitAt(repository *gogithub.Repository, file *gogithub.RepositoryContent) time.Time {
-	if strings.HasSuffix(os.Args[0], ".test") {
-		return time.Time{}
-	}
-
-	ownerName := *repository.Owner.Login
-	name := *repository.Name
-	defaultBranch := *repository.DefaultBranch
-
-	filePath := file.GetPath()
-	if filePath == "" {
-		return time.Time{}
-	}
-
-	options := &gogithub.CommitsListOptions{SHA: defaultBranch, Path: filePath}
-
-	commits, response, err := client.Repositories.ListCommits(context.Background(), ownerName, name, options)
-	if _, ok := err.(*gogithub.RateLimitError); ok {
-		log.Print("Hit rate limit reached")
-		waitForRateLimitReset(response.Rate.Reset)
-		return GetFileLastCommitAt(repository, file)
-	} else if err != nil {
-		log.Printf("Error getting last commit of %s/%s (%s): %s", ownerName, name, filePath, err)
-		return time.Time{}
-	} else if len(commits) == 0 {
-		log.Printf("Error getting last commit of %s/%s (%s): no commits founds", ownerName, name, filePath)
-		return time.Time{}
-	}
-
-	return commits[0].Commit.Author.Date.Time
-}
-
-// GetRepositoryFileURLs returns all file URLs in a repository
-func GetRepositoryFiles(repository *gogithub.Repository) []*gogithub.RepositoryContent {
-	if strings.HasSuffix(os.Args[0], ".test") {
-		return []*gogithub.RepositoryContent{}
-	}
-
-	ownerName := *repository.Owner.Login
-	name := *repository.Name
-	basePath := ""
-
-	files, err := getRepositoryFilesAtPath(ownerName, name, basePath)
-	if err != nil {
-		log.Print(err)
-		return []*gogithub.RepositoryContent{}
-	}
-
-	return files
-}
-
-func getRepositoryFilesAtPath(ownerName string, name string, path string) ([]*gogithub.RepositoryContent, error) {
-	if strings.HasSuffix(os.Args[0], ".test") {
-		return []*gogithub.RepositoryContent{}, errors.New("Running in test mode")
-	}
-
-	options := &gogithub.RepositoryContentGetOptions{}
-	_, contents, response, err := client.Repositories.GetContents(context.Background(), ownerName, name, path, options)
-	if _, ok := err.(*gogithub.RateLimitError); ok {
-		log.Print("Hit rate limit reached")
-		waitForRateLimitReset(response.Rate.Reset)
-		return getRepositoryFilesAtPath(ownerName, name, path)
-	} else if err != nil {
-		log.Print(err)
-		return []*gogithub.RepositoryContent{}, err
-	}
-
-	files := []*gogithub.RepositoryContent{}
-
-	for _, content := range contents {
-		if len(files) > fileQueryLimit {
-			// limit reached
-			return []*gogithub.RepositoryContent{}, errors.New("File limit reached")
-		}
-
-		switch content.GetType() {
-		case "file":
-			if content.GetDownloadURL() != "" {
-				// the file might be a symbolic link if it does not have a download URL
-				files = append(files, content)
-			}
-		case "dir":
-			newFiles, err := getRepositoryFilesAtPath(ownerName, name, content.GetPath())
-			if err != nil {
-				return []*gogithub.RepositoryContent{}, err
-			}
-			files = append(files, newFiles...)
-		default:
-			break
-		}
-	}
-
-	return files, nil
 }
 
 // SearchRepositories returns all repositories from GitHub API matching some queries

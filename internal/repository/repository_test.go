@@ -2,11 +2,10 @@ package repository
 
 import (
 	"reflect"
-	"sort"
 	"testing"
 	"time"
 
-	gogithub "github.com/google/go-github/v62/github"
+	gogithub "github.com/google/go-github/v68/github"
 	dateUtil "github.com/vimcolorschemes/worker/internal/date"
 )
 
@@ -62,7 +61,7 @@ func TestAppendToStargazersCountHistory(t *testing.T) {
 
 		expected := []StargazersCountHistoryItem{
 			{Date: today, StargazersCount: 100},
-			{Date: repository.GitHubCreatedAt, StargazersCount: 0},
+			{Date: repository.GitHubCreatedAt, StargazersCount: 100},
 		}
 
 		if !reflect.DeepEqual(history, expected) {
@@ -320,7 +319,6 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 		repository.LastCommitAt = time.Now()
 		repository.StargazersCount = 1
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
-		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
 
 		isValid := repository.IsValidAfterUpdate()
 		if !isValid {
@@ -332,7 +330,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 		var repository Repository
 		repository.StargazersCount = 1
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
-		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
+		repository.VimColorSchemes = []VimColorScheme{{Name: "test"}}
 
 		isValid := repository.IsValidAfterUpdate()
 		if isValid {
@@ -345,7 +343,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 		repository.LastCommitAt = time.Now()
 		repository.StargazersCount = 0
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
-		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
+		repository.VimColorSchemes = []VimColorScheme{{Name: "test"}}
 
 		isValid := repository.IsValidAfterUpdate()
 		if isValid {
@@ -358,7 +356,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 		repository.LastCommitAt = time.Now()
 		repository.StargazersCount = 1
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{}
-		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
+		repository.VimColorSchemes = []VimColorScheme{{Name: "test"}}
 
 		isValid := repository.IsValidAfterUpdate()
 		if isValid {
@@ -372,20 +370,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 		repository.StargazersCount = 1
 		date := time.Date(1990, time.November, 01, 0, 0, 0, 0, time.UTC)
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date, StargazersCount: 1}}
-		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org"}}
-
-		isValid := repository.IsValidAfterUpdate()
-		if isValid {
-			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, false)
-		}
-	})
-
-	t.Run("should return invalid for a repository with an empty vim color scheme name list", func(t *testing.T) {
-		var repository Repository
-		repository.LastCommitAt = time.Now()
-		repository.StargazersCount = 1
-		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
-		repository.VimColorSchemes = []VimColorScheme{}
+		repository.VimColorSchemes = []VimColorScheme{{Name: "test"}}
 
 		isValid := repository.IsValidAfterUpdate()
 		if isValid {
@@ -397,7 +382,7 @@ func TestComputeRepositoryValidityAfterUpdate(t *testing.T) {
 func TestComputeRepositoryValidityAfterGenerate(t *testing.T) {
 	t.Run("should return valid for a repository that checks all boxes", func(t *testing.T) {
 		var repository Repository
-		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org", Valid: true}}
+		repository.VimColorSchemes = []VimColorScheme{{Name: "test"}}
 		repository.UpdateValid = true
 
 		isValid := repository.IsValidAfterGenerate()
@@ -410,7 +395,7 @@ func TestComputeRepositoryValidityAfterGenerate(t *testing.T) {
 		var repository Repository
 		repository.StargazersCount = 1
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
-		repository.VimColorSchemes = []VimColorScheme{{Name: "test", FileURL: "http://vim.org", Valid: false}}
+		repository.VimColorSchemes = []VimColorScheme{{Name: "test"}}
 
 		isValid := repository.IsValidAfterGenerate()
 		if isValid {
@@ -427,391 +412,6 @@ func TestComputeRepositoryValidityAfterGenerate(t *testing.T) {
 		isValid := repository.IsValidAfterGenerate()
 		if isValid {
 			t.Errorf("Incorrect result for IsRepositoryValidAfterGenerate, got: %v, want: %v", isValid, false)
-		}
-	})
-}
-
-func TestSynchronizeVimColorSchemes(t *testing.T) {
-	t.Run("should erase the original list given an empty list", func(t *testing.T) {
-		originalList := []VimColorScheme{{Name: "test"}}
-		newList := []VimColorScheme{}
-
-		repository := Repository{VimColorSchemes: originalList}
-
-		repository.SyncVimColorSchemes(newList)
-
-		if len(repository.VimColorSchemes) != 0 {
-			t.Errorf(
-				"Incorrect result for SyncVimColorSchemes, got length: %d, want length: %d",
-				len(repository.VimColorSchemes),
-				0,
-			)
-		}
-	})
-
-	t.Run("should replace the whole list given a list with different vim color scheme names", func(t *testing.T) {
-		originalList := []VimColorScheme{
-			{
-				Name:    "test",
-				Valid:   true,
-				FileURL: "test.url",
-				Data: VimColorSchemeData{
-					Dark: []VimColorSchemeGroup{
-						{HexCode: "#000000", Name: "NormalBg"},
-					},
-					Light: nil,
-				},
-			},
-		}
-
-		newList := []VimColorScheme{
-			{
-				Name: "test_2",
-			},
-		}
-
-		repository := Repository{VimColorSchemes: originalList}
-
-		repository.SyncVimColorSchemes(newList)
-
-		if !reflect.DeepEqual(repository.VimColorSchemes, newList) {
-			t.Errorf(
-				"Incorrect result for SyncVimColorSchemes, got: %v, want length: %v",
-				repository.VimColorSchemes,
-				newList,
-			)
-		}
-	})
-
-	t.Run("should update the corresponding list items", func(t *testing.T) {
-		originalList := []VimColorScheme{
-			{
-				Name:    "test",
-				Valid:   true,
-				FileURL: "old.url",
-				Data: VimColorSchemeData{
-					Dark: []VimColorSchemeGroup{
-						{HexCode: "#000000", Name: "NormalBg"},
-					},
-					Light: nil,
-				},
-			},
-		}
-
-		newList := []VimColorScheme{
-			{
-				Name:    "test",
-				FileURL: "new.url",
-			},
-		}
-
-		expectedList := []VimColorScheme{
-			{
-				Name:    "test",
-				Valid:   true,
-				FileURL: "new.url",
-				Data: VimColorSchemeData{
-					Dark: []VimColorSchemeGroup{
-						{HexCode: "#000000", Name: "NormalBg"},
-					},
-					Light: nil,
-				},
-			},
-		}
-
-		repository := Repository{VimColorSchemes: originalList}
-
-		repository.SyncVimColorSchemes(newList)
-
-		if !reflect.DeepEqual(repository.VimColorSchemes, expectedList) {
-			t.Errorf(
-				"Incorrect result for SyncVimColorSchemes, got: %v, want length: %v",
-				repository.VimColorSchemes,
-				expectedList,
-			)
-		}
-	})
-
-	t.Run("should update the corresponding list items and insert new ones", func(t *testing.T) {
-		originalList := []VimColorScheme{
-			{
-				Name:    "test",
-				Valid:   true,
-				FileURL: "old.url",
-				Data: VimColorSchemeData{
-					Dark:  []VimColorSchemeGroup{{HexCode: "#000000", Name: "NormalBg"}},
-					Light: nil,
-				},
-			},
-		}
-
-		newList := []VimColorScheme{
-			{Name: "test", FileURL: "new.url"},
-			{Name: "new", FileURL: "new.url"},
-		}
-
-		expectedList := []VimColorScheme{
-			{Name: "new", FileURL: "new.url"},
-			{
-				Name:    "test",
-				Valid:   true,
-				FileURL: "new.url",
-				Data: VimColorSchemeData{
-					Dark:  []VimColorSchemeGroup{{HexCode: "#000000", Name: "NormalBg"}},
-					Light: nil,
-				},
-			},
-		}
-
-		repository := Repository{VimColorSchemes: originalList}
-
-		repository.SyncVimColorSchemes(newList)
-
-		sort.Slice(repository.VimColorSchemes, func(i, j int) bool {
-			return repository.VimColorSchemes[i].Name < repository.VimColorSchemes[j].Name
-		})
-
-		if !reflect.DeepEqual(repository.VimColorSchemes, expectedList) {
-			t.Errorf(
-				"Incorrect result for SyncVimColorSchemes, got: %v, want: %v",
-				repository.VimColorSchemes,
-				expectedList,
-			)
-		}
-	})
-
-	t.Run("should update the corresponding list items and erase old ones", func(t *testing.T) {
-		originalList := []VimColorScheme{
-			{
-				Name:    "test",
-				Valid:   true,
-				FileURL: "old.url",
-				Data: VimColorSchemeData{
-					Dark: []VimColorSchemeGroup{
-						{HexCode: "#000000", Name: "NormalBg"},
-					},
-					Light: nil,
-				},
-			},
-			{
-				Name:    "old",
-				Valid:   true,
-				FileURL: "old.url",
-				Data: VimColorSchemeData{
-					Dark: []VimColorSchemeGroup{
-						{HexCode: "#000000", Name: "NormalBg"},
-					},
-					Light: nil,
-				},
-			},
-		}
-
-		newList := []VimColorScheme{
-			{
-				Name:    "test",
-				FileURL: "new.url",
-			},
-		}
-
-		expectedList := []VimColorScheme{
-			{
-				Name:    "test",
-				Valid:   true,
-				FileURL: "new.url",
-				Data: VimColorSchemeData{
-					Dark: []VimColorSchemeGroup{
-						{HexCode: "#000000", Name: "NormalBg"},
-					},
-					Light: nil,
-				},
-			},
-		}
-
-		repository := Repository{VimColorSchemes: originalList}
-
-		repository.SyncVimColorSchemes(newList)
-
-		if !reflect.DeepEqual(repository.VimColorSchemes, expectedList) {
-			t.Errorf(
-				"Incorrect result for SyncVimColorSchemes, got: %v, want length: %v",
-				repository.VimColorSchemes,
-				expectedList,
-			)
-		}
-	})
-
-	t.Run("should update the corresponding list items, insert new ones and erase old ones", func(t *testing.T) {
-		time := time.Now()
-		originalList := []VimColorScheme{
-			{
-				Name:    "test",
-				Valid:   true,
-				FileURL: "old.test.url",
-				Data: VimColorSchemeData{
-					Dark: []VimColorSchemeGroup{
-						{HexCode: "#000000", Name: "NormalBg"},
-					},
-					Light: nil,
-				},
-				IsLua:        false,
-				LastCommitAt: time,
-			},
-			{
-				Name:    "test.old",
-				Valid:   true,
-				FileURL: "old.url",
-				Data: VimColorSchemeData{
-					Dark: []VimColorSchemeGroup{
-						{HexCode: "#000000", Name: "NormalBg"},
-					},
-					Light: nil,
-				},
-				IsLua:        false,
-				LastCommitAt: time,
-			},
-		}
-
-		newList := []VimColorScheme{
-			{
-				Name:         "test",
-				FileURL:      "new.test.url",
-				IsLua:        false,
-				LastCommitAt: time,
-			},
-			{
-				Name:         "test.new",
-				FileURL:      "new.url",
-				IsLua:        false,
-				LastCommitAt: time,
-			},
-		}
-
-		expectedList := []VimColorScheme{
-			{
-				Name:    "test",
-				Valid:   true,
-				FileURL: "new.test.url",
-				Data: VimColorSchemeData{
-					Dark: []VimColorSchemeGroup{
-						{HexCode: "#000000", Name: "NormalBg"},
-					},
-					Light: nil,
-				},
-				IsLua:        false,
-				LastCommitAt: time,
-			},
-			{
-				Name:         "test.new",
-				FileURL:      "new.url",
-				IsLua:        false,
-				LastCommitAt: time,
-			},
-		}
-
-		repository := Repository{VimColorSchemes: originalList}
-
-		repository.SyncVimColorSchemes(newList)
-
-		if !reflect.DeepEqual(repository.VimColorSchemes, expectedList) {
-			t.Errorf(
-				"Incorrect result for SyncVimColorSchemes, got: %v, want: %v",
-				repository.VimColorSchemes,
-				expectedList,
-			)
-		}
-	})
-}
-
-func TestAssignRepositoryType(t *testing.T) {
-	t.Run("should set type vim when a vim color scheme exists", func(t *testing.T) {
-		vimColorSchemes := []VimColorScheme{
-			{
-				Name:  "vim",
-				IsLua: false,
-			},
-		}
-
-		repository := Repository{VimColorSchemes: vimColorSchemes}
-		repository.AssignRepositoryType()
-
-		if !repository.IsVim {
-			t.Error("Incorrect result for AssignRepositoryType, got: IsVim=false, want: true")
-		}
-
-		if repository.IsLua {
-			t.Error("Incorrect result for AssignRepositoryType, got: IsLua=true, want: false")
-		}
-	})
-
-	t.Run("should set type lua when a lua color scheme exists", func(t *testing.T) {
-		vimColorSchemes := []VimColorScheme{
-			{
-				Name:  "lua",
-				IsLua: true,
-			},
-		}
-
-		repository := Repository{VimColorSchemes: vimColorSchemes}
-		repository.AssignRepositoryType()
-
-		if repository.IsVim {
-			t.Error("Incorrect result for AssignRepositoryType, got: IsVim=true, want: false")
-		}
-
-		if !repository.IsLua {
-			t.Error("Incorrect result for AssignRepositoryType, got: IsLua=false, want: true")
-		}
-	})
-
-	t.Run("should set both types when vim lua color schemes exist", func(t *testing.T) {
-		vimColorSchemes := []VimColorScheme{
-			{
-				Name:  "vim",
-				IsLua: false,
-			},
-			{
-				Name:  "lua",
-				IsLua: true,
-			},
-		}
-
-		repository := Repository{VimColorSchemes: vimColorSchemes}
-		repository.AssignRepositoryType()
-
-		if !repository.IsVim {
-			t.Error("Incorrect result for AssignRepositoryType, got: IsVim=false, want: true")
-		}
-
-		if !repository.IsLua {
-			t.Error("Incorrect result for AssignRepositoryType, got: IsLua=false, want: true")
-		}
-	})
-}
-
-func TestUniquifyVimColorSchemes(t *testing.T) {
-	t.Run("should return the same list if it has no duplicate name", func(t *testing.T) {
-		vimColorSchemes := []VimColorScheme{{Name: "vim"}, {Name: "lua"}}
-		uniqueList := uniquifyVimColorSchemes(vimColorSchemes)
-		if !reflect.DeepEqual(vimColorSchemes, uniqueList) {
-			t.Errorf("Incorrect result for getUniqueVimColorSchemeList, got %d color schemes, expected %d", len(uniqueList), len(vimColorSchemes))
-		}
-	})
-
-	t.Run("should remove duplicate items keeping most recent LastCommitAt", func(t *testing.T) {
-		vimColorSchemes := []VimColorScheme{
-			{Name: "vim", LastCommitAt: time.Date(2022, time.Month(2), 21, 1, 0, 0, 0, time.UTC)},
-			{Name: "lua", LastCommitAt: time.Date(2023, time.Month(2), 21, 1, 0, 0, 0, time.UTC)},
-			{Name: "vim", LastCommitAt: time.Date(2021, time.Month(2), 21, 1, 0, 0, 0, time.UTC)},
-		}
-
-		result := uniquifyVimColorSchemes(vimColorSchemes)
-		expectedResult := []VimColorScheme{
-			{Name: "vim", LastCommitAt: time.Date(2022, time.Month(2), 21, 1, 0, 0, 0, time.UTC)},
-			{Name: "lua", LastCommitAt: time.Date(2023, time.Month(2), 21, 1, 0, 0, 0, time.UTC)},
-		}
-
-		if !reflect.DeepEqual(result, expectedResult) {
-			t.Errorf("Incorrect result for getUniqueVimColorSchemeList, got %d color schemes, expected %d", len(result), len(expectedResult))
 		}
 	})
 }

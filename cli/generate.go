@@ -6,19 +6,18 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/vimcolorschemes/worker/internal/database"
 	file "github.com/vimcolorschemes/worker/internal/file"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
-	"github.com/vimcolorschemes/worker/internal/vim"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 var tmpDirectoryPath string
+var packDirectoryPath string
 var vimrcPath string
 var vimFilesPath string
 var colorDataFilePath string
@@ -61,65 +60,65 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 
 		generateCount++
 
-		newVimColorSchemes := repository.VimColorSchemes
-
-		pluginPath := fmt.Sprintf("colors/%s__%s", repository.Owner.Name, repository.Name)
-		err := installPlugin(repository.GitHubURL, pluginPath)
+		key := fmt.Sprintf("%s__%s", repository.Owner.Name, repository.Name)
+		err := installPlugin(repository.GitHubURL, key)
 		if err != nil {
-			log.Print(err)
+			log.Printf("Error installing plugin: %s", err)
+			repository.GenerateValid = false
+			updateRepositoryAfterGenerate(repository)
 			continue
 		}
 
-		for index, vimColorScheme := range repository.VimColorSchemes {
-			var backgrounds []string
+		var data, dataError = getVimColorSchemeColorData()
+		err = deletePlugin(key)
+		if err != nil {
+			log.Printf("Error deleting plugin: %s", err)
+		}
+		if dataError != nil {
+			log.Printf("Error getting color data: %s", dataError)
+			repository.GenerateValid = false
+			updateRepositoryAfterGenerate(repository)
+			continue
+		}
 
-			lightVimColorSchemeColors, lightErr := getVimColorSchemeColorData(vimColorScheme, repoHelper.LightBackground)
-			if lightErr == nil {
-				backgrounds = append(backgrounds, "light")
-			}
+		var vimColorSchemes []repoHelper.VimColorScheme
 
-			darkVimColorSchemeColors, darkErr := getVimColorSchemeColorData(vimColorScheme, repoHelper.DarkBackground)
-			if darkErr == nil {
-				backgrounds = append(backgrounds, "dark")
-			}
-
-			if lightErr != nil && darkErr != nil {
+		for name := range data {
+			if name == "default" || name == "module-injection" || name == "tick_tock" {
 				continue
 			}
 
-			vimColorSchemeData := repoHelper.VimColorSchemeData{
-				Light: lightVimColorSchemeColors,
-				Dark:  darkVimColorSchemeColors,
+			var backgrounds []repoHelper.VimBackgroundValue
+			if data[name].Light != nil {
+				backgrounds = append(backgrounds, repoHelper.LightBackground)
+			}
+			if data[name].Dark != nil {
+				backgrounds = append(backgrounds, repoHelper.DarkBackground)
 			}
 
-			newVimColorSchemes[index] = repoHelper.VimColorScheme{
-				Name:         vimColorScheme.Name,
-				FileURL:      vimColorScheme.FileURL,
-				Data:         vimColorSchemeData,
-				Backgrounds:  backgrounds,
-				Valid:        true,
-				IsLua:        vimColorScheme.IsLua,
-				LastCommitAt: vimColorScheme.LastCommitAt,
-			}
-
+			vimColorSchemes = append(
+				vimColorSchemes,
+				repoHelper.VimColorScheme{
+					Name:        name,
+					Data:        data[name],
+					Backgrounds: backgrounds,
+				})
 		}
 
-		repository.VimColorSchemes = newVimColorSchemes
-		repository.GenerateValid = repository.IsValidAfterGenerate()
-
-		generateObject := getGenerateRepositoryObject(repository)
-		database.UpsertRepository(repository.ID, generateObject)
-
-		err = deletePlugin()
-		if err != nil {
-			log.Print(err)
-			continue
-		}
+		repository.VimColorSchemes = vimColorSchemes
+		repository.GenerateValid = len(repository.VimColorSchemes) > 0
+		updateRepositoryAfterGenerate(repository)
 	}
 
 	cleanUp()
 
 	return bson.M{"repositoryCount": generateCount}
+}
+
+func updateRepositoryAfterGenerate(repository repoHelper.Repository) {
+	log.Printf("Generate valid: %v", repository.GenerateValid)
+	generateObject := getGenerateRepositoryObject(repository)
+	database.UpsertRepository(repository.ID, generateObject)
 }
 
 // Initializes a temporary directory for vim configuration files
@@ -130,8 +129,9 @@ func initVimFiles() {
 	}
 
 	tmpDirectoryPath = fmt.Sprintf("%s/.tmp", workingDirectory)
+	packDirectoryPath = fmt.Sprintf("%s/pack/plugins/start", tmpDirectoryPath)
 	vimFilesPath = fmt.Sprintf("%s/vim", workingDirectory)
-	vimrcPath = fmt.Sprintf("%s/.vimrc", tmpDirectoryPath)
+	vimrcPath = fmt.Sprintf("%s/init.lua", tmpDirectoryPath)
 	colorDataFilePath = fmt.Sprintf("%s/data.json", tmpDirectoryPath)
 
 	if _, err := os.Stat(tmpDirectoryPath); !os.IsNotExist(err) {
@@ -148,6 +148,12 @@ func initVimFiles() {
 		log.Panic(err)
 	}
 
+	log.Printf("Creating pack directory: %s", packDirectoryPath)
+	err = os.MkdirAll(packDirectoryPath, os.FileMode(0700))
+	if err != nil {
+		log.Panic(err)
+	}
+
 	log.Printf("Creating tmp .vimrc: %s", vimrcPath)
 	_, err = os.Create(vimrcPath)
 	if err != nil {
@@ -159,28 +165,26 @@ func initVimFiles() {
 func setupVim() {
 	log.Print("Setting up vim config")
 
-	baseVimrcContent, err := file.GetLocalFileContent(fmt.Sprintf("%s/base_vimrc.vim", vimFilesPath))
+	baseVimrcContent, err := file.GetLocalFileContent(fmt.Sprintf("%s/init.lua", vimFilesPath))
 	if err != nil {
 		log.Panic(err)
 	}
 
-	myVimrc := fmt.Sprintf("let $MYVIMRC='%s'\n\n", vimrcPath)
+	myVimrc := fmt.Sprintf("vim.env.MYVIMRC=\"%s\"\n", vimrcPath)
 
-	runtimepath := fmt.Sprintf("let &runtimepath.=',%s/colors'\n\n", tmpDirectoryPath)
+	runtimepath := fmt.Sprintf("vim.opt.runtimepath:append(\"%s\")\n", tmpDirectoryPath)
+	packpath := fmt.Sprintf("vim.opt.packpath:append(\"%s\")\n", tmpDirectoryPath)
 
-	vimrcContent := fmt.Sprintf("%s\n%s\n%s", baseVimrcContent, myVimrc, runtimepath)
+	colorDataPath := fmt.Sprintf("vim.env.COLOR_DATA_PATH=\"%s\"\n", colorDataFilePath)
+
+	vimrcContent := fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n", baseVimrcContent, myVimrc, runtimepath, packpath, colorDataPath)
 
 	err = file.AppendToFile(vimrcContent, vimrcPath)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	vcspg, err := file.GetLocalFileContent(fmt.Sprintf("%s/vcspg.vim", vimFilesPath))
-	if err != nil {
-		log.Panic(err)
-	}
-
-	err = file.AppendToFile(vcspg, vimrcPath)
+	err = installPlugin("https://github.com/vimcolorschemes/extractor.nvim", "extractor.nvim")
 	if err != nil {
 		log.Panic(err)
 	}
@@ -189,25 +193,66 @@ func setupVim() {
 	if err != nil {
 		log.Panic(err)
 	}
+
+	err = removeDefaultColorschemes()
+	if err != nil {
+		log.Panic(err)
+	}
+}
+
+// removeDefaultColorschemes removes all default colorschemes from the vim
+// runtime, except for "default", which is needed to run the preview generator.
+func removeDefaultColorschemes() error {
+	tmpRuntimeFilePath := fmt.Sprintf("%s/runtime", tmpDirectoryPath)
+
+	args := []string{"-es", "--headless", "-c", fmt.Sprintf("redir! > %s", tmpRuntimeFilePath), "-c", "echo $VIMRUNTIME", "-c", "redir END", "-c", "quit"}
+	cmd := exec.Command("nvim", args...)
+
+	log.Printf("Running %s", cmd)
+
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+
+	runtimePath, err := file.GetLocalFileContent(tmpRuntimeFilePath)
+	if err != nil {
+		return err
+	}
+
+	runtimePath = strings.TrimSpace(runtimePath)
+	runtimePath = strings.Trim(runtimePath, "\n")
+
+	colorsPath := fmt.Sprintf("%s/colors", runtimePath)
+	log.Printf("Removing default colorschemes from: %s", colorsPath)
+
+	files, err := os.ReadDir(colorsPath)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		if file.IsDir() || file.Name() == "default.vim" {
+			continue
+		}
+
+		err = os.Remove(fmt.Sprintf("%s/%s", colorsPath, file.Name()))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Installs a plugin/color scheme on the vim configuration from a GitHub URL
 func installPlugin(gitRepositoryURL string, path string) error {
 	log.Printf("Installing %s", path)
 
-	target := fmt.Sprintf("%s/%s", tmpDirectoryPath, path)
-	err := os.MkdirAll(target, 0700)
-	if err != nil {
-		return err
-	}
+	target := fmt.Sprintf("%s/%s", packDirectoryPath, path)
 
 	cmd := exec.Command("git", "clone", gitRepositoryURL, target)
-	err = cmd.Run()
-	if err != nil {
-		return err
-	}
-
-	err = addSubdirectoriesToRuntimepath(target)
+	err := cmd.Run()
 	if err != nil {
 		return err
 	}
@@ -216,119 +261,54 @@ func installPlugin(gitRepositoryURL string, path string) error {
 }
 
 // Clears all installation traces of the vim plugin
-func deletePlugin() error {
-	// Remove plugin specific runtimepath from .vimrc
-	err := file.RemoveLinesInFile("let &runtimepath.*\" plugin runtimepath", vimrcPath)
-	if err != nil {
-		return err
-	}
-
+func deletePlugin(key string) error {
 	// Remove downloaded files
-	target := fmt.Sprintf("%s/colors", tmpDirectoryPath)
-	err = os.RemoveAll(target)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	target := fmt.Sprintf("%s/%s", packDirectoryPath, key)
+	err := os.RemoveAll(target)
+	return err
 }
 
-func addSubdirectoriesToRuntimepath(path string) error {
-	var paths []string
-
-	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !info.IsDir() || strings.Contains(path, ".git") {
-			return nil
-		}
-
-		paths = append(paths, path)
-
-		return nil
-	})
+// Gathers the colorscheme data from vimcolorschemes/extractor.nvim
+func getVimColorSchemeColorData() (map[string]repoHelper.VimColorSchemeData, error) {
+	err := executePreviewGenerator()
 	if err != nil {
-		return err
-	}
-
-	runtimepath := fmt.Sprintf("let &runtimepath.=',%s' \" plugin runtimepath\n\n", strings.Join(paths, ","))
-
-	err = file.AppendToFile(runtimepath, vimrcPath)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Gathers the color scheme data on a specific background from vcspg.vim
-func getVimColorSchemeColorData(vimColorScheme repoHelper.VimColorScheme, background repoHelper.VimBackgroundValue) ([]repoHelper.VimColorSchemeGroup, error) {
-	err := executePreviewGenerator(vimColorScheme, background)
-	if err != nil {
+		log.Printf("Error executing nvim: %s", err)
 		return nil, err
 	}
 
 	vimColorSchemeOutput, err := file.GetLocalFileContent(colorDataFilePath)
 	if err != nil {
+		log.Printf("Error getting local file content from \"%s\": %s", colorDataFilePath, err)
 		return nil, err
 	}
 
-	err = os.Remove(colorDataFilePath)
+	var data map[string]repoHelper.VimColorSchemeData
+	err = json.Unmarshal([]byte(vimColorSchemeOutput), &data)
 	if err != nil {
 		return nil, err
-	}
-
-	var vimColorSchemeColorsResult map[string]string
-	err = json.Unmarshal([]byte(vimColorSchemeOutput), &vimColorSchemeColorsResult)
-	if err != nil {
-		return nil, err
-	}
-
-	vimColorSchemeColors := make([]repoHelper.VimColorSchemeGroup, 0, len(vimColorSchemeColorsResult))
-
-	for groupName, colorCode := range vimColorSchemeColorsResult {
-		vimColorSchemeColors = append(vimColorSchemeColors, repoHelper.VimColorSchemeGroup{
-			Name:    groupName,
-			HexCode: colorCode,
-		})
-	}
-
-	return vim.NormalizeVimColorSchemeColors(vimColorSchemeColors), nil
-}
-
-// Starts a vim instance and auto commands to configure and start vcspg.vim on load
-func executePreviewGenerator(vimColorScheme repoHelper.VimColorScheme, background repoHelper.VimBackgroundValue) error {
-	writeColorValuesAutoCmd := fmt.Sprintf(
-		"autocmd ColorScheme * :call WriteColorValues(\"%s/data.json\", \"%s\", \"%s\")",
-		tmpDirectoryPath,
-		vimColorScheme.Name,
-		background,
-	)
-
-	setBackground := fmt.Sprintf("set background=%s", background)
-	setColorScheme := fmt.Sprintf("silent! colorscheme %s", vimColorScheme.Name)
-
-	args := []string{
-		"-u", vimrcPath,
-		"-c", writeColorValuesAutoCmd,
-		"-c", setBackground,
-		"-c", setColorScheme,
 	}
 
 	if !debugMode {
-		args = append(args, "-c", ":qa!")
+		err = os.Remove(colorDataFilePath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return data, nil
+}
+
+// Starts a vim instance and auto commands to configure and start vcspg.vim on load
+func executePreviewGenerator() error {
+	args := []string{"-u", vimrcPath}
+
+	if !debugMode {
+		args = append(args, "--headless", "-c", ":qa!")
 	}
 
 	args = append(args, "./vim/code_sample.vim")
 
-	executable := "vim"
-	if vimColorScheme.IsLua {
-		executable = "nvim"
-	}
-
-	cmd := exec.Command(executable, args...)
+	cmd := exec.Command("nvim", args...)
 
 	log.Printf("Running %s", cmd)
 
@@ -345,6 +325,10 @@ func executePreviewGenerator(vimColorScheme repoHelper.VimColorScheme, backgroun
 
 // Deletes the temporary directory used for the vim config
 func cleanUp() {
+	if debugMode {
+		return
+	}
+
 	err := os.RemoveAll(tmpDirectoryPath)
 	if err != nil {
 		log.Panic(err)
