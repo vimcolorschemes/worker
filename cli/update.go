@@ -50,6 +50,12 @@ func updateRepository(repository repoHelper.Repository) repoHelper.Repository {
 		return repository
 	}
 
+	if githubRepository.PushedAt == nil {
+		log.Print("No commits on ", repository.Owner.Name, "/", repository.Name)
+		repository.UpdateValid = false
+		return repository
+	}
+
 	repository.PushedAt = githubRepository.PushedAt.Time
 
 	log.Print("Gathering basic infos")
