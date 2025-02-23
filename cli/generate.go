@@ -40,25 +40,16 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 			log.Panic(err)
 		}
 		repositories = []repoHelper.Repository{repository}
+	} else if force {
+		repositories = database.GetRepositories()
 	} else {
-		repositories = database.GetValidRepositories()
+		repositories = database.GetRepositoriesToGenerate()
 	}
 
 	log.Printf("Generating vim preview for %d repositories", len(repositories))
 
-	var generateCount int
-
-	for _, repository := range repositories {
-		fmt.Println()
-
-		log.Print("Generating vim previews for ", repository.Owner.Name, "/", repository.Name)
-
-		if !force && repository.GeneratedAt.After(repository.GithubUpdatedAt) {
-			log.Print("Repository is not due for a generate")
-			continue
-		}
-
-		generateCount++
+	for index, repository := range repositories {
+		log.Print("\nGenerating vim previews for ", repository.Owner.Name, "/", repository.Name, " (", index+1, "/", len(repositories), ")")
 
 		key := fmt.Sprintf("%s__%s", repository.Owner.Name, repository.Name)
 		err := installPlugin(repository.GithubURL, key)
@@ -112,7 +103,7 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 
 	cleanUp()
 
-	return bson.M{"repositoryCount": generateCount}
+	return bson.M{"repositoryCount": len(repositories)}
 }
 
 func updateRepositoryAfterGenerate(repository repoHelper.Repository) {
