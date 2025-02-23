@@ -50,7 +50,7 @@ func updateRepository(repository repoHelper.Repository) repoHelper.Repository {
 		return repository
 	}
 
-	repository.GithubUpdatedAt = githubRepository.UpdatedAt.Time
+	repository.PushedAt = githubRepository.PushedAt.Time
 
 	log.Print("Gathering basic infos")
 	repository.StargazersCount = *githubRepository.StargazersCount
@@ -70,7 +70,7 @@ func updateRepository(repository repoHelper.Repository) repoHelper.Repository {
 
 func getUpdateRepositoryObject(repository repoHelper.Repository) bson.M {
 	return bson.M{
-		"githubUpdatedAt":        repository.GithubUpdatedAt,
+		"pushedAt":               repository.PushedAt,
 		"stargazersCount":        repository.StargazersCount,
 		"stargazersCountHistory": repository.StargazersCountHistory,
 		"weekStargazersCount":    repository.WeekStargazersCount,

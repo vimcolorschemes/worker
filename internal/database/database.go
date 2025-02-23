@@ -85,9 +85,10 @@ func GetRepository(repoKey string) (repository.Repository, error) {
 	return repo, nil
 }
 
-// GetValidRepositories gets repositories stored in the database that are marked as valid
-func GetValidRepositories() []repository.Repository {
-	return getRepositories(bson.M{"updateValid": true})
+// GetRepositoriesToGenerate gets all repositories that are due for a preview
+// generate.
+func GetRepositoriesToGenerate() []repository.Repository {
+	return getRepositories(bson.M{"updateValid": true, "$expr": bson.M{"$gt": []string{"$pushedAt", "$generatedAt"}}})
 }
 
 func getRepositories(filter bson.M) []repository.Repository {

@@ -20,7 +20,7 @@ type Repository struct {
 	StargazersCountHistory []StargazersCountHistoryItem `bson:"stargazersCountHistory"`
 	WeekStargazersCount    int                          `bson:"weekStargazersCount"`
 	GithubCreatedAt        time.Time                    `bson:"githubCreatedAt"`
-	GithubUpdatedAt        time.Time                    `bson:"githubUpdatedAt"`
+	PushedAt               time.Time                    `bson:"pushedAt"`
 	VimColorSchemes        []VimColorScheme             `bson:"vimColorSchemes,omitempty"`
 	UpdateValid            bool                         `bson:"updateValid"`
 	UpdatedAt              time.Time                    `bson:"updatedAt"`
@@ -152,8 +152,8 @@ func (repository Repository) ComputeTrendingStargazersCount(dayCount int) int {
 // valid from our standards after an update job
 func (repository Repository) IsValidAfterUpdate() bool {
 	var defaultTime time.Time
-	if repository.GithubUpdatedAt == defaultTime {
-		log.Print("Repository last commit at is not valid")
+	if repository.PushedAt == defaultTime {
+		log.Print("Repository last commit date is not valid")
 		return false
 	}
 
