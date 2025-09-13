@@ -40,7 +40,7 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 			log.Panic(err)
 		}
 		repositories = []repoHelper.Repository{repository}
-	} else if force {
+	} else if force || debug {
 		repositories = database.GetRepositories()
 	} else {
 		repositories = database.GetRepositoriesToGenerate()
