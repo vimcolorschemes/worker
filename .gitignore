@@ -1,2 +1,4 @@
 # generate job temporary files
 .tmp
+
+db/vimcolorschemes.db

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+file="db/migrations/$(date +%Y%m%d%H%M%S)_$1.sql"
+
+echo "Creating migration file: $file"
+
+touch $file

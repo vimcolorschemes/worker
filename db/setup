@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+if ! command -v sqlite3 &> /dev/null
+then
+    echo "sqlite3 could not be found, please install it first."
+    exit
+fi
+
+DB_FILE="db/vimcolorschemes.db"
+MIGRATIONS_DIR="db/migrations"
+
+if [ ! -f "$DB_FILE" ]; then
+    sqlite3 "$DB_FILE" <<EOF
+CREATE TABLE IF NOT EXISTS migrations (
+    id TEXT PRIMARY KEY,
+    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+EOF
+    echo "Database and migrations table created."
+fi
+
+for migration in "$MIGRATIONS_DIR"/*.sql; do
+    MIGRATION_ID=$(basename "$migration")
+    if ! sqlite3 "$DB_FILE" "SELECT COUNT(*) FROM migrations WHERE id = '$MIGRATION_ID';" | grep -q 1; then
+        echo "Applying migration: $MIGRATION_ID"
+        sqlite3 "$DB_FILE" < "$migration"
+        sqlite3 "$DB_FILE" "INSERT INTO migrations (id) VALUES ('$MIGRATION_ID');"
+    fi
+done
+
+echo "Setup complete."
