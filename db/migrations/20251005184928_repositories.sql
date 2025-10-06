@@ -5,5 +5,6 @@ CREATE TABLE repositories (
   description TEXT,
   created_at TIMESTAMP NOT NULL,
   updated_at TIMESTAMP NOT NULL,
+
   UNIQUE(owner, name)
 );

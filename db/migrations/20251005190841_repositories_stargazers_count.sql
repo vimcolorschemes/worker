@@ -8,6 +8,7 @@ CREATE TABLE repository_stargazers_count_snapshots (
   repository_id INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
   snapshot_date TEXT NOT NULL,
   stargazers_count INTEGER NOT NULL,
+
   PRIMARY KEY (repository_id, snapshot_date)
 );
 
