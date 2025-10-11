@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"log"
 	"math"
 	"strings"
@@ -8,14 +9,14 @@ import (
 	"github.com/vimcolorschemes/worker/internal/database"
 	"github.com/vimcolorschemes/worker/internal/dotenv"
 	"github.com/vimcolorschemes/worker/internal/github"
-
-	"go.mongodb.org/mongo-driver/bson"
+	"github.com/vimcolorschemes/worker/internal/store"
 
 	gogithub "github.com/google/go-github/v68/github"
 )
 
 var repositoryCountLimit int
 var repositoryCountLimitPerPage int
+var repositoryStore *store.RepositoryStore
 
 var queries = []string{
 	"vim theme",
@@ -31,6 +32,8 @@ var queries = []string{
 }
 
 func init() {
+	repositoryStore = store.NewRepositoryStore(database.Connect())
+
 	repositoryCountLimitValue, err := dotenv.GetInt("GITHUB_REPOSITORY_COUNT_LIMIT")
 	if err != nil {
 		repositoryCountLimitValue = 100
@@ -41,7 +44,7 @@ func init() {
 }
 
 // Import potential vim color scheme repositories from Github
-func Import(_force bool, _debug bool, repoKey string) bson.M {
+func Import(_force bool, _debug bool, repoKey string) int {
 	log.Printf("Repository limit: %d", repositoryCountLimit)
 
 	var repositories []*gogithub.Repository
@@ -62,22 +65,18 @@ func Import(_force bool, _debug bool, repoKey string) bson.M {
 	log.Print("Upserting ", len(repositories), " repositories")
 	for _, repository := range repositories {
 		log.Print("Upserting ", *repository.Name)
-		repositoryUpdateObject := getImportRepositoryObject(repository)
-		database.UpsertRepository(*repository.ID, repositoryUpdateObject)
+		err := repositoryStore.Upsert(context.TODO(), store.Repository{
+			ID:          *repository.ID,
+			Name:        *repository.Name,
+			Owner:       *repository.Owner.Login,
+			Description: *repository.Description,
+			CreatedAt:   *repository.CreatedAt.GetTime(),
+			UpdatedAt:   *repository.PushedAt.GetTime(),
+		})
+		if err != nil {
+			log.Println("Error upserting repository:", err)
+		}
 	}
 
-	return bson.M{"repositoryCount": len(repositories)}
-}
-
-func getImportRepositoryObject(repository *gogithub.Repository) bson.M {
-	return bson.M{
-		"_id":             repository.GetID(),
-		"owner.name":      repository.GetOwner().GetLogin(),
-		"owner.avatarURL": repository.GetOwner().GetAvatarURL(),
-		"name":            repository.GetName(),
-		"description":     repository.GetDescription(),
-		"githubURL":       repository.GetHTMLURL(),
-		"githubCreatedAt": repository.GetCreatedAt().Time,
-		"pushedAt":        repository.GetPushedAt().Time,
-	}
+	return len(repositories)
 }

@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/vimcolorschemes/worker/internal/database"
+	// "github.com/vimcolorschemes/worker/internal/database"
 	"github.com/vimcolorschemes/worker/internal/github"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
 
@@ -13,16 +13,16 @@ import (
 )
 
 // Update the imported repositories with all kinds of useful information
-func Update(_force bool, _debug bool, repoKey string) bson.M {
+func Update(_force bool, _debug bool, repoKey string) int {
 	var repositories []repoHelper.Repository
 	if repoKey != "" {
-		repository, err := database.GetRepository(repoKey)
-		if err != nil {
-			log.Panic(err)
-		}
-		repositories = []repoHelper.Repository{repository}
+		// repository, err := database.GetRepository(repoKey)
+		// if err != nil {
+		// log.Panic(err)
+		// }
+		// repositories = []repoHelper.Repository{repository}
 	} else {
-		repositories = database.GetRepositories()
+		// repositories = database.GetRepositories()
 	}
 
 	log.Print(len(repositories), " repositories to update")
@@ -32,14 +32,14 @@ func Update(_force bool, _debug bool, repoKey string) bson.M {
 
 		log.Print("Updating ", index, " of ", len(repositories), ": ", repository.Owner.Name, "/", repository.Name)
 
-		updatedRepository := updateRepository(repository)
+		// updatedRepository := updateRepository(repository)
 
-		updateObject := getUpdateRepositoryObject(updatedRepository)
+		// updateObject := getUpdateRepositoryObject(updatedRepository)
 
-		database.UpsertRepository(repository.ID, updateObject)
+		// database.UpsertRepository(repository.ID, updateObject)
 	}
 
-	return bson.M{"repositoryCount": len(repositories)}
+	return len(repositories)
 }
 
 func updateRepository(repository repoHelper.Repository) repoHelper.Repository {

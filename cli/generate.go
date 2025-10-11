@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vimcolorschemes/worker/internal/database"
 	file "github.com/vimcolorschemes/worker/internal/file"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
 
@@ -24,7 +23,7 @@ var colorDataFilePath string
 var debugMode bool
 
 // Generate vim color scheme data for all valid repositories
-func Generate(force bool, debug bool, repoKey string) bson.M {
+func Generate(force bool, debug bool, repoKey string) int {
 	debugMode = debug
 
 	initVimFiles()
@@ -35,15 +34,15 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 
 	var repositories []repoHelper.Repository
 	if repoKey != "" {
-		repository, err := database.GetRepository(repoKey)
-		if err != nil {
-			log.Panic(err)
-		}
-		repositories = []repoHelper.Repository{repository}
+		// repository, err := database.GetRepository(repoKey)
+		// if err != nil {
+		// log.Panic(err)
+		// }
+		// repositories = []repoHelper.Repository{repository}
 	} else if force || debug {
-		repositories = database.GetRepositories()
+		// repositories = database.GetRepositories()
 	} else {
-		repositories = database.GetRepositoriesToGenerate()
+		// repositories = database.GetRepositoriesToGenerate()
 	}
 
 	log.Printf("Generating vim preview for %d repositories", len(repositories))
@@ -103,13 +102,13 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 
 	cleanUp()
 
-	return bson.M{"repositoryCount": len(repositories)}
+	return len(repositories)
 }
 
 func updateRepositoryAfterGenerate(repository repoHelper.Repository) {
 	log.Printf("Generate valid: %v", repository.GenerateValid)
-	generateObject := getGenerateRepositoryObject(repository)
-	database.UpsertRepository(repository.ID, generateObject)
+	// generateObject := getGenerateRepositoryObject(repository)
+	// database.UpsertRepository(repository.ID, generateObject)
 }
 
 // Initializes a temporary directory for vim configuration files

@@ -8,13 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-
 	"github.com/vimcolorschemes/worker/cli"
-	"github.com/vimcolorschemes/worker/internal/database"
 )
 
-var jobRunnerMap = map[string]interface{}{
+var jobRunnerMap = map[string]func(force bool, debug bool, repoKey string) int{
 	"import":   cli.Import,
 	"update":   cli.Update,
 	"generate": cli.Generate,
@@ -38,8 +35,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	runner := jobRunnerMap[job]
-	if runner == nil {
+	runner, ok := jobRunnerMap[job]
+	if !ok {
 		log.Print(job, " is not a valid job")
 		os.Exit(1)
 	}
@@ -48,10 +45,10 @@ func main() {
 
 	fmt.Println()
 
-	data := runner.(func(force bool, debug bool, repoKey string) bson.M)(force, debug, repoKey)
+	data := runner(force, debug, repoKey)
+	log.Printf("Processed %d items", data)
 
 	elapsedTime := time.Since(startTime)
-	database.CreateReport(job, elapsedTime.Seconds(), data)
 
 	fmt.Println()
 	log.Printf("Elapsed time: %s\n", elapsedTime)
@@ -71,19 +68,16 @@ func getJobArgs(osArgs []string) (string, bool, bool, string, error) {
 
 	args := osArgs[2:]
 
-	forceIndex := getArgIndex(args, "--force")
-	force := forceIndex != -1
-
-	debugIndex := getArgIndex(args, "--debug")
-	debug := debugIndex != -1
+	force := getArgIndex(args, "--force") != -1
+	debug := getArgIndex(args, "--debug") != -1
 
 	repoIndex := getArgIndex(args, "--repo")
 	if repoIndex == -1 || len(args) < repoIndex+1 {
-		return osArgs[1], force, debug, "", nil
+		return job, force, debug, "", nil
 	}
 
 	repoKey := strings.ToLower(args[repoIndex+1])
-	return osArgs[1], force, debug, repoKey, nil
+	return job, force, debug, repoKey, nil
 }
 
 func getArgIndex(args []string, target string) int {

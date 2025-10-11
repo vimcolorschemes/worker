@@ -1,139 +1,41 @@
 package database
 
 import (
-	"context"
-	"errors"
+	"database/sql"
 	"log"
 	"os"
 	"strings"
-	"time"
 
-	"github.com/vimcolorschemes/worker/internal/dotenv"
-	"github.com/vimcolorschemes/worker/internal/repository"
-
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/tursodatabase/libsql-client-go/libsql"
 )
 
-var ctx = context.TODO()
-var repositoriesCollection *mongo.Collection
-var reportsCollection *mongo.Collection
+func Connect() *sql.DB {
+	url := os.Getenv("TURSO_DATABASE_URL")
+	token := os.Getenv("TURSO_AUTH_TOKEN")
 
-func init() {
-	if strings.HasSuffix(os.Args[0], ".test") {
-		// Running in test mode
-		return
+	var driver, dsn string
+
+	if strings.HasPrefix(url, "libsql://") {
+		driver = "libsql"
+		sep := "?"
+		if strings.Contains(url, "?") {
+			sep = "&"
+		}
+		dsn = url
+		if token != "" {
+			dsn = dsn + sep + "authToken=" + token
+		}
+	} else {
+		driver, dsn = "sqlite3", "./db/vimcolorschemes.db"
 	}
 
-	connectionString, exists := dotenv.Get("MONGODB_CONNECTION_STRING")
-	if !exists {
-		log.Panic("Database connection string not found in env")
-	}
+	log.Printf("Connecting to database with driver %s and dsn %s", driver, dsn)
 
-	clientOptions := options.Client().ApplyURI(connectionString)
-
-	databaseUsername, usernameExists := dotenv.Get("MONGODB_USERNAME")
-	databasePassword, passwordExists := dotenv.Get("MONGODB_PASSWORD")
-	if usernameExists && databaseUsername != "" && passwordExists && databasePassword != "" {
-		credentials := options.Credential{Username: databaseUsername, Password: databasePassword}
-		clientOptions.SetAuth(credentials)
-	}
-
-	client, err := mongo.Connect(ctx, clientOptions)
+	db, err := sql.Open(driver, dsn)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	err = client.Ping(ctx, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	databaseName, databaseNameExists := dotenv.Get("MONGODB_DATABASE")
-	if !databaseNameExists {
-		databaseName = "vimcolorschemes"
-	}
-
-	database := client.Database(databaseName)
-	repositoriesCollection = database.Collection("repositories")
-	reportsCollection = database.Collection("reports")
-}
-
-// GetRepositories gets all repositories stored in the database
-func GetRepositories() []repository.Repository {
-	return getRepositories(bson.M{})
-}
-
-// GetRepository gets the repository matching the repository key
-func GetRepository(repoKey string) (repository.Repository, error) {
-	matches := strings.Split(repoKey, "/")
-
-	if len(matches) < 2 {
-		return repository.Repository{}, errors.New("key not valid")
-	}
-
-	var repo repository.Repository
-
-	ownerName := bson.M{"$regex": matches[0], "$options": "i"}
-	name := bson.M{"$regex": matches[1], "$options": "i"}
-	err := repositoriesCollection.FindOne(ctx, bson.M{"owner.name": ownerName, "name": name}).Decode(&repo)
-	if err != nil {
-		return repository.Repository{}, err
-	}
-
-	return repo, nil
-}
-
-// GetRepositoriesToGenerate gets all repositories that are due for a preview
-// generate.
-func GetRepositoriesToGenerate() []repository.Repository {
-	return getRepositories(bson.M{"updateValid": true, "$expr": bson.M{"$gt": []string{"$pushedAt", "$generatedAt"}}})
-}
-
-func getRepositories(filter bson.M) []repository.Repository {
-	var repositories []repository.Repository
-	cursor, err := repositoriesCollection.Find(ctx, filter)
-	if err != nil {
-		log.Print("here")
-		panic(err)
-	}
-	if err = cursor.All(ctx, &repositories); err != nil {
-		log.Print("or here")
-		panic(err)
-	}
-	return repositories
-}
-
-// UpsertRepository updates the repository if it exists, inserts it if not
-func UpsertRepository(id int64, updateObject bson.M) {
-	filter := bson.M{"_id": id}
-
-	update := bson.M{"$set": updateObject}
-	delete(updateObject, "_id")
-
-	upsertOptions := options.Update().SetUpsert(true)
-
-	_, err := repositoriesCollection.UpdateOne(ctx, filter, update, upsertOptions)
-
-	if err != nil {
-		log.Printf("Error upserting repository: %s", err)
-		panic(err)
-	}
-}
-
-// CreateReport stores a job report in the database
-func CreateReport(job string, elapsedTime float64, data bson.M) {
-	object := bson.M{
-		"date":        time.Now(),
-		"job":         job,
-		"elapsedTime": elapsedTime,
-		"data":        data,
-	}
-	_, err := reportsCollection.InsertOne(ctx, object, &options.InsertOneOptions{})
-
-	if err != nil {
-		log.Printf("Error creating report: %s", err)
-		panic(err)
-	}
+	return db
 }
