@@ -9,10 +9,10 @@ import (
 	"github.com/vimcolorschemes/worker/internal/store"
 )
 
-var repositoryStargazersCountStore *store.RepositoryStargarzersCountStore
+var repositoryStargazersCountSnapshotStore *store.RepositoryStargarzersCountSnapshotStore
 
 func init() {
-	repositoryStargazersCountStore = store.NewRepositoryStargazersCountStore(database.Connect())
+	repositoryStargazersCountSnapshotStore = store.NewRepositoryStargazersCountSnapshotStore(database.Connect())
 }
 
 // Update the imported repositories with all kinds of useful information
@@ -51,7 +51,7 @@ func Update(_force bool, _debug bool, repoKey string) int {
 			log.Println("Error upserting repository:", err)
 		}
 
-		err = repositoryStargazersCountStore.Insert(context.TODO(), store.RepositoryStargazersCount{
+		err = repositoryStargazersCountSnapshotStore.Insert(context.TODO(), store.RepositoryStargazersCountSnapshot{
 			RepositoryID:    *githubRepository.ID,
 			StargazersCount: *githubRepository.StargazersCount,
 		})
