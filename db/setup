@@ -20,28 +20,3 @@ EOF
 fi
 
 echo "Database ready."
-
-for migration in "$MIGRATIONS_DIR"/*.sql; do
-  MIGRATION_ID=$(basename "$migration")
-
-  # Skip if already applied
-  if sqlite3 "$DB_FILE" -batch -bail "SELECT 1 FROM migrations WHERE id = '$MIGRATION_ID' LIMIT 1;" | grep -q 1; then
-    continue
-  fi
-
-  echo "Applying migration: $MIGRATION_ID"
-  sqlite3 "$DB_FILE" -batch -bail <<SQL
-PRAGMA foreign_keys = ON;
-BEGIN IMMEDIATE;
-.read $migration
-INSERT INTO migrations (id) VALUES ('$MIGRATION_ID');
-COMMIT;
-SQL
-
-  if [ $? -ne 0 ]; then
-    echo "Error applying migration: $MIGRATION_ID"
-    exit 1
-  fi
-done
-
-echo "Setup complete."
