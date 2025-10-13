@@ -1,86 +1,64 @@
 package cli
 
 import (
-	"fmt"
+	"context"
 	"log"
-	"time"
 
-	// "github.com/vimcolorschemes/worker/internal/database"
+	"github.com/vimcolorschemes/worker/internal/database"
 	"github.com/vimcolorschemes/worker/internal/github"
-	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
-
-	"go.mongodb.org/mongo-driver/bson"
+	"github.com/vimcolorschemes/worker/internal/store"
 )
+
+var repositoryStargazersCountStore *store.RepositoryStargarzersCountStore
+
+func init() {
+	repositoryStargazersCountStore = store.NewRepositoryStargazersCountStore(database.Connect())
+}
 
 // Update the imported repositories with all kinds of useful information
 func Update(_force bool, _debug bool, repoKey string) int {
-	var repositories []repoHelper.Repository
+	var repositories []store.Repository
 	if repoKey != "" {
-		// repository, err := database.GetRepository(repoKey)
-		// if err != nil {
-		// log.Panic(err)
-		// }
-		// repositories = []repoHelper.Repository{repository}
+		repository, err := repositoryStore.GetByKey(context.TODO(), repoKey)
+		if err != nil {
+			log.Panic(err)
+		}
+		repositories = []store.Repository{*repository}
 	} else {
-		// repositories = database.GetRepositories()
+		repositories = repositoryStore.GetAll()
 	}
 
 	log.Print(len(repositories), " repositories to update")
 
 	for index, repository := range repositories {
-		fmt.Println()
+		log.Print("Updating ", index, " of ", len(repositories), ": ", repository.Owner, "/", repository.Name)
 
-		log.Print("Updating ", index, " of ", len(repositories), ": ", repository.Owner.Name, "/", repository.Name)
+		githubRepository, err := github.GetRepository(repository.Owner, repository.Name)
+		if err != nil {
+			log.Print("Error fetching ", repository.Owner, "/", repository.Name)
+			continue
+		}
 
-		// updatedRepository := updateRepository(repository)
+		err = repositoryStore.Upsert(context.TODO(), store.Repository{
+			ID:          *githubRepository.ID,
+			Name:        *githubRepository.Name,
+			Owner:       *githubRepository.Owner.Login,
+			Description: *githubRepository.Description,
+			CreatedAt:   *githubRepository.CreatedAt.GetTime(),
+			UpdatedAt:   *githubRepository.PushedAt.GetTime(),
+		})
+		if err != nil {
+			log.Println("Error upserting repository:", err)
+		}
 
-		// updateObject := getUpdateRepositoryObject(updatedRepository)
-
-		// database.UpsertRepository(repository.ID, updateObject)
+		err = repositoryStargazersCountStore.Insert(context.TODO(), store.RepositoryStargazersCount{
+			RepositoryID:    *githubRepository.ID,
+			StargazersCount: *githubRepository.StargazersCount,
+		})
+		if err != nil {
+			log.Println("Error inserting stargazers count:", err)
+		}
 	}
 
 	return len(repositories)
-}
-
-func updateRepository(repository repoHelper.Repository) repoHelper.Repository {
-	githubRepository, err := github.GetRepository(repository.Owner.Name, repository.Name)
-	if err != nil {
-		log.Print("Error fetching ", repository.Owner.Name, "/", repository.Name)
-		repository.UpdateValid = false
-		return repository
-	}
-
-	if githubRepository.PushedAt == nil {
-		log.Print("No commits on ", repository.Owner.Name, "/", repository.Name)
-		repository.UpdateValid = false
-		return repository
-	}
-
-	repository.PushedAt = githubRepository.PushedAt.Time
-
-	log.Print("Gathering basic infos")
-	repository.StargazersCount = *githubRepository.StargazersCount
-
-	log.Print("Building stargazers count history")
-	repository.StargazersCountHistory = repository.AppendToStargazersCountHistory()
-
-	log.Print("Computing week stargazers count")
-	repository.WeekStargazersCount = repository.ComputeTrendingStargazersCount(7)
-
-	log.Print("Checking if ", repository.Owner.Name, "/", repository.Name, " is valid")
-	repository.UpdateValid = repository.IsValidAfterUpdate()
-	log.Printf("Update valid: %v", repository.UpdateValid)
-
-	return repository
-}
-
-func getUpdateRepositoryObject(repository repoHelper.Repository) bson.M {
-	return bson.M{
-		"pushedAt":               repository.PushedAt,
-		"stargazersCount":        repository.StargazersCount,
-		"stargazersCountHistory": repository.StargazersCountHistory,
-		"weekStargazersCount":    repository.WeekStargazersCount,
-		"updateValid":            repository.UpdateValid,
-		"updatedAt":              time.Now(),
-	}
 }
