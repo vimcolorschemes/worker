@@ -1,19 +1,34 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
+	"github.com/vimcolorschemes/worker/internal/database"
 	file "github.com/vimcolorschemes/worker/internal/file"
-	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
-
-	"go.mongodb.org/mongo-driver/bson"
+	"github.com/vimcolorschemes/worker/internal/store"
 )
+
+type ColorschemeData struct {
+	Light []store.ColorschemeGroupDefinition
+	Dark  []store.ColorschemeGroupDefinition
+}
+
+type ColorschemeGroupDefinition struct {
+	Name    string
+	HexCode string
+}
+
+var colorschemeVariantStore *store.ColorschemeVariantStore
+
+func init() {
+	colorschemeVariantStore = store.NewColorschemeVariantStore(database.Connect())
+}
 
 var tmpDirectoryPath string
 var packDirectoryPath string
@@ -32,83 +47,77 @@ func Generate(force bool, debug bool, repoKey string) int {
 
 	fmt.Println()
 
-	var repositories []repoHelper.Repository
+	var repositories []store.Repository
 	if repoKey != "" {
-		// repository, err := database.GetRepository(repoKey)
-		// if err != nil {
-		// log.Panic(err)
-		// }
-		// repositories = []repoHelper.Repository{repository}
-	} else if force || debug {
-		// repositories = database.GetRepositories()
+		repository, err := repositoryStore.GetByKey(context.TODO(), repoKey)
+		if err != nil {
+			log.Panic(err)
+		}
+		repositories = []store.Repository{*repository}
 	} else {
-		// repositories = database.GetRepositoriesToGenerate()
+		repositories = repositoryStore.GetAll()
 	}
 
 	log.Printf("Generating vim preview for %d repositories", len(repositories))
 
 	for index, repository := range repositories {
-		log.Print("\nGenerating vim previews for ", repository.Owner.Name, "/", repository.Name, " (", index+1, "/", len(repositories), ")")
+		log.Print("\nGenerating vim previews for ", repository.Owner, "/", repository.Name, " (", index+1, "/", len(repositories), ")")
 
-		key := fmt.Sprintf("%s__%s", repository.Owner.Name, repository.Name)
+		key := fmt.Sprintf("%s__%s", repository.Owner, repository.Name)
 		err := installPlugin(repository.GithubURL, key)
 		if err != nil {
 			log.Printf("Error installing plugin: %s", err)
-			repository.GenerateValid = false
-			updateRepositoryAfterGenerate(repository)
+			// repository.GenerateValid = false
+			// updateRepositoryAfterGenerate(repository)
 			continue
 		}
 
-		var data, dataError = getVimColorSchemeColorData()
+		var dataMap, dataError = getColorschemeDataMap()
 		err = deletePlugin(key)
 		if err != nil {
 			log.Printf("Error deleting plugin: %s", err)
 		}
 		if dataError != nil {
 			log.Printf("Error getting color data: %s", dataError)
-			repository.GenerateValid = false
-			updateRepositoryAfterGenerate(repository)
+			// repository.GenerateValid = false
+			// updateRepositoryAfterGenerate(repository)
 			continue
 		}
 
-		var vimColorSchemes []repoHelper.VimColorScheme
-
-		for name := range data {
+		for name := range dataMap {
 			if name == "default" || name == "module-injection" || name == "tick_tock" {
 				continue
 			}
 
-			var backgrounds []repoHelper.VimBackgroundValue
-			if data[name].Light != nil {
-				backgrounds = append(backgrounds, repoHelper.LightBackground)
-			}
-			if data[name].Dark != nil {
-				backgrounds = append(backgrounds, repoHelper.DarkBackground)
-			}
-
-			vimColorSchemes = append(
-				vimColorSchemes,
-				repoHelper.VimColorScheme{
-					Name:        name,
-					Data:        data[name],
-					Backgrounds: backgrounds,
+			if dataMap[name].Light != nil {
+				err = colorschemeVariantStore.UpsertColorschemeVariant(context.TODO(), &store.ColorschemeVariant{
+					Name:         name,
+					RepositoryID: repository.ID,
+					Background:   store.BackgroundLight,
+					ColorData:    dataMap[name].Light,
 				})
-		}
+				if err != nil {
+					log.Printf("Error upserting colorscheme variant: %s", err)
+				}
+			}
 
-		repository.VimColorSchemes = vimColorSchemes
-		repository.GenerateValid = len(repository.VimColorSchemes) > 0
-		updateRepositoryAfterGenerate(repository)
+			if dataMap[name].Dark != nil {
+				err = colorschemeVariantStore.UpsertColorschemeVariant(context.TODO(), &store.ColorschemeVariant{
+					Name:         name,
+					RepositoryID: repository.ID,
+					Background:   store.BackgroundDark,
+					ColorData:    dataMap[name].Dark,
+				})
+				if err != nil {
+					log.Printf("Error upserting colorscheme variant: %s", err)
+				}
+			}
+		}
 	}
 
 	cleanUp()
 
 	return len(repositories)
-}
-
-func updateRepositoryAfterGenerate(repository repoHelper.Repository) {
-	log.Printf("Generate valid: %v", repository.GenerateValid)
-	// generateObject := getGenerateRepositoryObject(repository)
-	// database.UpsertRepository(repository.ID, generateObject)
 }
 
 // Initializes a temporary directory for vim configuration files
@@ -258,22 +267,23 @@ func deletePlugin(key string) error {
 	return err
 }
 
-// Gathers the colorscheme data from vimcolorschemes/extractor.nvim
-func getVimColorSchemeColorData() (map[string]repoHelper.VimColorSchemeData, error) {
+// Gathers the colorscheme data from vimcolorschemes/extractor.nvim mapped by
+// colorscheme name
+func getColorschemeDataMap() (map[string]ColorschemeData, error) {
 	err := executePreviewGenerator()
 	if err != nil {
 		log.Printf("Error executing nvim: %s", err)
 		return nil, err
 	}
 
-	vimColorSchemeOutput, err := file.GetLocalFileContent(colorDataFilePath)
+	colorschemeOutput, err := file.GetLocalFileContent(colorDataFilePath)
 	if err != nil {
 		log.Printf("Error getting local file content from \"%s\": %s", colorDataFilePath, err)
 		return nil, err
 	}
 
-	var data map[string]repoHelper.VimColorSchemeData
-	err = json.Unmarshal([]byte(vimColorSchemeOutput), &data)
+	var data map[string]ColorschemeData
+	err = json.Unmarshal([]byte(colorschemeOutput), &data)
 	if err != nil {
 		return nil, err
 	}
@@ -322,13 +332,5 @@ func cleanUp() {
 	err := os.RemoveAll(tmpDirectoryPath)
 	if err != nil {
 		log.Panic(err)
-	}
-}
-
-func getGenerateRepositoryObject(repository repoHelper.Repository) bson.M {
-	return bson.M{
-		"vimColorSchemes": repository.VimColorSchemes,
-		"generateValid":   repository.GenerateValid,
-		"generatedAt":     time.Now(),
 	}
 }
