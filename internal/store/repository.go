@@ -15,6 +15,7 @@ type Repository struct {
 	Description string    `db:"description"`
 	CreatedAt   time.Time `db:"created_at"`
 	UpdatedAt   time.Time `db:"updated_at"`
+	GithubURL   string    `db:"github_url"`
 }
 
 type RepositoryStore struct {
@@ -35,7 +36,7 @@ func (store *RepositoryStore) GetByKey(ctx context.Context, key string) (*Reposi
 
 	var r Repository
 	err := store.database.QueryRowContext(ctx, `
-		SELECT id, owner, name, description, created_at, updated_at
+		SELECT id, owner, name, description, created_at, updated_at, github_url
 		FROM repositories
 		WHERE owner = ? AND name = ?
 	`, owner, name).Scan(
@@ -45,6 +46,7 @@ func (store *RepositoryStore) GetByKey(ctx context.Context, key string) (*Reposi
 		&r.Description,
 		&r.CreatedAt,
 		&r.UpdatedAt,
+		&r.GithubURL,
 	)
 
 	if err != nil {
@@ -59,13 +61,14 @@ func (store *RepositoryStore) GetByKey(ctx context.Context, key string) (*Reposi
 
 func (store *RepositoryStore) Upsert(ctx context.Context, r Repository) error {
 	_, err := store.database.ExecContext(ctx, `
-		INSERT INTO repositories (id, owner, name, description, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO repositories (id, owner, name, description, created_at, updated_at, github_url)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			owner = excluded.owner,
 			name = excluded.name,
 			description = excluded.description,
-			updated_at = excluded.updated_at;
+			updated_at = excluded.updated_at,
+			github_url = excluded.github_url;
 	`,
 		r.ID,
 		r.Owner,
@@ -73,13 +76,14 @@ func (store *RepositoryStore) Upsert(ctx context.Context, r Repository) error {
 		r.Description,
 		r.CreatedAt,
 		r.UpdatedAt,
+		r.GithubURL,
 	)
 	return err
 }
 
 func (store *RepositoryStore) GetAll() []Repository {
 	rows, err := store.database.Query(`
-		SELECT id, owner, name, description, created_at, updated_at
+		SELECT id, owner, name, description, created_at, updated_at, github_url
 		FROM repositories
 	`)
 	if err != nil {
@@ -97,6 +101,7 @@ func (store *RepositoryStore) GetAll() []Repository {
 			&r.Description,
 			&r.CreatedAt,
 			&r.UpdatedAt,
+			&r.GithubURL,
 		); err != nil {
 			panic(err)
 		}

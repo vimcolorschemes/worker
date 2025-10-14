@@ -46,6 +46,7 @@ func Update(_force bool, _debug bool, repoKey string) int {
 			Description: *githubRepository.Description,
 			CreatedAt:   *githubRepository.CreatedAt.GetTime(),
 			UpdatedAt:   *githubRepository.PushedAt.GetTime(),
+			GithubURL:   *githubRepository.HTMLURL,
 		})
 		if err != nil {
 			log.Println("Error upserting repository:", err)

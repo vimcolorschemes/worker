@@ -72,6 +72,7 @@ func Import(_force bool, _debug bool, repoKey string) int {
 			Description: *repository.Description,
 			CreatedAt:   *repository.CreatedAt.GetTime(),
 			UpdatedAt:   *repository.PushedAt.GetTime(),
+			GithubURL:   *repository.HTMLURL,
 		})
 		if err != nil {
 			log.Println("Error upserting repository:", err)
