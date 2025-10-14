@@ -5,7 +5,7 @@ CREATE TABLE repositories (
   description TEXT,
   created_at TIMESTAMP NOT NULL,
   updated_at TIMESTAMP NOT NULL,
-  github_url TEXT NOT NULL UNIQUE CHECK (github_url LIKE 'https?://github.com/%/%'),
+  github_url TEXT NOT NULL UNIQUE,
 
   UNIQUE(owner, name)
 );
