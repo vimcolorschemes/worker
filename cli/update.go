@@ -16,7 +16,7 @@ func init() {
 }
 
 // Update the imported repositories with all kinds of useful information
-func Update(_force bool, _debug bool, repoKey string) int {
+func Update(_force bool, _debug bool, repoKey string) database.JSONB {
 	var repositories []store.Repository
 	if repoKey != "" {
 		repository, err := repositoryStore.GetByKey(context.TODO(), repoKey)
@@ -61,5 +61,6 @@ func Update(_force bool, _debug bool, repoKey string) int {
 		}
 	}
 
-	return len(repositories)
+	log.Printf("Updated %d repositories", len(repositories))
+	return database.JSONB{"count": len(repositories)}
 }

@@ -44,7 +44,7 @@ func init() {
 }
 
 // Import potential vim color scheme repositories from Github
-func Import(_force bool, _debug bool, repoKey string) int {
+func Import(_force bool, _debug bool, repoKey string) database.JSONB {
 	log.Printf("Repository limit: %d", repositoryCountLimit)
 
 	var repositories []*gogithub.Repository
@@ -79,5 +79,6 @@ func Import(_force bool, _debug bool, repoKey string) int {
 		}
 	}
 
-	return len(repositories)
+	log.Printf("Imported %d repositories", len(repositories))
+	return database.JSONB{"count": len(repositories)}
 }

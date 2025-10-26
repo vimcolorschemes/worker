@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -9,15 +10,20 @@ import (
 	"time"
 
 	"github.com/vimcolorschemes/worker/cli"
+	"github.com/vimcolorschemes/worker/internal/database"
+	"github.com/vimcolorschemes/worker/internal/store"
 )
 
-var jobRunnerMap = map[string]func(force bool, debug bool, repoKey string) int{
+var jobRunnerMap = map[string]func(force bool, debug bool, repoKey string) database.JSONB{
 	"import":   cli.Import,
 	"update":   cli.Update,
 	"generate": cli.Generate,
 }
 
 func main() {
+	database := database.Connect()
+	jobReportStore := *store.NewJobReportStore(database)
+
 	job, force, debug, repoKey, err := getJobArgs(os.Args)
 
 	log.Printf("Running %s", job)
@@ -46,9 +52,18 @@ func main() {
 	fmt.Println()
 
 	data := runner(force, debug, repoKey)
-	log.Printf("Processed %d items", data)
 
 	elapsedTime := time.Since(startTime)
+
+	err = jobReportStore.Create(context.TODO(), store.JobReport{
+		Job:                  store.Job(job),
+		ReportData:           data,
+		ElapsedTimeInSeconds: int64(elapsedTime.Seconds()),
+		CreatedAt:            time.Now(),
+	})
+	if err != nil {
+		log.Panic(err)
+	}
 
 	fmt.Println()
 	log.Printf("Elapsed time: %s\n", elapsedTime)

@@ -10,6 +10,8 @@ import (
 	_ "github.com/tursodatabase/libsql-client-go/libsql"
 )
 
+type JSONB map[string]any
+
 func Connect() *sql.DB {
 	url := os.Getenv("TURSO_DATABASE_URL")
 	token := os.Getenv("TURSO_AUTH_TOKEN")

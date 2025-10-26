@@ -38,7 +38,7 @@ var colorDataFilePath string
 var debugMode bool
 
 // Generate vim color scheme data for all valid repositories
-func Generate(force bool, debug bool, repoKey string) int {
+func Generate(force bool, debug bool, repoKey string) database.JSONB {
 	debugMode = debug
 
 	initVimFiles()
@@ -117,7 +117,8 @@ func Generate(force bool, debug bool, repoKey string) int {
 
 	cleanUp()
 
-	return len(repositories)
+	log.Printf("Generated %d repositories", len(repositories))
+	return database.JSONB{"count": len(repositories)}
 }
 
 // Initializes a temporary directory for vim configuration files

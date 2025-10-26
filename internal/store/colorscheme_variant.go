@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"log"
 )
 
 type Background string
@@ -39,8 +38,6 @@ func (store *ColorschemeVariantStore) UpsertColorschemeVariant(ctx context.Conte
 	if err != nil {
 		return err
 	}
-
-	log.Printf("Upserting colorscheme variant %s: %v", colorschemeVariant.Name, colorData)
 
 	_, err = store.database.ExecContext(ctx, `
 			INSERT INTO colorscheme_variants (colorscheme_name, repository_id, background, color_data)
