@@ -8,12 +8,10 @@ import (
 	"github.com/vimcolorschemes/worker/internal/database"
 	"github.com/vimcolorschemes/worker/internal/github"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
-
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 // Update the imported repositories with all kinds of useful information
-func Update(_force bool, _debug bool, repoKey string) bson.M {
+func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	var repositories []repoHelper.Repository
 	if repoKey != "" {
 		repository, err := database.GetRepository(repoKey)
@@ -34,25 +32,25 @@ func Update(_force bool, _debug bool, repoKey string) bson.M {
 
 		updatedRepository := updateRepository(repository)
 
-		updateObject := getUpdateRepositoryObject(updatedRepository)
+		data := getUpdateData(updatedRepository)
 
-		database.UpsertRepository(repository.ID, updateObject)
+		database.UpdateRepositoryFromUpdate(repository.ID, data)
 	}
 
-	return bson.M{"repositoryCount": len(repositories)}
+	return map[string]interface{}{"repositoryCount": len(repositories)}
 }
 
 func updateRepository(repository repoHelper.Repository) repoHelper.Repository {
 	githubRepository, err := github.GetRepository(repository.Owner.Name, repository.Name)
 	if err != nil {
 		log.Print("Error fetching ", repository.Owner.Name, "/", repository.Name)
-		repository.UpdateValid = false
+		repository.IsEligible = false
 		return repository
 	}
 
 	if githubRepository.PushedAt == nil {
 		log.Print("No commits on ", repository.Owner.Name, "/", repository.Name)
-		repository.UpdateValid = false
+		repository.IsEligible = false
 		return repository
 	}
 
@@ -67,20 +65,20 @@ func updateRepository(repository repoHelper.Repository) repoHelper.Repository {
 	log.Print("Computing week stargazers count")
 	repository.WeekStargazersCount = repository.ComputeTrendingStargazersCount(7)
 
-	log.Print("Checking if ", repository.Owner.Name, "/", repository.Name, " is valid")
-	repository.UpdateValid = repository.IsValidAfterUpdate()
-	log.Printf("Update valid: %v", repository.UpdateValid)
+	log.Print("Checking if ", repository.Owner.Name, "/", repository.Name, " is eligible")
+	repository.IsEligible = repository.IsEligibleAfterUpdate()
+	log.Printf("Eligible after update: %v", repository.IsEligible)
 
 	return repository
 }
 
-func getUpdateRepositoryObject(repository repoHelper.Repository) bson.M {
-	return bson.M{
-		"pushedAt":               repository.PushedAt,
-		"stargazersCount":        repository.StargazersCount,
-		"stargazersCountHistory": repository.StargazersCountHistory,
-		"weekStargazersCount":    repository.WeekStargazersCount,
-		"updateValid":            repository.UpdateValid,
-		"updatedAt":              time.Now(),
+func getUpdateData(repository repoHelper.Repository) database.UpdateData {
+	return database.UpdateData{
+		PushedAt:               repository.PushedAt,
+		StargazersCount:        repository.StargazersCount,
+		StargazersCountHistory: repository.StargazersCountHistory,
+		WeekStargazersCount:    repository.WeekStargazersCount,
+		IsEligible:             repository.IsEligible,
+		UpdatedAt:              time.Now(),
 	}
 }

@@ -11,3 +11,19 @@ infra/terraform/*.tfvars
 infra/terraform/envs/*.tfvars
 !infra/terraform/backend.hcl.example
 !infra/terraform/envs/*.tfvars.example
+
+# local build artifacts
+worker
+
+# database files
+*.db
+
+# local environment files
+.env
+.env.docker
+.env.deploy
+
+# keep tracked templates
+!.env.example
+!.env.docker.example
+!.env.deploy.example

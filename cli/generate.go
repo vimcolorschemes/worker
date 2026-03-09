@@ -6,14 +6,11 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/vimcolorschemes/worker/internal/database"
 	file "github.com/vimcolorschemes/worker/internal/file"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
-
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 var tmpDirectoryPath string
@@ -21,15 +18,17 @@ var packDirectoryPath string
 var vimrcPath string
 var vimFilesPath string
 var colorDataFilePath string
+var defaultColorschemeFilePath string
+var defaultColorschemes map[string]bool
 var debugMode bool
 
-// Generate vim color scheme data for all valid repositories
-func Generate(force bool, debug bool, repoKey string) bson.M {
+// Generate color scheme data for all valid repositories
+func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 	debugMode = debug
 
-	initVimFiles()
+	initRuntimeFiles()
 
-	setupVim()
+	setupRuntime()
 
 	fmt.Println()
 
@@ -46,40 +45,39 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 		repositories = database.GetRepositoriesToGenerate()
 	}
 
-	log.Printf("Generating vim preview for %d repositories", len(repositories))
+	log.Printf("Generating previews for %d repositories", len(repositories))
 
 	for index, repository := range repositories {
-		log.Print("\nGenerating vim previews for ", repository.Owner.Name, "/", repository.Name, " (", index+1, "/", len(repositories), ")")
+		log.Print("\nGenerating previews for ", repository.Owner.Name, "/", repository.Name, " (", index+1, "/", len(repositories), ")")
 
 		key := fmt.Sprintf("%s__%s", repository.Owner.Name, repository.Name)
 		err := installPlugin(repository.GithubURL, key)
 		if err != nil {
 			log.Printf("Error installing plugin: %s", err)
-			repository.GenerateValid = false
 			updateRepositoryAfterGenerate(repository)
 			continue
 		}
 
-		var data, dataError = getVimColorSchemeColorData()
+		var data, dataError = getColorSchemeColorData()
 		err = deletePlugin(key)
 		if err != nil {
 			log.Printf("Error deleting plugin: %s", err)
 		}
 		if dataError != nil {
 			log.Printf("Error getting color data: %s", dataError)
-			repository.GenerateValid = false
 			updateRepositoryAfterGenerate(repository)
 			continue
 		}
 
-		var vimColorSchemes []repoHelper.VimColorScheme
+		var colorSchemes []repoHelper.ColorScheme
 
 		for name := range data {
-			if name == "default" || name == "module-injection" || name == "tick_tock" {
+			// Skip built-in colorschemes
+			if defaultColorschemes[name] || isDefaultColorscheme(name) {
 				continue
 			}
 
-			var backgrounds []repoHelper.VimBackgroundValue
+			var backgrounds []repoHelper.BackgroundValue
 			if data[name].Light != nil {
 				backgrounds = append(backgrounds, repoHelper.LightBackground)
 			}
@@ -87,33 +85,32 @@ func Generate(force bool, debug bool, repoKey string) bson.M {
 				backgrounds = append(backgrounds, repoHelper.DarkBackground)
 			}
 
-			vimColorSchemes = append(
-				vimColorSchemes,
-				repoHelper.VimColorScheme{
+			colorSchemes = append(
+				colorSchemes,
+				repoHelper.ColorScheme{
 					Name:        name,
 					Data:        data[name],
 					Backgrounds: backgrounds,
 				})
 		}
 
-		repository.VimColorSchemes = vimColorSchemes
-		repository.GenerateValid = len(repository.VimColorSchemes) > 0
+		repository.ColorSchemes = colorSchemes
 		updateRepositoryAfterGenerate(repository)
 	}
 
 	cleanUp()
 
-	return bson.M{"repositoryCount": len(repositories)}
+	return map[string]interface{}{"repositoryCount": len(repositories)}
 }
 
 func updateRepositoryAfterGenerate(repository repoHelper.Repository) {
-	log.Printf("Generate valid: %v", repository.GenerateValid)
-	generateObject := getGenerateRepositoryObject(repository)
-	database.UpsertRepository(repository.ID, generateObject)
+	log.Printf("Generated %d color schemes", len(repository.ColorSchemes))
+	data := getGenerateData(repository)
+	database.UpdateRepositoryFromGenerate(repository.ID, data)
 }
 
-// Initializes a temporary directory for vim configuration files
-func initVimFiles() {
+// Initializes a temporary directory for runtime configuration files
+func initRuntimeFiles() {
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		log.Panic(err)
@@ -124,6 +121,7 @@ func initVimFiles() {
 	vimFilesPath = fmt.Sprintf("%s/vim", workingDirectory)
 	vimrcPath = fmt.Sprintf("%s/init.lua", tmpDirectoryPath)
 	colorDataFilePath = fmt.Sprintf("%s/data.json", tmpDirectoryPath)
+	defaultColorschemeFilePath = fmt.Sprintf("%s/default_colorschemes.json", tmpDirectoryPath)
 
 	if _, err := os.Stat(tmpDirectoryPath); !os.IsNotExist(err) {
 		// .tmp directory exists, remove it
@@ -152,9 +150,9 @@ func initVimFiles() {
 	}
 }
 
-// Sets up the vim configuration common to all vim color schemes
-func setupVim() {
-	log.Print("Setting up vim config")
+// Sets up the runtime configuration common to all color schemes
+func setupRuntime() {
+	log.Print("Setting up runtime config")
 
 	baseVimrcContent, err := file.GetLocalFileContent(fmt.Sprintf("%s/init.lua", vimFilesPath))
 	if err != nil {
@@ -185,58 +183,46 @@ func setupVim() {
 		log.Panic(err)
 	}
 
-	err = removeDefaultColorschemes()
-	if err != nil {
-		log.Panic(err)
-	}
+	captureDefaultColorschemes()
 }
 
-// removeDefaultColorschemes removes all default colorschemes from the vim
-// runtime, except for "default", which is needed to run the preview generator.
-func removeDefaultColorschemes() error {
-	tmpRuntimeFilePath := fmt.Sprintf("%s/runtime", tmpDirectoryPath)
+// captureDefaultColorschemes runs nvim to get the list of built-in colorschemes
+// and populates the defaultColorschemes map.
+func captureDefaultColorschemes() {
+	log.Print("Capturing default colorschemes")
 
-	args := []string{"-es", "--headless", "-c", fmt.Sprintf("redir! > %s", tmpRuntimeFilePath), "-c", "echo $VIMRUNTIME", "-c", "redir END", "-c", "quit"}
-	cmd := exec.Command("nvim", args...)
+	cmd := exec.Command("nvim", "-u", vimrcPath, "--headless",
+		"-c", fmt.Sprintf("lua require('extractor').colorschemes({ output_path = '%s' })", defaultColorschemeFilePath),
+		"-c", "qa!")
 
 	log.Printf("Running %s", cmd)
+	cmd.Stdout = os.Stdout
 
 	err := cmd.Run()
 	if err != nil {
-		return err
+		log.Panic(err)
 	}
 
-	runtimePath, err := file.GetLocalFileContent(tmpRuntimeFilePath)
+	content, err := file.GetLocalFileContent(defaultColorschemeFilePath)
 	if err != nil {
-		return err
+		log.Panic(err)
 	}
 
-	runtimePath = strings.TrimSpace(runtimePath)
-	runtimePath = strings.Trim(runtimePath, "\n")
-
-	colorsPath := fmt.Sprintf("%s/colors", runtimePath)
-	log.Printf("Removing default colorschemes from: %s", colorsPath)
-
-	files, err := os.ReadDir(colorsPath)
+	var names []string
+	err = json.Unmarshal([]byte(content), &names)
 	if err != nil {
-		return err
+		log.Panic(err)
 	}
 
-	for _, file := range files {
-		if file.IsDir() || file.Name() == "default.vim" {
-			continue
-		}
-
-		err = os.Remove(fmt.Sprintf("%s/%s", colorsPath, file.Name()))
-		if err != nil {
-			return err
-		}
+	defaultColorschemes = make(map[string]bool, len(names))
+	for _, name := range names {
+		defaultColorschemes[name] = true
 	}
 
-	return nil
+	log.Printf("Captured %d default colorschemes", len(defaultColorschemes))
 }
 
-// Installs a plugin/color scheme on the vim configuration from a Github URL
+// Installs a plugin/color scheme on the runtime configuration from a Github URL
 func installPlugin(gitRepositoryURL string, path string) error {
 	log.Printf("Installing %s", path)
 
@@ -251,7 +237,7 @@ func installPlugin(gitRepositoryURL string, path string) error {
 	return nil
 }
 
-// Clears all installation traces of the vim plugin
+// Clears all installation traces of the plugin
 func deletePlugin(key string) error {
 	// Remove downloaded files
 	target := fmt.Sprintf("%s/%s", packDirectoryPath, key)
@@ -260,21 +246,21 @@ func deletePlugin(key string) error {
 }
 
 // Gathers the colorscheme data from vimcolorschemes/extractor.nvim
-func getVimColorSchemeColorData() (map[string]repoHelper.VimColorSchemeData, error) {
+func getColorSchemeColorData() (map[string]repoHelper.ColorSchemeData, error) {
 	err := executePreviewGenerator()
 	if err != nil {
 		log.Printf("Error executing nvim: %s", err)
 		return nil, err
 	}
 
-	vimColorSchemeOutput, err := file.GetLocalFileContent(colorDataFilePath)
+	colorSchemeOutput, err := file.GetLocalFileContent(colorDataFilePath)
 	if err != nil {
 		log.Printf("Error getting local file content from \"%s\": %s", colorDataFilePath, err)
 		return nil, err
 	}
 
-	var data map[string]repoHelper.VimColorSchemeData
-	err = json.Unmarshal([]byte(vimColorSchemeOutput), &data)
+	var data map[string]repoHelper.ColorSchemeData
+	err = json.Unmarshal([]byte(colorSchemeOutput), &data)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +275,7 @@ func getVimColorSchemeColorData() (map[string]repoHelper.VimColorSchemeData, err
 	return data, nil
 }
 
-// Starts a vim instance and auto commands to configure and start vcspg.vim on load
+// Starts a runtime instance and auto commands to configure and start vcspg on load
 func executePreviewGenerator() error {
 	args := []string{"-u", vimrcPath}
 
@@ -314,7 +300,7 @@ func executePreviewGenerator() error {
 	return nil
 }
 
-// Deletes the temporary directory used for the vim config
+// Deletes the temporary directory used for runtime config
 func cleanUp() {
 	if debugMode {
 		return
@@ -326,10 +312,20 @@ func cleanUp() {
 	}
 }
 
-func getGenerateRepositoryObject(repository repoHelper.Repository) bson.M {
-	return bson.M{
-		"vimColorSchemes": repository.VimColorSchemes,
-		"generateValid":   repository.GenerateValid,
-		"generatedAt":     time.Now(),
+func getGenerateData(repository repoHelper.Repository) database.GenerateData {
+	return database.GenerateData{
+		ColorSchemes: repository.ColorSchemes,
+		GeneratedAt:  time.Now(),
 	}
+}
+
+func isDefaultColorscheme(name string) bool {
+	defaultNames := map[string]bool{
+		"default":  true,
+		"habamax":  true,
+		"slate":    true,
+		"zaibatsu": true,
+	}
+
+	return defaultNames[name]
 }

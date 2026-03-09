@@ -1,0 +1,345 @@
+package database
+
+import (
+	"database/sql"
+	"testing"
+	"time"
+
+	"github.com/vimcolorschemes/worker/internal/repository"
+)
+
+func insertTestRepo(t *testing.T, id int64, ownerName, name string) {
+	t.Helper()
+	_, err := db.Exec(`INSERT INTO repositories (id, owner_name, name) VALUES (?, ?, ?)`, id, ownerName, name)
+	if err != nil {
+		t.Fatalf("insert test repo: %v", err)
+	}
+}
+
+func TestUpsertRepositoryFromImport(t *testing.T) {
+	t.Run("inserts a new repository", func(t *testing.T) {
+		setupTestDB(t)
+		now := time.Now().UTC().Truncate(time.Second)
+		UpsertRepositoryFromImport(ImportData{
+			ID:              1,
+			OwnerName:       "owner",
+			OwnerAvatarURL:  "https://avatar",
+			Name:            "repo",
+			GithubURL:       "https://github.com/owner/repo",
+			GithubCreatedAt: now,
+			PushedAt:        now,
+		})
+
+		var id int64
+		var ownerName, ownerAvatarURL, name, githubURL string
+		err := db.QueryRow(`SELECT id, owner_name, owner_avatar_url, name, github_url FROM repositories WHERE id = 1`).
+			Scan(&id, &ownerName, &ownerAvatarURL, &name, &githubURL)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if id != 1 {
+			t.Fatalf("id = %d, want 1", id)
+		}
+		if ownerName != "owner" {
+			t.Fatalf("owner_name = %q, want %q", ownerName, "owner")
+		}
+		if ownerAvatarURL != "https://avatar" {
+			t.Fatalf("owner_avatar_url = %q, want %q", ownerAvatarURL, "https://avatar")
+		}
+		if name != "repo" {
+			t.Fatalf("name = %q, want %q", name, "repo")
+		}
+		if githubURL != "https://github.com/owner/repo" {
+			t.Fatalf("github_url = %q, want %q", githubURL, "https://github.com/owner/repo")
+		}
+	})
+
+	t.Run("updates existing repository on conflict", func(t *testing.T) {
+		setupTestDB(t)
+		now := time.Now().UTC().Truncate(time.Second)
+		UpsertRepositoryFromImport(ImportData{ID: 1, OwnerName: "owner", Name: "repo", PushedAt: now})
+		UpsertRepositoryFromImport(ImportData{ID: 1, OwnerName: "new-owner", Name: "new-repo", PushedAt: now})
+
+		var ownerName, name string
+		err := db.QueryRow(`SELECT owner_name, name FROM repositories WHERE id = 1`).Scan(&ownerName, &name)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if ownerName != "new-owner" {
+			t.Fatalf("owner_name = %q, want %q", ownerName, "new-owner")
+		}
+		if name != "new-repo" {
+			t.Fatalf("name = %q, want %q", name, "new-repo")
+		}
+	})
+}
+
+func TestGetRepositories(t *testing.T) {
+	t.Run("returns empty slice when no repositories", func(t *testing.T) {
+		setupTestDB(t)
+		repos := GetRepositories()
+		if len(repos) != 0 {
+			t.Fatalf("len(repos) = %d, want 0", len(repos))
+		}
+	})
+
+	t.Run("returns all repositories", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner1", "repo1")
+		insertTestRepo(t, 2, "owner2", "repo2")
+
+		repos := GetRepositories()
+		if len(repos) != 2 {
+			t.Fatalf("len(repos) = %d, want 2", len(repos))
+		}
+		ids := map[int64]bool{repos[0].ID: true, repos[1].ID: true}
+		if !ids[1] || !ids[2] {
+			t.Fatalf("expected IDs 1 and 2, got %v", ids)
+		}
+	})
+}
+
+func TestGetRepository(t *testing.T) {
+	t.Run("returns the repository by owner and name", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		repo, err := GetRepository("owner/repo")
+		if err != nil {
+			t.Fatalf("GetRepository returned error: %v", err)
+		}
+		if repo.ID != 1 {
+			t.Fatalf("ID = %d, want 1", repo.ID)
+		}
+		if repo.Owner.Name != "owner" {
+			t.Fatalf("Owner.Name = %q, want %q", repo.Owner.Name, "owner")
+		}
+		if repo.Name != "repo" {
+			t.Fatalf("Name = %q, want %q", repo.Name, "repo")
+		}
+	})
+
+	t.Run("is case-insensitive", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		repo, err := GetRepository("OWNER/REPO")
+		if err != nil {
+			t.Fatalf("GetRepository returned error: %v", err)
+		}
+		if repo.ID != 1 {
+			t.Fatalf("ID = %d, want 1", repo.ID)
+		}
+	})
+
+	t.Run("returns error for invalid key", func(t *testing.T) {
+		setupTestDB(t)
+		_, err := GetRepository("noslash")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("returns error when not found", func(t *testing.T) {
+		setupTestDB(t)
+		_, err := GetRepository("x/y")
+		if err != sql.ErrNoRows {
+			t.Fatalf("expected sql.ErrNoRows, got %v", err)
+		}
+	})
+}
+
+func TestGetRepositoriesToGenerate(t *testing.T) {
+	insertRepoForGenerate := func(t *testing.T, id int64, isEligible int, pushedAt, generatedAt interface{}) {
+		t.Helper()
+		_, err := db.Exec(
+			`INSERT INTO repositories (id, owner_name, name, is_eligible, pushed_at, generated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+			id, "owner", "repo", isEligible, pushedAt, generatedAt,
+		)
+		if err != nil {
+			t.Fatalf("insert repo: %v", err)
+		}
+	}
+
+	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	t.Run("returns repos where is_eligible=1 and pushed_at > generated_at", func(t *testing.T) {
+		setupTestDB(t)
+		insertRepoForGenerate(t, 1, 1, base.Add(time.Hour), base)
+
+		repos := GetRepositoriesToGenerate()
+		if len(repos) != 1 {
+			t.Fatalf("len(repos) = %d, want 1", len(repos))
+		}
+		if repos[0].ID != 1 {
+			t.Fatalf("ID = %d, want 1", repos[0].ID)
+		}
+	})
+
+	t.Run("excludes repos where is_eligible=0", func(t *testing.T) {
+		setupTestDB(t)
+		insertRepoForGenerate(t, 1, 0, base.Add(time.Hour), base)
+
+		repos := GetRepositoriesToGenerate()
+		if len(repos) != 0 {
+			t.Fatalf("len(repos) = %d, want 0", len(repos))
+		}
+	})
+
+	t.Run("excludes repos where generated_at >= pushed_at", func(t *testing.T) {
+		setupTestDB(t)
+		insertRepoForGenerate(t, 1, 1, base, base.Add(time.Hour))
+
+		repos := GetRepositoriesToGenerate()
+		if len(repos) != 0 {
+			t.Fatalf("len(repos) = %d, want 0", len(repos))
+		}
+	})
+
+	t.Run("includes repos where generated_at IS NULL", func(t *testing.T) {
+		setupTestDB(t)
+		insertRepoForGenerate(t, 1, 1, base, nil)
+
+		repos := GetRepositoriesToGenerate()
+		if len(repos) != 1 {
+			t.Fatalf("len(repos) = %d, want 1", len(repos))
+		}
+	})
+}
+
+func TestUpdateRepositoryFromUpdate(t *testing.T) {
+	t.Run("updates all fields correctly", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		UpdateRepositoryFromUpdate(1, UpdateData{
+			StargazersCount:     42,
+			WeekStargazersCount: 7,
+			IsEligible:          true,
+		})
+
+		var stargazersCount, weekStargazersCount int
+		var isEligible bool
+		err := db.QueryRow(`SELECT stargazers_count, week_stargazers_count, is_eligible FROM repositories WHERE id = 1`).
+			Scan(&stargazersCount, &weekStargazersCount, &isEligible)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if stargazersCount != 42 {
+			t.Fatalf("stargazers_count = %d, want 42", stargazersCount)
+		}
+		if weekStargazersCount != 7 {
+			t.Fatalf("week_stargazers_count = %d, want 7", weekStargazersCount)
+		}
+		if !isEligible {
+			t.Fatal("is_eligible = false, want true")
+		}
+	})
+
+	t.Run("roundtrips stargazers_count_history JSON", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		history := []repository.StargazersCountHistoryItem{
+			{Date: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), StargazersCount: 10},
+			{Date: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC), StargazersCount: 20},
+		}
+		UpdateRepositoryFromUpdate(1, UpdateData{StargazersCountHistory: history})
+
+		repo, err := GetRepository("owner/repo")
+		if err != nil {
+			t.Fatalf("GetRepository: %v", err)
+		}
+		if len(repo.StargazersCountHistory) != 2 {
+			t.Fatalf("StargazersCountHistory len = %d, want 2", len(repo.StargazersCountHistory))
+		}
+		if repo.StargazersCountHistory[0].StargazersCount != 10 {
+			t.Fatalf("StargazersCount[0] = %d, want 10", repo.StargazersCountHistory[0].StargazersCount)
+		}
+		if repo.StargazersCountHistory[1].StargazersCount != 20 {
+			t.Fatalf("StargazersCount[1] = %d, want 20", repo.StargazersCountHistory[1].StargazersCount)
+		}
+	})
+}
+
+func TestUpdateRepositoryFromGenerate(t *testing.T) {
+	t.Run("saves color schemes and groups", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		now := time.Now().UTC().Truncate(time.Second)
+		UpdateRepositoryFromGenerate(1, GenerateData{
+			ColorSchemes: []repository.ColorScheme{
+				{
+					Name: "myscheme",
+					Data: repository.ColorSchemeData{
+						Light: []repository.ColorSchemeGroup{{Name: "Normal", HexCode: "#ffffff"}},
+						Dark:  []repository.ColorSchemeGroup{{Name: "Normal", HexCode: "#000000"}},
+					},
+				},
+			},
+			GeneratedAt: now,
+		})
+
+		repo, err := GetRepository("owner/repo")
+		if err != nil {
+			t.Fatalf("GetRepository: %v", err)
+		}
+		if len(repo.ColorSchemes) != 1 {
+			t.Fatalf("ColorSchemes len = %d, want 1", len(repo.ColorSchemes))
+		}
+		scheme := repo.ColorSchemes[0]
+		if scheme.Name != "myscheme" {
+			t.Fatalf("Name = %q, want %q", scheme.Name, "myscheme")
+		}
+		if len(scheme.Data.Light) != 1 {
+			t.Fatalf("Data.Light len = %d, want 1", len(scheme.Data.Light))
+		}
+		if len(scheme.Data.Dark) != 1 {
+			t.Fatalf("Data.Dark len = %d, want 1", len(scheme.Data.Dark))
+		}
+		if repo.GeneratedAt.IsZero() {
+			t.Fatal("GeneratedAt = zero, want non-zero")
+		}
+	})
+
+	t.Run("replaces existing color schemes", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		UpdateRepositoryFromGenerate(1, GenerateData{
+			ColorSchemes: []repository.ColorScheme{{Name: "scheme1"}},
+		})
+		UpdateRepositoryFromGenerate(1, GenerateData{
+			ColorSchemes: []repository.ColorScheme{{Name: "scheme2"}},
+		})
+
+		repo, err := GetRepository("owner/repo")
+		if err != nil {
+			t.Fatalf("GetRepository: %v", err)
+		}
+		if len(repo.ColorSchemes) != 1 {
+			t.Fatalf("ColorSchemes len = %d, want 1", len(repo.ColorSchemes))
+		}
+		if repo.ColorSchemes[0].Name != "scheme2" {
+			t.Fatalf("Name = %q, want %q", repo.ColorSchemes[0].Name, "scheme2")
+		}
+	})
+
+	t.Run("sets generated_at", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+		now := time.Now().UTC().Truncate(time.Second)
+
+		UpdateRepositoryFromGenerate(1, GenerateData{GeneratedAt: now})
+
+		var generatedAt time.Time
+		err := db.QueryRow(`SELECT generated_at FROM repositories WHERE id = 1`).Scan(&generatedAt)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if generatedAt.IsZero() {
+			t.Fatal("generated_at = zero, want non-zero")
+		}
+	})
+}

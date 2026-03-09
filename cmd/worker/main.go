@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-
 	"github.com/vimcolorschemes/worker/cli"
 	"github.com/vimcolorschemes/worker/internal/database"
 )
@@ -48,7 +46,7 @@ func main() {
 
 	fmt.Println()
 
-	data := runner.(func(force bool, debug bool, repoKey string) bson.M)(force, debug, repoKey)
+	data := runner.(func(force bool, debug bool, repoKey string) map[string]interface{})(force, debug, repoKey)
 
 	elapsedTime := time.Since(startTime)
 	database.CreateReport(job, elapsedTime.Seconds(), data)
