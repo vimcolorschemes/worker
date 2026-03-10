@@ -11,6 +11,7 @@ var schemaStatements = []string{
 		owner_name               TEXT NOT NULL DEFAULT '',
 		owner_avatar_url         TEXT NOT NULL DEFAULT '',
 		name                     TEXT NOT NULL DEFAULT '',
+		description              TEXT NOT NULL DEFAULT '',
 		github_url               TEXT NOT NULL DEFAULT '',
 		stargazers_count         INTEGER NOT NULL DEFAULT 0,
 		stargazers_count_history TEXT NOT NULL DEFAULT '[]',
@@ -40,6 +41,48 @@ var schemaStatements = []string{
 		elapsed_time REAL NOT NULL,
 		data         TEXT NOT NULL DEFAULT '{}'
 	)`,
+
+	// Case-insensitive lookup for repository detail pages.
+	`CREATE INDEX IF NOT EXISTS idx_repositories_owner_name_name_nocase
+		ON repositories(owner_name COLLATE NOCASE, name COLLATE NOCASE)`,
+
+	// Trending sort for repository lists.
+	`CREATE INDEX IF NOT EXISTS idx_repositories_week_stargazers_count_id
+		ON repositories(week_stargazers_count DESC, id)`,
+
+	// Top sort for repository lists.
+	`CREATE INDEX IF NOT EXISTS idx_repositories_stargazers_count_id
+		ON repositories(stargazers_count DESC, id)`,
+
+	// New/old sort for repository lists.
+	`CREATE INDEX IF NOT EXISTS idx_repositories_github_created_at_id
+		ON repositories(github_created_at, id)`,
+
+	// Owner page listing sorted by trending.
+	`CREATE INDEX IF NOT EXISTS idx_repositories_owner_week_stars_id_nocase
+		ON repositories(owner_name COLLATE NOCASE, week_stargazers_count DESC, id)`,
+
+	// Fast existence checks and joins for repository color schemes.
+	`CREATE INDEX IF NOT EXISTS idx_color_schemes_repository_id_id
+		ON color_schemes(repository_id, id)`,
+
+	// Fast loading of groups for each selected color scheme.
+	`CREATE INDEX IF NOT EXISTS idx_color_scheme_groups_scheme_id_id
+		ON color_scheme_groups(color_scheme_id, id)`,
+
+	// Background filter support (dark/light/both).
+	`CREATE INDEX IF NOT EXISTS idx_color_scheme_groups_background_scheme_id
+		ON color_scheme_groups(background, color_scheme_id)`,
+
+	// Generate queue: eligible repositories never generated.
+	`CREATE INDEX IF NOT EXISTS idx_repositories_generate_pending
+		ON repositories(pushed_at, id)
+		WHERE is_eligible = 1 AND generated_at IS NULL`,
+
+	// Generate queue: eligible repositories with stale generated data.
+	`CREATE INDEX IF NOT EXISTS idx_repositories_generate_stale
+		ON repositories(pushed_at, generated_at, id)
+		WHERE is_eligible = 1 AND generated_at IS NOT NULL`,
 }
 
 func initializeSchema(db *sql.DB) error {
@@ -124,6 +167,12 @@ func migrateRepositoriesSchema(db *sql.DB) error {
 	if columns["generate_valid"] {
 		if _, err := db.Exec("ALTER TABLE repositories DROP COLUMN generate_valid"); err != nil {
 			return fmt.Errorf("drop generate_valid: %w", err)
+		}
+	}
+
+	if !columns["description"] {
+		if _, err := db.Exec("ALTER TABLE repositories ADD COLUMN description TEXT NOT NULL DEFAULT ''"); err != nil {
+			return fmt.Errorf("add description column: %w", err)
 		}
 	}
 
