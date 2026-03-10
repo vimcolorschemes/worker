@@ -77,7 +77,10 @@ func TestUpsertRepositoryFromImport(t *testing.T) {
 func TestGetRepositories(t *testing.T) {
 	t.Run("returns empty slice when no repositories", func(t *testing.T) {
 		setupTestDB(t)
-		repos := GetRepositories()
+		repos, err := GetRepositories()
+		if err != nil {
+			t.Fatalf("GetRepositories returned error: %v", err)
+		}
 		if len(repos) != 0 {
 			t.Fatalf("len(repos) = %d, want 0", len(repos))
 		}
@@ -88,7 +91,10 @@ func TestGetRepositories(t *testing.T) {
 		insertTestRepo(t, 1, "owner1", "repo1")
 		insertTestRepo(t, 2, "owner2", "repo2")
 
-		repos := GetRepositories()
+		repos, err := GetRepositories()
+		if err != nil {
+			t.Fatalf("GetRepositories returned error: %v", err)
+		}
 		if len(repos) != 2 {
 			t.Fatalf("len(repos) = %d, want 2", len(repos))
 		}
@@ -167,7 +173,10 @@ func TestGetRepositoriesToGenerate(t *testing.T) {
 		setupTestDB(t)
 		insertRepoForGenerate(t, 1, 1, base.Add(time.Hour), base)
 
-		repos := GetRepositoriesToGenerate()
+		repos, err := GetRepositoriesToGenerate()
+		if err != nil {
+			t.Fatalf("GetRepositoriesToGenerate returned error: %v", err)
+		}
 		if len(repos) != 1 {
 			t.Fatalf("len(repos) = %d, want 1", len(repos))
 		}
@@ -180,7 +189,10 @@ func TestGetRepositoriesToGenerate(t *testing.T) {
 		setupTestDB(t)
 		insertRepoForGenerate(t, 1, 0, base.Add(time.Hour), base)
 
-		repos := GetRepositoriesToGenerate()
+		repos, err := GetRepositoriesToGenerate()
+		if err != nil {
+			t.Fatalf("GetRepositoriesToGenerate returned error: %v", err)
+		}
 		if len(repos) != 0 {
 			t.Fatalf("len(repos) = %d, want 0", len(repos))
 		}
@@ -190,7 +202,10 @@ func TestGetRepositoriesToGenerate(t *testing.T) {
 		setupTestDB(t)
 		insertRepoForGenerate(t, 1, 1, base, base.Add(time.Hour))
 
-		repos := GetRepositoriesToGenerate()
+		repos, err := GetRepositoriesToGenerate()
+		if err != nil {
+			t.Fatalf("GetRepositoriesToGenerate returned error: %v", err)
+		}
 		if len(repos) != 0 {
 			t.Fatalf("len(repos) = %d, want 0", len(repos))
 		}
@@ -200,7 +215,10 @@ func TestGetRepositoriesToGenerate(t *testing.T) {
 		setupTestDB(t)
 		insertRepoForGenerate(t, 1, 1, base, nil)
 
-		repos := GetRepositoriesToGenerate()
+		repos, err := GetRepositoriesToGenerate()
+		if err != nil {
+			t.Fatalf("GetRepositoriesToGenerate returned error: %v", err)
+		}
 		if len(repos) != 1 {
 			t.Fatalf("len(repos) = %d, want 1", len(repos))
 		}

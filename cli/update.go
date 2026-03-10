@@ -20,7 +20,11 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 		}
 		repositories = []repoHelper.Repository{repository}
 	} else {
-		repositories = database.GetRepositories()
+		var err error
+		repositories, err = database.GetRepositories()
+		if err != nil {
+			log.Panic(err)
+		}
 	}
 
 	log.Print(len(repositories), " repositories to update")

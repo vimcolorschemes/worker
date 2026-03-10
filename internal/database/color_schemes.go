@@ -9,11 +9,11 @@ import (
 
 func loadColorSchemes(repositoryID int64) ([]repository.ColorScheme, error) {
 	rows, err := db.Query(`
-		SELECT vcs.id, vcs.name, vcsg.background, vcsg.name, vcsg.hex_code
-		FROM color_schemes vcs
-		LEFT JOIN color_scheme_groups vcsg ON vcsg.color_scheme_id = vcs.id
-		WHERE vcs.repository_id = ?
-		ORDER BY vcs.id, vcsg.id`, repositoryID)
+		SELECT cs.id, cs.name, csg.background, csg.name, csg.hex_code
+		FROM color_schemes cs
+		LEFT JOIN color_scheme_groups csg ON csg.color_scheme_id = cs.id
+		WHERE cs.repository_id = ?
+		ORDER BY cs.id, csg.id`, repositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -102,6 +102,15 @@ func scanRepository(s scannable) (repository.Repository, error) {
 	}
 
 	if err := json.Unmarshal([]byte(historyJSON), &repo.StargazersCountHistory); err != nil {
+		return repository.Repository{}, err
+	}
+
+	return repo, nil
+}
+
+func scanRepositoryWithColorSchemes(s scannable) (repository.Repository, error) {
+	repo, err := scanRepository(s)
+	if err != nil {
 		return repository.Repository{}, err
 	}
 

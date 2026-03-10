@@ -40,9 +40,17 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 		}
 		repositories = []repoHelper.Repository{repository}
 	} else if force || debug {
-		repositories = database.GetRepositories()
+		var err error
+		repositories, err = database.GetRepositories()
+		if err != nil {
+			log.Panic(err)
+		}
 	} else {
-		repositories = database.GetRepositoriesToGenerate()
+		var err error
+		repositories, err = database.GetRepositoriesToGenerate()
+		if err != nil {
+			log.Panic(err)
+		}
 	}
 
 	log.Printf("Generating previews for %d repositories", len(repositories))

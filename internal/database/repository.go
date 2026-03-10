@@ -37,29 +37,9 @@ type GenerateData struct {
 	GeneratedAt  time.Time
 }
 
-const repositorySelectColumns = "id, owner_name, owner_avatar_url, name, github_url, stargazers_count, stargazers_count_history, week_stargazers_count, github_created_at, pushed_at, is_eligible, updated_at, generated_at"
-
-func queryRepositories(query string, args ...any) []repository.Repository {
-	rows, err := db.Query(query, args...)
-	if err != nil {
-		panic(err)
-	}
-	defer rows.Close()
-
-	var repositories []repository.Repository
-	for rows.Next() {
-		repo, err := scanRepository(rows)
-		if err != nil {
-			panic(err)
-		}
-		repositories = append(repositories, repo)
-	}
-	return repositories
-}
-
 // GetRepositories gets all repositories stored in the database.
-func GetRepositories() []repository.Repository {
-	return queryRepositories("SELECT " + repositorySelectColumns + " FROM repositories")
+func GetRepositories() ([]repository.Repository, error) {
+	return queryRepositories(queryAllRepositories)
 }
 
 // GetRepository gets the repository matching the repository key.
@@ -69,9 +49,9 @@ func GetRepository(repoKey string) (repository.Repository, error) {
 		return repository.Repository{}, errors.New("key not valid")
 	}
 
-	row := db.QueryRow("SELECT "+repositorySelectColumns+" FROM repositories WHERE owner_name = ? COLLATE NOCASE AND name = ? COLLATE NOCASE", matches[0], matches[1])
+	row := db.QueryRow(queryRepositoryByOwnerAndName, matches[0], matches[1])
 
-	repo, err := scanRepository(row)
+	repo, err := scanRepositoryWithColorSchemes(row)
 	if err != nil {
 		return repository.Repository{}, err
 	}
@@ -79,8 +59,8 @@ func GetRepository(repoKey string) (repository.Repository, error) {
 }
 
 // GetRepositoriesToGenerate gets all repositories that are due for a preview generate.
-func GetRepositoriesToGenerate() []repository.Repository {
-	return queryRepositories("SELECT " + repositorySelectColumns + " FROM repositories WHERE is_eligible = 1 AND (generated_at IS NULL OR pushed_at > generated_at)")
+func GetRepositoriesToGenerate() ([]repository.Repository, error) {
+	return queryRepositories(queryRepositoriesToGenerate)
 }
 
 // UpsertRepositoryFromImport inserts or updates a repository from import data.
