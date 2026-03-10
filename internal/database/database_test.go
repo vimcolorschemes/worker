@@ -21,7 +21,7 @@ func setupTestDB(t *testing.T) {
 		t.Fatalf("initializeSchema returned error: %v", err)
 	}
 	t.Cleanup(func() {
-		db.Close()
+		_ = db.Close()
 		db = nil
 	})
 }
@@ -72,7 +72,9 @@ func TestInitializeSchemaCreatesAllTables(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sql.Open returned error: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	if err := initializeSchema(db); err != nil {
 		t.Fatalf("initializeSchema returned error: %v", err)
@@ -96,7 +98,9 @@ func TestInitializeSchemaCreatesExpectedIndexes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sql.Open returned error: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	if err := initializeSchema(db); err != nil {
 		t.Fatalf("initializeSchema returned error: %v", err)
@@ -131,7 +135,9 @@ func TestInitializeSchemaMigratesDescriptionColumn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sql.Open returned error: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	_, err = db.Exec(`CREATE TABLE repositories (
 		id INTEGER PRIMARY KEY,

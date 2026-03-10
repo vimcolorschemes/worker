@@ -184,7 +184,9 @@ func getTableColumns(db *sql.DB, tableName string) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns := make(map[string]bool)
 	for rows.Next() {

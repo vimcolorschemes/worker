@@ -24,9 +24,15 @@ func TestLoadColorSchemes(t *testing.T) {
 	t.Run("returns schemes with light and dark groups", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
-		db.Exec(`INSERT INTO color_schemes (id, repository_id, name) VALUES (1, 1, 'myscheme')`)
-		db.Exec(`INSERT INTO color_scheme_groups (color_scheme_id, background, name, hex_code) VALUES (1, 'light', 'Normal', '#fff')`)
-		db.Exec(`INSERT INTO color_scheme_groups (color_scheme_id, background, name, hex_code) VALUES (1, 'dark', 'Normal', '#000')`)
+		if _, err := db.Exec(`INSERT INTO color_schemes (id, repository_id, name) VALUES (1, 1, 'myscheme')`); err != nil {
+			t.Fatalf("insert color_scheme: %v", err)
+		}
+		if _, err := db.Exec(`INSERT INTO color_scheme_groups (color_scheme_id, background, name, hex_code) VALUES (1, 'light', 'Normal', '#fff')`); err != nil {
+			t.Fatalf("insert light color_scheme_group: %v", err)
+		}
+		if _, err := db.Exec(`INSERT INTO color_scheme_groups (color_scheme_id, background, name, hex_code) VALUES (1, 'dark', 'Normal', '#000')`); err != nil {
+			t.Fatalf("insert dark color_scheme_group: %v", err)
+		}
 
 		schemes, err := loadColorSchemes(1)
 		if err != nil {
@@ -49,8 +55,12 @@ func TestLoadColorSchemes(t *testing.T) {
 	t.Run("derives backgrounds from groups", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
-		db.Exec(`INSERT INTO color_schemes (id, repository_id, name) VALUES (1, 1, 'darkonly')`)
-		db.Exec(`INSERT INTO color_scheme_groups (color_scheme_id, background, name, hex_code) VALUES (1, 'dark', 'Normal', '#000')`)
+		if _, err := db.Exec(`INSERT INTO color_schemes (id, repository_id, name) VALUES (1, 1, 'darkonly')`); err != nil {
+			t.Fatalf("insert color_scheme: %v", err)
+		}
+		if _, err := db.Exec(`INSERT INTO color_scheme_groups (color_scheme_id, background, name, hex_code) VALUES (1, 'dark', 'Normal', '#000')`); err != nil {
+			t.Fatalf("insert color_scheme_group: %v", err)
+		}
 
 		schemes, err := loadColorSchemes(1)
 		if err != nil {
@@ -67,7 +77,9 @@ func TestLoadColorSchemes(t *testing.T) {
 	t.Run("handles scheme with no groups", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
-		db.Exec(`INSERT INTO color_schemes (id, repository_id, name) VALUES (1, 1, 'nogroups')`)
+		if _, err := db.Exec(`INSERT INTO color_schemes (id, repository_id, name) VALUES (1, 1, 'nogroups')`); err != nil {
+			t.Fatalf("insert color_scheme: %v", err)
+		}
 
 		schemes, err := loadColorSchemes(1)
 		if err != nil {
@@ -131,17 +143,16 @@ func TestScanRepository(t *testing.T) {
 		if err != nil {
 			t.Fatalf("scanRepository: %v", err)
 		}
-		var zero time.Time
-		if repo.GithubCreatedAt != zero {
+		if !repo.GithubCreatedAt.IsZero() {
 			t.Fatalf("GithubCreatedAt should be zero, got %v", repo.GithubCreatedAt)
 		}
-		if repo.PushedAt != zero {
+		if !repo.PushedAt.IsZero() {
 			t.Fatalf("PushedAt should be zero, got %v", repo.PushedAt)
 		}
-		if repo.UpdatedAt != zero {
+		if !repo.UpdatedAt.IsZero() {
 			t.Fatalf("UpdatedAt should be zero, got %v", repo.UpdatedAt)
 		}
-		if repo.GeneratedAt != zero {
+		if !repo.GeneratedAt.IsZero() {
 			t.Fatalf("GeneratedAt should be zero, got %v", repo.GeneratedAt)
 		}
 	})

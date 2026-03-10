@@ -106,7 +106,7 @@ func (repository Repository) AppendToStargazersCountHistory() []StargazersCountH
 	// remove present entries for today
 	for index := 0; index < len(history); {
 		item := history[index]
-		if item.Date == today {
+		if item.Date.Equal(today) {
 			history = append(history[:index], history[index+1:]...)
 		} else {
 			index++
@@ -150,8 +150,7 @@ func (repository Repository) ComputeTrendingStargazersCount(dayCount int) int {
 // IsEligibleAfterUpdate returns true if a repository is considered
 // eligible from our standards after an update job
 func (repository Repository) IsEligibleAfterUpdate() bool {
-	var defaultTime time.Time
-	if repository.PushedAt == defaultTime {
+	if repository.PushedAt.IsZero() {
 		log.Print("Repository last commit date is not valid")
 		return false
 	}

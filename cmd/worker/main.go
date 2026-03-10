@@ -58,7 +58,7 @@ func main() {
 
 func getJobArgs(osArgs []string) (string, bool, bool, string, error) {
 	if len(osArgs) < 2 {
-		return "", false, false, "", errors.New("Please provide an argument")
+		return "", false, false, "", errors.New("please provide an argument")
 	}
 
 	job := osArgs[1]

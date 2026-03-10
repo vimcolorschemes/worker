@@ -44,7 +44,7 @@ func init() {
 // GetRepository gets a repository from the Github API using a repository's owner and name
 func GetRepository(ownerName string, name string) (*gogithub.Repository, error) {
 	if strings.HasSuffix(os.Args[0], ".test") {
-		return nil, errors.New("Running in test mode")
+		return nil, errors.New("running in test mode")
 	}
 
 	repository, response, err := client.Repositories.Get(context.Background(), ownerName, name)
@@ -138,7 +138,7 @@ func waitForRateLimitReset(resetTime gogithub.Timestamp) {
 
 		time.Sleep(time.Second)
 
-		if resetTime.Time.Before(time.Now()) {
+		if resetTime.Before(time.Now()) {
 			log.Print("Rate limit over, continuing...")
 			break
 		}

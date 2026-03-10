@@ -102,7 +102,9 @@ func UpdateRepositoryFromGenerate(id int64, data GenerateData) {
 	if err != nil {
 		panic(err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	_, err = tx.Exec("DELETE FROM color_schemes WHERE repository_id = ?", id)
 	if err != nil {

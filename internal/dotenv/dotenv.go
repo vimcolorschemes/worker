@@ -47,7 +47,7 @@ func GetInt(key string) (int, error) {
 	result, err := strconv.Atoi(value)
 
 	if err != nil {
-		return 0, fmt.Errorf("Error parsing %s to int with value %s", key, value)
+		return 0, fmt.Errorf("error parsing %s to int with value %s", key, value)
 	}
 
 	return result, nil

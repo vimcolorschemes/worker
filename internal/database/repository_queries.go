@@ -45,7 +45,9 @@ func queryRepositories(query string, args ...any) ([]repository.Repository, erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var repositories []repository.Repository
 	for rows.Next() {

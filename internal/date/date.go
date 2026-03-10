@@ -14,5 +14,5 @@ func RoundTimeToDate(datetime time.Time) time.Time {
 
 // IsSameDay returns true if 2 dates are on the same specific day
 func IsSameDay(time1 time.Time, time2 time.Time) bool {
-	return RoundTimeToDate(time1) == RoundTimeToDate(time2)
+	return RoundTimeToDate(time1).Equal(RoundTimeToDate(time2))
 }

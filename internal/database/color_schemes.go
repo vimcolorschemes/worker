@@ -17,11 +17,12 @@ func loadColorSchemes(repositoryID int64) ([]repository.ColorScheme, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	type schemeEntry struct {
-		scheme repository.ColorScheme
-		index  int
+		index int
 	}
 	schemeMap := make(map[int64]*schemeEntry)
 	var schemes []repository.ColorScheme
