@@ -77,13 +77,13 @@ type scannable interface {
 func scanRepository(s scannable) (repository.Repository, error) {
 	var repo repository.Repository
 	var historyJSON string
-	var githubCreatedAt, pushedAt, updatedAt, generatedAt sql.NullTime
+	var githubCreatedAt, pushedAt, updatedAt sql.NullTime
 
 	err := s.Scan(
 		&repo.ID, &repo.Owner.Name, &repo.Owner.AvatarURL, &repo.Name, &repo.GithubURL,
 		&repo.StargazersCount, &historyJSON, &repo.WeekStargazersCount,
 		&githubCreatedAt, &pushedAt,
-		&repo.IsEligible, &updatedAt, &generatedAt,
+		&repo.IsEligible, &updatedAt,
 	)
 	if err != nil {
 		return repository.Repository{}, err
@@ -98,10 +98,6 @@ func scanRepository(s scannable) (repository.Repository, error) {
 	if updatedAt.Valid {
 		repo.UpdatedAt = updatedAt.Time
 	}
-	if generatedAt.Valid {
-		repo.GeneratedAt = generatedAt.Time
-	}
-
 	if err := json.Unmarshal([]byte(historyJSON), &repo.StargazersCountHistory); err != nil {
 		return repository.Repository{}, err
 	}

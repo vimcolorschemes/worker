@@ -105,8 +105,8 @@ func TestScanRepository(t *testing.T) {
 		setupTestDB(t)
 		now := time.Now().UTC().Truncate(time.Second)
 		_, err := db.Exec(
-			`INSERT INTO repositories (id, owner_name, name, github_created_at, pushed_at, updated_at, generated_at) VALUES (1, 'owner', 'repo', ?, ?, ?, ?)`,
-			now, now, now, now,
+			`INSERT INTO repositories (id, owner_name, name, github_created_at, pushed_at, updated_at) VALUES (1, 'owner', 'repo', ?, ?, ?)`,
+			now, now, now,
 		)
 		if err != nil {
 			t.Fatalf("insert repo: %v", err)
@@ -125,9 +125,6 @@ func TestScanRepository(t *testing.T) {
 		}
 		if repo.UpdatedAt.IsZero() {
 			t.Fatal("UpdatedAt should not be zero")
-		}
-		if repo.GeneratedAt.IsZero() {
-			t.Fatal("GeneratedAt should not be zero")
 		}
 	})
 
@@ -151,9 +148,6 @@ func TestScanRepository(t *testing.T) {
 		}
 		if !repo.UpdatedAt.IsZero() {
 			t.Fatalf("UpdatedAt should be zero, got %v", repo.UpdatedAt)
-		}
-		if !repo.GeneratedAt.IsZero() {
-			t.Fatalf("GeneratedAt should be zero, got %v", repo.GeneratedAt)
 		}
 	})
 }

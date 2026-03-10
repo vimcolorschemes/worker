@@ -24,7 +24,6 @@ type Repository struct {
 	ColorSchemes           []ColorScheme                `json:"colorSchemes,omitempty"`
 	IsEligible             bool                         `json:"isEligible"`
 	UpdatedAt              time.Time                    `json:"updatedAt"`
-	GeneratedAt            time.Time                    `json:"generatedAt"`
 }
 
 // Owner represents the owner of a repository

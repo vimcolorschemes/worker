@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -70,6 +71,21 @@ func TestUpsertRepositoryFromImport(t *testing.T) {
 		}
 		if name != "new-repo" {
 			t.Fatalf("name = %q, want %q", name, "new-repo")
+		}
+	})
+
+	t.Run("creates an import job event", func(t *testing.T) {
+		setupTestDB(t)
+		now := time.Now().UTC().Truncate(time.Second)
+		UpsertRepositoryFromImport(ImportData{ID: 1, OwnerName: "owner", Name: "repo", PushedAt: now})
+
+		var eventCount int
+		err := db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE repository_id = 1 AND job = 'import' AND status = 'success'`).Scan(&eventCount)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if eventCount != 1 {
+			t.Fatalf("eventCount = %d, want 1", eventCount)
 		}
 	})
 }
@@ -156,22 +172,35 @@ func TestGetRepository(t *testing.T) {
 }
 
 func TestGetRepositoriesToGenerate(t *testing.T) {
-	insertRepoForGenerate := func(t *testing.T, id int64, isEligible int, pushedAt, generatedAt interface{}) {
+	insertRepoForGenerate := func(t *testing.T, id int64, isEligible int, pushedAt interface{}) {
 		t.Helper()
 		_, err := db.Exec(
-			`INSERT INTO repositories (id, owner_name, name, is_eligible, pushed_at, generated_at) VALUES (?, ?, ?, ?, ?, ?)`,
-			id, "owner", "repo", isEligible, pushedAt, generatedAt,
+			`INSERT INTO repositories (id, owner_name, name, is_eligible, pushed_at) VALUES (?, ?, ?, ?, ?)`,
+			id, "owner", "repo", isEligible, pushedAt,
 		)
 		if err != nil {
 			t.Fatalf("insert repo: %v", err)
 		}
 	}
 
+	insertGenerateEvent := func(t *testing.T, id int64, createdAt time.Time) {
+		t.Helper()
+		_, err := db.Exec(
+			`INSERT INTO repository_job_events (repository_id, job, created_at) VALUES (?, 'generate', ?)`,
+			id,
+			createdAt,
+		)
+		if err != nil {
+			t.Fatalf("insert generate event: %v", err)
+		}
+	}
+
 	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	t.Run("returns repos where is_eligible=1 and pushed_at > generated_at", func(t *testing.T) {
+	t.Run("returns repos where is_eligible=1 and pushed_at > last generate event", func(t *testing.T) {
 		setupTestDB(t)
-		insertRepoForGenerate(t, 1, 1, base.Add(time.Hour), base)
+		insertRepoForGenerate(t, 1, 1, base.Add(time.Hour))
+		insertGenerateEvent(t, 1, base)
 
 		repos, err := GetRepositoriesToGenerate()
 		if err != nil {
@@ -187,7 +216,8 @@ func TestGetRepositoriesToGenerate(t *testing.T) {
 
 	t.Run("excludes repos where is_eligible=0", func(t *testing.T) {
 		setupTestDB(t)
-		insertRepoForGenerate(t, 1, 0, base.Add(time.Hour), base)
+		insertRepoForGenerate(t, 1, 0, base.Add(time.Hour))
+		insertGenerateEvent(t, 1, base)
 
 		repos, err := GetRepositoriesToGenerate()
 		if err != nil {
@@ -198,9 +228,10 @@ func TestGetRepositoriesToGenerate(t *testing.T) {
 		}
 	})
 
-	t.Run("excludes repos where generated_at >= pushed_at", func(t *testing.T) {
+	t.Run("excludes repos where last generate event >= pushed_at", func(t *testing.T) {
 		setupTestDB(t)
-		insertRepoForGenerate(t, 1, 1, base, base.Add(time.Hour))
+		insertRepoForGenerate(t, 1, 1, base)
+		insertGenerateEvent(t, 1, base.Add(time.Hour))
 
 		repos, err := GetRepositoriesToGenerate()
 		if err != nil {
@@ -211,9 +242,9 @@ func TestGetRepositoriesToGenerate(t *testing.T) {
 		}
 	})
 
-	t.Run("includes repos where generated_at IS NULL", func(t *testing.T) {
+	t.Run("includes repos where no generate event exists", func(t *testing.T) {
 		setupTestDB(t)
-		insertRepoForGenerate(t, 1, 1, base, nil)
+		insertRepoForGenerate(t, 1, 1, base)
 
 		repos, err := GetRepositoriesToGenerate()
 		if err != nil {
@@ -278,6 +309,22 @@ func TestUpdateRepositoryFromUpdate(t *testing.T) {
 			t.Fatalf("StargazersCount[1] = %d, want 20", repo.StargazersCountHistory[1].StargazersCount)
 		}
 	})
+
+	t.Run("creates an update job event", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		UpdateRepositoryFromUpdate(1, UpdateData{})
+
+		var eventCount int
+		err := db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE repository_id = 1 AND job = 'update' AND status = 'success'`).Scan(&eventCount)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if eventCount != 1 {
+			t.Fatalf("eventCount = %d, want 1", eventCount)
+		}
+	})
 }
 
 func TestUpdateRepositoryFromGenerate(t *testing.T) {
@@ -285,7 +332,6 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
 
-		now := time.Now().UTC().Truncate(time.Second)
 		UpdateRepositoryFromGenerate(1, GenerateData{
 			ColorSchemes: []repository.ColorScheme{
 				{
@@ -296,7 +342,6 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 					},
 				},
 			},
-			GeneratedAt: now,
 		})
 
 		repo, err := GetRepository("owner/repo")
@@ -315,9 +360,6 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		}
 		if len(scheme.Data.Dark) != 1 {
 			t.Fatalf("Data.Dark len = %d, want 1", len(scheme.Data.Dark))
-		}
-		if repo.GeneratedAt.IsZero() {
-			t.Fatal("GeneratedAt = zero, want non-zero")
 		}
 	})
 
@@ -344,20 +386,42 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		}
 	})
 
-	t.Run("sets generated_at", func(t *testing.T) {
+	t.Run("creates a generate job event", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
-		now := time.Now().UTC().Truncate(time.Second)
 
-		UpdateRepositoryFromGenerate(1, GenerateData{GeneratedAt: now})
+		UpdateRepositoryFromGenerate(1, GenerateData{})
 
-		var generatedAt time.Time
-		err := db.QueryRow(`SELECT generated_at FROM repositories WHERE id = 1`).Scan(&generatedAt)
+		var eventCount int
+		err := db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE repository_id = 1 AND job = 'generate' AND status = 'success'`).Scan(&eventCount)
 		if err != nil {
 			t.Fatalf("query row: %v", err)
 		}
-		if generatedAt.IsZero() {
-			t.Fatal("generated_at = zero, want non-zero")
+		if eventCount != 1 {
+			t.Fatalf("eventCount = %d, want 1", eventCount)
+		}
+	})
+
+	t.Run("stores capped error message for generate failure", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		longError := strings.Repeat("x", 3000)
+		err := CreateRepositoryGenerateErrorEvent(1, longError)
+		if err != nil {
+			t.Fatalf("CreateRepositoryGenerateErrorEvent: %v", err)
+		}
+
+		var status, errorMessage string
+		err = db.QueryRow(`SELECT status, error_message FROM repository_job_events WHERE repository_id = 1 AND job = 'generate' ORDER BY id DESC LIMIT 1`).Scan(&status, &errorMessage)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if status != "error" {
+			t.Fatalf("status = %q, want %q", status, "error")
+		}
+		if len(errorMessage) != 2048 {
+			t.Fatalf("len(errorMessage) = %d, want 2048", len(errorMessage))
 		}
 	})
 }

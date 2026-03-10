@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"log"
@@ -34,8 +35,18 @@ type UpdateData struct {
 // GenerateData holds the fields set during a generate job.
 type GenerateData struct {
 	ColorSchemes []repository.ColorScheme
-	GeneratedAt  time.Time
 }
+
+const (
+	jobImport   = "import"
+	jobUpdate   = "update"
+	jobGenerate = "generate"
+
+	jobStatusSuccess = "success"
+	jobStatusError   = "error"
+
+	maxJobEventErrorMessageLength = 2048
+)
 
 // GetRepositories gets all repositories stored in the database.
 func GetRepositories() ([]repository.Repository, error) {
@@ -79,6 +90,11 @@ func UpsertRepositoryFromImport(data ImportData) {
 		log.Printf("Error upserting repository: %s", err)
 		panic(err)
 	}
+
+	if err := createRepositoryJobEvent(db, data.ID, jobImport, jobStatusSuccess, "", time.Now().UTC()); err != nil {
+		log.Printf("Error creating repository job event: %s", err)
+		panic(err)
+	}
 }
 
 // UpdateRepositoryFromUpdate updates a repository with update job data.
@@ -92,6 +108,11 @@ func UpdateRepositoryFromUpdate(id int64, data UpdateData) {
 		data.PushedAt, data.StargazersCount, string(historyJSON), data.WeekStargazersCount, data.IsEligible, data.UpdatedAt, id)
 	if err != nil {
 		log.Printf("Error updating repository: %s", err)
+		panic(err)
+	}
+
+	if err := createRepositoryJobEvent(db, id, jobUpdate, jobStatusSuccess, "", time.Now().UTC()); err != nil {
+		log.Printf("Error creating repository job event: %s", err)
 		panic(err)
 	}
 }
@@ -140,14 +161,39 @@ func UpdateRepositoryFromGenerate(id int64, data GenerateData) {
 		}
 	}
 
-	_, err = tx.Exec("UPDATE repositories SET generated_at = ? WHERE id = ?",
-		data.GeneratedAt, id)
+	err = createRepositoryJobEvent(tx, id, jobGenerate, jobStatusSuccess, "", time.Now().UTC())
 	if err != nil {
-		log.Printf("Error updating repository: %s", err)
+		log.Printf("Error creating repository job event: %s", err)
 		panic(err)
 	}
 
 	if err := tx.Commit(); err != nil {
 		panic(err)
 	}
+}
+
+type repositoryJobEventExecutor interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+// CreateRepositoryGenerateErrorEvent stores a failed generate attempt for a repository.
+func CreateRepositoryGenerateErrorEvent(repositoryID int64, errorMessage string) error {
+	return createRepositoryJobEvent(db, repositoryID, jobGenerate, jobStatusError, errorMessage, time.Now().UTC())
+}
+
+func createRepositoryJobEvent(exec repositoryJobEventExecutor, repositoryID int64, job string, status string, errorMessage string, createdAt time.Time) error {
+	trimmedErrorMessage := errorMessage
+	if len(trimmedErrorMessage) > maxJobEventErrorMessageLength {
+		trimmedErrorMessage = trimmedErrorMessage[:maxJobEventErrorMessageLength]
+	}
+
+	_, err := exec.Exec(
+		"INSERT INTO repository_job_events (repository_id, job, status, error_message, created_at) VALUES (?, ?, ?, ?, ?)",
+		repositoryID,
+		job,
+		status,
+		trimmedErrorMessage,
+		createdAt,
+	)
+	return err
 }

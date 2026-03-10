@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"time"
 
 	"github.com/vimcolorschemes/worker/internal/database"
 	file "github.com/vimcolorschemes/worker/internal/file"
@@ -62,7 +61,9 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 		err := installPlugin(repository.GithubURL, key)
 		if err != nil {
 			log.Printf("Error installing plugin: %s", err)
-			updateRepositoryAfterGenerate(repository)
+			if eventErr := database.CreateRepositoryGenerateErrorEvent(repository.ID, err.Error()); eventErr != nil {
+				log.Printf("Error creating generate failure event: %s", eventErr)
+			}
 			continue
 		}
 
@@ -73,7 +74,9 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 		}
 		if dataError != nil {
 			log.Printf("Error getting color data: %s", dataError)
-			updateRepositoryAfterGenerate(repository)
+			if eventErr := database.CreateRepositoryGenerateErrorEvent(repository.ID, dataError.Error()); eventErr != nil {
+				log.Printf("Error creating generate failure event: %s", eventErr)
+			}
 			continue
 		}
 
@@ -323,7 +326,6 @@ func cleanUp() {
 func getGenerateData(repository repoHelper.Repository) database.GenerateData {
 	return database.GenerateData{
 		ColorSchemes: repository.ColorSchemes,
-		GeneratedAt:  time.Now(),
 	}
 }
 

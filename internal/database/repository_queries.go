@@ -15,8 +15,7 @@ const (
 		github_created_at,
 		pushed_at,
 		is_eligible,
-		updated_at,
-		generated_at
+		updated_at
 	`
 
 	queryRepositoryByOwnerAndName = `
@@ -33,9 +32,15 @@ const (
 
 	queryRepositoriesToGenerate = `
 		SELECT ` + repositorySelectColumns + `
-		FROM repositories
-		WHERE is_eligible = 1
-		  AND (generated_at IS NULL OR pushed_at > generated_at)
+		FROM repositories r
+		LEFT JOIN (
+			SELECT repository_id, MAX(created_at) AS last_generate_event_at
+			FROM repository_job_events
+			WHERE job = 'generate'
+			GROUP BY repository_id
+		) ge ON ge.repository_id = r.id
+		WHERE r.is_eligible = 1
+		  AND (ge.last_generate_event_at IS NULL OR r.pushed_at > ge.last_generate_event_at)
 	`
 )
 

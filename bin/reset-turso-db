@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if ! command -v turso >/dev/null 2>&1; then
+  printf "turso CLI not found. Install it first: https://docs.turso.tech/cli/installation\n" >&2
+  exit 1
+fi
+
+if [[ -f .env ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  printf "DATABASE_URL is not set in .env\n" >&2
+  exit 1
+fi
+
+if [[ "${DATABASE_URL}" != libsql://* ]]; then
+  printf "DATABASE_URL must be a remote libsql URL (libsql://...)\n" >&2
+  printf "Use bin/reset-local-db for local SQLite DBs.\n" >&2
+  exit 1
+fi
+
+url_without_scheme="${DATABASE_URL#libsql://}"
+host_part="${url_without_scheme%%/*}"
+host_part="${host_part%%\?*}"
+host_label="${host_part%%.*}"
+
+if [[ -n "${TURSO_DB_NAME:-}" ]]; then
+  db_name="${TURSO_DB_NAME}"
+elif [[ "$host_label" == *-* ]]; then
+  db_name="${host_label%-*}"
+else
+  db_name="$host_label"
+fi
+
+if [[ -z "$db_name" ]]; then
+  printf "Could not determine Turso database name from DATABASE_URL\n" >&2
+  exit 1
+fi
+
+printf "Resolved Turso database name: %s (from host %s)\n" "$db_name" "$host_part"
+
+printf "This will destroy and recreate Turso DB '%s'. Continue? [y/N] " "$db_name"
+read -r answer
+if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
+  printf "Cancelled.\n"
+  exit 1
+fi
+
+printf "Destroying database %s...\n" "$db_name"
+turso db destroy "$db_name"
+
+printf "Creating database %s...\n" "$db_name"
+if [[ -n "${TURSO_GROUP:-}" ]]; then
+  turso db create "$db_name" --group "$TURSO_GROUP"
+else
+  turso db create "$db_name"
+fi
+
+printf "Creating new auth token...\n"
+new_token="$(turso db tokens create "$db_name")"
+
+printf "\nDone. Update your .env with the new token:\n"
+printf "export DATABASE_AUTH_TOKEN=%s\n" "$new_token"
+printf "\nThen run a worker job to recreate schema, for example:\n"
+printf "bin/start import --repo morhetz/gruvbox\n"
