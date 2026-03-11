@@ -34,7 +34,7 @@ type UpdateData struct {
 
 // GenerateData holds the fields set during a generate job.
 type GenerateData struct {
-	ColorSchemes []repository.ColorScheme
+	Colorschemes []repository.Colorscheme
 }
 
 const (
@@ -62,7 +62,7 @@ func GetRepository(repoKey string) (repository.Repository, error) {
 
 	row := db.QueryRow(queryRepositoryByOwnerAndName, matches[0], matches[1])
 
-	repo, err := scanRepositoryWithColorSchemes(row)
+	repo, err := scanRepositoryWithColorschemes(row)
 	if err != nil {
 		return repository.Repository{}, err
 	}
@@ -127,16 +127,16 @@ func UpdateRepositoryFromGenerate(id int64, data GenerateData) {
 		_ = tx.Rollback()
 	}()
 
-	_, err = tx.Exec("DELETE FROM color_schemes WHERE repository_id = ?", id)
+	_, err = tx.Exec("DELETE FROM colorschemes WHERE repository_id = ?", id)
 	if err != nil {
-		log.Printf("Error deleting color schemes: %s", err)
+		log.Printf("Error deleting colorschemes: %s", err)
 		panic(err)
 	}
 
-	for _, scheme := range data.ColorSchemes {
-		result, err := tx.Exec("INSERT INTO color_schemes (repository_id, name) VALUES (?, ?)", id, scheme.Name)
+	for _, scheme := range data.Colorschemes {
+		result, err := tx.Exec("INSERT INTO colorschemes (repository_id, name) VALUES (?, ?)", id, scheme.Name)
 		if err != nil {
-			log.Printf("Error inserting color scheme: %s", err)
+			log.Printf("Error inserting colorscheme: %s", err)
 			panic(err)
 		}
 		schemeID, err := result.LastInsertId()
@@ -145,16 +145,16 @@ func UpdateRepositoryFromGenerate(id int64, data GenerateData) {
 		}
 		for _, bg := range []struct {
 			value  repository.BackgroundValue
-			groups []repository.ColorSchemeGroup
+			groups []repository.ColorschemeGroup
 		}{
 			{repository.LightBackground, scheme.Data.Light},
 			{repository.DarkBackground, scheme.Data.Dark},
 		} {
 			for _, group := range bg.groups {
-				_, err = tx.Exec("INSERT INTO color_scheme_groups (color_scheme_id, background, name, hex_code) VALUES (?, ?, ?, ?)",
+				_, err = tx.Exec("INSERT INTO colorscheme_groups (colorscheme_id, background, name, hex_code) VALUES (?, ?, ?, ?)",
 					schemeID, bg.value, group.Name, group.HexCode)
 				if err != nil {
-					log.Printf("Error inserting color scheme group: %s", err)
+					log.Printf("Error inserting colorscheme group: %s", err)
 					panic(err)
 				}
 			}

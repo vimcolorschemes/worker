@@ -330,7 +330,7 @@ func TestComputeRepositoryEligibilityAfterUpdate(t *testing.T) {
 		var repository Repository
 		repository.StargazersCount = 1
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
-		repository.ColorSchemes = []ColorScheme{{Name: "test"}}
+		repository.Colorschemes = []Colorscheme{{Name: "test"}}
 
 		isValid := repository.IsEligibleAfterUpdate()
 		if isValid {
@@ -343,7 +343,7 @@ func TestComputeRepositoryEligibilityAfterUpdate(t *testing.T) {
 		repository.PushedAt = time.Now()
 		repository.StargazersCount = 0
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: dateUtil.Today(), StargazersCount: 1}}
-		repository.ColorSchemes = []ColorScheme{{Name: "test"}}
+		repository.Colorschemes = []Colorscheme{{Name: "test"}}
 
 		isValid := repository.IsEligibleAfterUpdate()
 		if isValid {
@@ -356,7 +356,7 @@ func TestComputeRepositoryEligibilityAfterUpdate(t *testing.T) {
 		repository.PushedAt = time.Now()
 		repository.StargazersCount = 1
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{}
-		repository.ColorSchemes = []ColorScheme{{Name: "test"}}
+		repository.Colorschemes = []Colorscheme{{Name: "test"}}
 
 		isValid := repository.IsEligibleAfterUpdate()
 		if isValid {
@@ -370,7 +370,7 @@ func TestComputeRepositoryEligibilityAfterUpdate(t *testing.T) {
 		repository.StargazersCount = 1
 		date := time.Date(1990, time.November, 01, 0, 0, 0, 0, time.UTC)
 		repository.StargazersCountHistory = []StargazersCountHistoryItem{{Date: date, StargazersCount: 1}}
-		repository.ColorSchemes = []ColorScheme{{Name: "test"}}
+		repository.Colorschemes = []Colorscheme{{Name: "test"}}
 
 		isValid := repository.IsEligibleAfterUpdate()
 		if isValid {

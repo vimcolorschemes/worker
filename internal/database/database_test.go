@@ -80,7 +80,7 @@ func TestInitializeSchemaCreatesAllTables(t *testing.T) {
 		t.Fatalf("initializeSchema returned error: %v", err)
 	}
 
-	for _, tableName := range []string{"repositories", "repository_job_events", "color_schemes", "color_scheme_groups", "reports"} {
+	for _, tableName := range []string{"repositories", "repository_job_events", "colorschemes", "colorscheme_groups", "reports"} {
 		var actual string
 		err := db.QueryRow("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", tableName).Scan(&actual)
 		if err != nil {
@@ -112,9 +112,9 @@ func TestInitializeSchemaCreatesExpectedIndexes(t *testing.T) {
 		"idx_repositories_stargazers_count_id",
 		"idx_repositories_github_created_at_id",
 		"idx_repositories_owner_week_stars_id_nocase",
-		"idx_color_schemes_repository_id_id",
-		"idx_color_scheme_groups_scheme_id_id",
-		"idx_color_scheme_groups_background_scheme_id",
+		"idx_colorschemes_repository_id_id",
+		"idx_colorscheme_groups_scheme_id_id",
+		"idx_colorscheme_groups_background_scheme_id",
 		"idx_repository_job_events_job_repository_created",
 	} {
 		var actual string

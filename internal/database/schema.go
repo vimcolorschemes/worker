@@ -28,14 +28,14 @@ var schemaStatements = []string{
 		error_message TEXT,
 		created_at    DATETIME NOT NULL
 	)`,
-	`CREATE TABLE IF NOT EXISTS color_schemes (
+	`CREATE TABLE IF NOT EXISTS colorschemes (
 		id            INTEGER PRIMARY KEY AUTOINCREMENT,
 		repository_id INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
 		name          TEXT NOT NULL
 	)`,
-	`CREATE TABLE IF NOT EXISTS color_scheme_groups (
+	`CREATE TABLE IF NOT EXISTS colorscheme_groups (
 		id              INTEGER PRIMARY KEY AUTOINCREMENT,
-		color_scheme_id INTEGER NOT NULL REFERENCES color_schemes(id) ON DELETE CASCADE,
+		colorscheme_id  INTEGER NOT NULL REFERENCES colorschemes(id) ON DELETE CASCADE,
 		background      TEXT NOT NULL,
 		name            TEXT NOT NULL,
 		hex_code        TEXT NOT NULL
@@ -68,17 +68,17 @@ var schemaStatements = []string{
 	`CREATE INDEX IF NOT EXISTS idx_repositories_owner_week_stars_id_nocase
 		ON repositories(owner_name COLLATE NOCASE, week_stargazers_count DESC, id)`,
 
-	// Fast existence checks and joins for repository color schemes.
-	`CREATE INDEX IF NOT EXISTS idx_color_schemes_repository_id_id
-		ON color_schemes(repository_id, id)`,
+	// Fast existence checks and joins for repository colorschemes.
+	`CREATE INDEX IF NOT EXISTS idx_colorschemes_repository_id_id
+		ON colorschemes(repository_id, id)`,
 
-	// Fast loading of groups for each selected color scheme.
-	`CREATE INDEX IF NOT EXISTS idx_color_scheme_groups_scheme_id_id
-		ON color_scheme_groups(color_scheme_id, id)`,
+	// Fast loading of groups for each selected colorscheme.
+	`CREATE INDEX IF NOT EXISTS idx_colorscheme_groups_scheme_id_id
+		ON colorscheme_groups(colorscheme_id, id)`,
 
 	// Background filter support (dark/light/both).
-	`CREATE INDEX IF NOT EXISTS idx_color_scheme_groups_background_scheme_id
-		ON color_scheme_groups(background, color_scheme_id)`,
+	`CREATE INDEX IF NOT EXISTS idx_colorscheme_groups_background_scheme_id
+		ON colorscheme_groups(background, colorscheme_id)`,
 
 	// Generate queue lookup by latest generate event per repository.
 	`CREATE INDEX IF NOT EXISTS idx_repository_job_events_job_repository_created

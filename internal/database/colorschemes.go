@@ -7,11 +7,11 @@ import (
 	"github.com/vimcolorschemes/worker/internal/repository"
 )
 
-func loadColorSchemes(repositoryID int64) ([]repository.ColorScheme, error) {
+func loadColorschemes(repositoryID int64) ([]repository.Colorscheme, error) {
 	rows, err := db.Query(`
 		SELECT cs.id, cs.name, csg.background, csg.name, csg.hex_code
-		FROM color_schemes cs
-		LEFT JOIN color_scheme_groups csg ON csg.color_scheme_id = cs.id
+		FROM colorschemes cs
+		LEFT JOIN colorscheme_groups csg ON csg.colorscheme_id = cs.id
 		WHERE cs.repository_id = ?
 		ORDER BY cs.id, csg.id`, repositoryID)
 	if err != nil {
@@ -25,7 +25,7 @@ func loadColorSchemes(repositoryID int64) ([]repository.ColorScheme, error) {
 		index int
 	}
 	schemeMap := make(map[int64]*schemeEntry)
-	var schemes []repository.ColorScheme
+	var schemes []repository.Colorscheme
 
 	for rows.Next() {
 		var schemeID int64
@@ -38,13 +38,13 @@ func loadColorSchemes(repositoryID int64) ([]repository.ColorScheme, error) {
 
 		entry, exists := schemeMap[schemeID]
 		if !exists {
-			schemes = append(schemes, repository.ColorScheme{Name: schemeName})
+			schemes = append(schemes, repository.Colorscheme{Name: schemeName})
 			entry = &schemeEntry{index: len(schemes) - 1}
 			schemeMap[schemeID] = entry
 		}
 
 		if bg.Valid {
-			group := repository.ColorSchemeGroup{Name: groupName.String, HexCode: hexCode.String}
+			group := repository.ColorschemeGroup{Name: groupName.String, HexCode: hexCode.String}
 			s := &schemes[entry.index]
 			switch repository.BackgroundValue(bg.String) {
 			case repository.LightBackground:
@@ -105,17 +105,17 @@ func scanRepository(s scannable) (repository.Repository, error) {
 	return repo, nil
 }
 
-func scanRepositoryWithColorSchemes(s scannable) (repository.Repository, error) {
+func scanRepositoryWithColorschemes(s scannable) (repository.Repository, error) {
 	repo, err := scanRepository(s)
 	if err != nil {
 		return repository.Repository{}, err
 	}
 
-	schemes, err := loadColorSchemes(repo.ID)
+	schemes, err := loadColorschemes(repo.ID)
 	if err != nil {
 		return repository.Repository{}, err
 	}
-	repo.ColorSchemes = schemes
+	repo.Colorschemes = schemes
 
 	return repo, nil
 }

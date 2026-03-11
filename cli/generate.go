@@ -21,7 +21,7 @@ var defaultColorschemeFilePath string
 var defaultColorschemes map[string]bool
 var debugMode bool
 
-// Generate color scheme data for all valid repositories
+// Generate colorscheme data for all valid repositories
 func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 	debugMode = debug
 
@@ -67,7 +67,7 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 			continue
 		}
 
-		var data, dataError = getColorSchemeColorData()
+		var data, dataError = getColorschemeColorData()
 		err = deletePlugin(key)
 		if err != nil {
 			log.Printf("Error deleting plugin: %s", err)
@@ -80,7 +80,7 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 			continue
 		}
 
-		var colorSchemes []repoHelper.ColorScheme
+		var colorschemes []repoHelper.Colorscheme
 
 		for name := range data {
 			// Skip built-in colorschemes
@@ -96,16 +96,16 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 				backgrounds = append(backgrounds, repoHelper.DarkBackground)
 			}
 
-			colorSchemes = append(
-				colorSchemes,
-				repoHelper.ColorScheme{
+			colorschemes = append(
+				colorschemes,
+				repoHelper.Colorscheme{
 					Name:        name,
 					Data:        data[name],
 					Backgrounds: backgrounds,
 				})
 		}
 
-		repository.ColorSchemes = colorSchemes
+		repository.Colorschemes = colorschemes
 		updateRepositoryAfterGenerate(repository)
 	}
 
@@ -115,7 +115,7 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 }
 
 func updateRepositoryAfterGenerate(repository repoHelper.Repository) {
-	log.Printf("Generated %d color schemes", len(repository.ColorSchemes))
+	log.Printf("Generated %d colorschemes", len(repository.Colorschemes))
 	data := getGenerateData(repository)
 	database.UpdateRepositoryFromGenerate(repository.ID, data)
 }
@@ -161,7 +161,7 @@ func initRuntimeFiles() {
 	}
 }
 
-// Sets up the runtime configuration common to all color schemes
+// Sets up the runtime configuration common to all colorschemes
 func setupRuntime() {
 	log.Print("Setting up runtime config")
 
@@ -233,7 +233,7 @@ func captureDefaultColorschemes() {
 	log.Printf("Captured %d default colorschemes", len(defaultColorschemes))
 }
 
-// Installs a plugin/color scheme on the runtime configuration from a Github URL
+// Installs a plugin/colorscheme on the runtime configuration from a Github URL
 func installPlugin(gitRepositoryURL string, path string) error {
 	log.Printf("Installing %s", path)
 
@@ -257,7 +257,7 @@ func deletePlugin(key string) error {
 }
 
 // Gathers the colorscheme data from vimcolorschemes/extractor.nvim
-func getColorSchemeColorData() (map[string]repoHelper.ColorSchemeData, error) {
+func getColorschemeColorData() (map[string]repoHelper.ColorschemeData, error) {
 	err := executePreviewGenerator()
 	if err != nil {
 		log.Printf("Error executing nvim: %s", err)
@@ -270,7 +270,7 @@ func getColorSchemeColorData() (map[string]repoHelper.ColorSchemeData, error) {
 		return nil, err
 	}
 
-	var data map[string]repoHelper.ColorSchemeData
+	var data map[string]repoHelper.ColorschemeData
 	err = json.Unmarshal([]byte(colorSchemeOutput), &data)
 	if err != nil {
 		return nil, err
@@ -325,7 +325,7 @@ func cleanUp() {
 
 func getGenerateData(repository repoHelper.Repository) database.GenerateData {
 	return database.GenerateData{
-		ColorSchemes: repository.ColorSchemes,
+		Colorschemes: repository.Colorschemes,
 	}
 }
 

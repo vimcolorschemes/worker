@@ -7,14 +7,14 @@ import (
 	"github.com/vimcolorschemes/worker/internal/repository"
 )
 
-func TestLoadColorSchemes(t *testing.T) {
+func TestLoadColorschemes(t *testing.T) {
 	t.Run("returns empty slice for repo with no schemes", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
 
-		schemes, err := loadColorSchemes(1)
+		schemes, err := loadColorschemes(1)
 		if err != nil {
-			t.Fatalf("loadColorSchemes: %v", err)
+			t.Fatalf("loadColorschemes: %v", err)
 		}
 		if len(schemes) != 0 {
 			t.Fatalf("len(schemes) = %d, want 0", len(schemes))
@@ -24,19 +24,19 @@ func TestLoadColorSchemes(t *testing.T) {
 	t.Run("returns schemes with light and dark groups", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
-		if _, err := db.Exec(`INSERT INTO color_schemes (id, repository_id, name) VALUES (1, 1, 'myscheme')`); err != nil {
-			t.Fatalf("insert color_scheme: %v", err)
+		if _, err := db.Exec(`INSERT INTO colorschemes (id, repository_id, name) VALUES (1, 1, 'myscheme')`); err != nil {
+			t.Fatalf("insert colorscheme: %v", err)
 		}
-		if _, err := db.Exec(`INSERT INTO color_scheme_groups (color_scheme_id, background, name, hex_code) VALUES (1, 'light', 'Normal', '#fff')`); err != nil {
-			t.Fatalf("insert light color_scheme_group: %v", err)
+		if _, err := db.Exec(`INSERT INTO colorscheme_groups (colorscheme_id, background, name, hex_code) VALUES (1, 'light', 'Normal', '#fff')`); err != nil {
+			t.Fatalf("insert light colorscheme_group: %v", err)
 		}
-		if _, err := db.Exec(`INSERT INTO color_scheme_groups (color_scheme_id, background, name, hex_code) VALUES (1, 'dark', 'Normal', '#000')`); err != nil {
-			t.Fatalf("insert dark color_scheme_group: %v", err)
+		if _, err := db.Exec(`INSERT INTO colorscheme_groups (colorscheme_id, background, name, hex_code) VALUES (1, 'dark', 'Normal', '#000')`); err != nil {
+			t.Fatalf("insert dark colorscheme_group: %v", err)
 		}
 
-		schemes, err := loadColorSchemes(1)
+		schemes, err := loadColorschemes(1)
 		if err != nil {
-			t.Fatalf("loadColorSchemes: %v", err)
+			t.Fatalf("loadColorschemes: %v", err)
 		}
 		if len(schemes) != 1 {
 			t.Fatalf("len(schemes) = %d, want 1", len(schemes))
@@ -55,16 +55,16 @@ func TestLoadColorSchemes(t *testing.T) {
 	t.Run("derives backgrounds from groups", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
-		if _, err := db.Exec(`INSERT INTO color_schemes (id, repository_id, name) VALUES (1, 1, 'darkonly')`); err != nil {
-			t.Fatalf("insert color_scheme: %v", err)
+		if _, err := db.Exec(`INSERT INTO colorschemes (id, repository_id, name) VALUES (1, 1, 'darkonly')`); err != nil {
+			t.Fatalf("insert colorscheme: %v", err)
 		}
-		if _, err := db.Exec(`INSERT INTO color_scheme_groups (color_scheme_id, background, name, hex_code) VALUES (1, 'dark', 'Normal', '#000')`); err != nil {
-			t.Fatalf("insert color_scheme_group: %v", err)
+		if _, err := db.Exec(`INSERT INTO colorscheme_groups (colorscheme_id, background, name, hex_code) VALUES (1, 'dark', 'Normal', '#000')`); err != nil {
+			t.Fatalf("insert colorscheme_group: %v", err)
 		}
 
-		schemes, err := loadColorSchemes(1)
+		schemes, err := loadColorschemes(1)
 		if err != nil {
-			t.Fatalf("loadColorSchemes: %v", err)
+			t.Fatalf("loadColorschemes: %v", err)
 		}
 		if len(schemes[0].Backgrounds) != 1 {
 			t.Fatalf("Backgrounds len = %d, want 1", len(schemes[0].Backgrounds))
@@ -77,13 +77,13 @@ func TestLoadColorSchemes(t *testing.T) {
 	t.Run("handles scheme with no groups", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
-		if _, err := db.Exec(`INSERT INTO color_schemes (id, repository_id, name) VALUES (1, 1, 'nogroups')`); err != nil {
-			t.Fatalf("insert color_scheme: %v", err)
+		if _, err := db.Exec(`INSERT INTO colorschemes (id, repository_id, name) VALUES (1, 1, 'nogroups')`); err != nil {
+			t.Fatalf("insert colorscheme: %v", err)
 		}
 
-		schemes, err := loadColorSchemes(1)
+		schemes, err := loadColorschemes(1)
 		if err != nil {
-			t.Fatalf("loadColorSchemes: %v", err)
+			t.Fatalf("loadColorschemes: %v", err)
 		}
 		if len(schemes) != 1 {
 			t.Fatalf("len(schemes) = %d, want 1", len(schemes))

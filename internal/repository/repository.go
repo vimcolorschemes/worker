@@ -21,7 +21,7 @@ type Repository struct {
 	WeekStargazersCount    int                          `json:"weekStargazersCount"`
 	GithubCreatedAt        time.Time                    `json:"githubCreatedAt"`
 	PushedAt               time.Time                    `json:"pushedAt"`
-	ColorSchemes           []ColorScheme                `json:"colorSchemes,omitempty"`
+	Colorschemes           []Colorscheme                `json:"colorschemes,omitempty"`
 	IsEligible             bool                         `json:"isEligible"`
 	UpdatedAt              time.Time                    `json:"updatedAt"`
 }
@@ -38,21 +38,21 @@ type StargazersCountHistoryItem struct {
 	StargazersCount int       `json:"stargazersCount"`
 }
 
-// ColorScheme represents a color scheme's meta data
-type ColorScheme struct {
+// Colorscheme represents a colorscheme's metadata
+type Colorscheme struct {
 	Name        string            `json:"name"`
-	Data        ColorSchemeData   `json:"data"`
+	Data        ColorschemeData   `json:"data"`
 	Backgrounds []BackgroundValue `json:"backgrounds"`
 }
 
-// ColorSchemeData represents the color values for light and dark backgrounds
-type ColorSchemeData struct {
-	Light []ColorSchemeGroup `json:"light,omitempty"`
-	Dark  []ColorSchemeGroup `json:"dark,omitempty"`
+// ColorschemeData represents the color values for light and dark backgrounds
+type ColorschemeData struct {
+	Light []ColorschemeGroup `json:"light,omitempty"`
+	Dark  []ColorschemeGroup `json:"dark,omitempty"`
 }
 
-// ColorSchemeGroup represents a color scheme group's data
-type ColorSchemeGroup struct {
+// ColorschemeGroup represents a colorscheme group's data
+type ColorschemeGroup struct {
 	Name    string `json:"name"`
 	HexCode string `json:"hexCode"`
 }

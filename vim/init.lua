@@ -7,7 +7,7 @@ vim.opt.termguicolors = true
 vim.cmd("syntax on")
 vim.cmd("colorscheme default")
 
--- Necessary custom settings for some color schemes
+-- Necessary custom settings for some colorschemes
 vim.cmd("let g:solarized_termcolors=256")
 
 vim.api.nvim_create_autocmd("BufReadPost", {

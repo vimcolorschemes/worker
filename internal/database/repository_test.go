@@ -328,17 +328,17 @@ func TestUpdateRepositoryFromUpdate(t *testing.T) {
 }
 
 func TestUpdateRepositoryFromGenerate(t *testing.T) {
-	t.Run("saves color schemes and groups", func(t *testing.T) {
+	t.Run("saves colorschemes and groups", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
 
 		UpdateRepositoryFromGenerate(1, GenerateData{
-			ColorSchemes: []repository.ColorScheme{
+			Colorschemes: []repository.Colorscheme{
 				{
 					Name: "myscheme",
-					Data: repository.ColorSchemeData{
-						Light: []repository.ColorSchemeGroup{{Name: "Normal", HexCode: "#ffffff"}},
-						Dark:  []repository.ColorSchemeGroup{{Name: "Normal", HexCode: "#000000"}},
+					Data: repository.ColorschemeData{
+						Light: []repository.ColorschemeGroup{{Name: "Normal", HexCode: "#ffffff"}},
+						Dark:  []repository.ColorschemeGroup{{Name: "Normal", HexCode: "#000000"}},
 					},
 				},
 			},
@@ -348,10 +348,10 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetRepository: %v", err)
 		}
-		if len(repo.ColorSchemes) != 1 {
-			t.Fatalf("ColorSchemes len = %d, want 1", len(repo.ColorSchemes))
+		if len(repo.Colorschemes) != 1 {
+			t.Fatalf("Colorschemes len = %d, want 1", len(repo.Colorschemes))
 		}
-		scheme := repo.ColorSchemes[0]
+		scheme := repo.Colorschemes[0]
 		if scheme.Name != "myscheme" {
 			t.Fatalf("Name = %q, want %q", scheme.Name, "myscheme")
 		}
@@ -363,26 +363,26 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		}
 	})
 
-	t.Run("replaces existing color schemes", func(t *testing.T) {
+	t.Run("replaces existing colorschemes", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
 
 		UpdateRepositoryFromGenerate(1, GenerateData{
-			ColorSchemes: []repository.ColorScheme{{Name: "scheme1"}},
+			Colorschemes: []repository.Colorscheme{{Name: "scheme1"}},
 		})
 		UpdateRepositoryFromGenerate(1, GenerateData{
-			ColorSchemes: []repository.ColorScheme{{Name: "scheme2"}},
+			Colorschemes: []repository.Colorscheme{{Name: "scheme2"}},
 		})
 
 		repo, err := GetRepository("owner/repo")
 		if err != nil {
 			t.Fatalf("GetRepository: %v", err)
 		}
-		if len(repo.ColorSchemes) != 1 {
-			t.Fatalf("ColorSchemes len = %d, want 1", len(repo.ColorSchemes))
+		if len(repo.Colorschemes) != 1 {
+			t.Fatalf("Colorschemes len = %d, want 1", len(repo.Colorschemes))
 		}
-		if repo.ColorSchemes[0].Name != "scheme2" {
-			t.Fatalf("Name = %q, want %q", repo.ColorSchemes[0].Name, "scheme2")
+		if repo.Colorschemes[0].Name != "scheme2" {
+			t.Fatalf("Name = %q, want %q", repo.Colorschemes[0].Name, "scheme2")
 		}
 	})
 

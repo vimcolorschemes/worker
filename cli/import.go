@@ -38,7 +38,7 @@ func init() {
 	repositoryCountLimitPerPage = int(math.Min(float64(repositoryCountLimit), 100))
 }
 
-// Import potential color scheme repositories from Github
+// Import potential colorscheme repositories from Github
 func Import(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	log.Printf("Repository limit: %d", repositoryCountLimit)
 
