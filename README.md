@@ -149,3 +149,15 @@ Side note: this repo includes a helper script at `bin/deploy` for publishing the
 ```shell
 bin/deploy
 ```
+
+### CI deployment (recommended)
+
+This repo includes `.github/workflows/deploy.yml` to build and push the worker image on every push to `main` (and on manual dispatch).
+
+Set these repository-level GitHub Actions variables:
+
+- `AWS_REGION`
+- `AWS_REGISTRY_ID`
+- `AWS_ROLE_TO_ASSUME`
+
+The assumed role must trust GitHub OIDC (`token.actions.githubusercontent.com`) and allow ECR push for `vimcolorschemes/worker`.
