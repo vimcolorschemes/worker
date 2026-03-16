@@ -143,3 +143,9 @@ All schedules are in UTC.
 Publish a new worker image to ECR; subsequent scheduled tasks run with the updated image.
 
 Side note: this repo includes a helper script at `bin/deploy` for publishing the image.
+
+`bin/deploy` pushes `vimcolorschemes/worker:latest` to ECR:
+
+```shell
+bin/deploy
+```
