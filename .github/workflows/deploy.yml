@@ -16,6 +16,13 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_REGISTRY_ID }}
+      ECR_REPOSITORY: vimcolorschemes/worker
+      ECS_TASK_FAMILY: run-job
+      ECS_CONTAINER_NAME: vimcolorschemes-worker
+      EVENTBRIDGE_RULES: import update generate
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,9 +40,157 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
           push: true
-          tags: ${{ vars.AWS_REGISTRY_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/vimcolorschemes/worker:latest
+          tags: |
+            ${{ vars.AWS_REGISTRY_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/vimcolorschemes/worker:${{ github.sha }}
+            ${{ vars.AWS_REGISTRY_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/vimcolorschemes/worker:latest
+
+      - name: Register ECS task definition revision
+        id: taskdef
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          image_uri="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
+          immutable_image="${image_uri}@${{ steps.build.outputs.digest }}"
+
+          current_task="$(mktemp)"
+          new_task="$(mktemp)"
+
+          aws ecs describe-task-definition \
+            --task-definition "${ECS_TASK_FAMILY}" \
+            --region "${AWS_REGION}" \
+            --query taskDefinition > "${current_task}"
+
+          python3 - "${current_task}" "${new_task}" "${immutable_image}" "${ECS_CONTAINER_NAME}" <<'PY'
+          import json
+          import sys
+
+          source, dest, image, container_name = sys.argv[1:5]
+
+          with open(source, "r", encoding="utf-8") as f:
+              task_def = json.load(f)
+
+          allowed = {
+              "family",
+              "taskRoleArn",
+              "executionRoleArn",
+              "networkMode",
+              "containerDefinitions",
+              "volumes",
+              "placementConstraints",
+              "requiresCompatibilities",
+              "cpu",
+              "memory",
+              "pidMode",
+              "ipcMode",
+              "proxyConfiguration",
+              "inferenceAccelerators",
+              "ephemeralStorage",
+              "runtimePlatform",
+          }
+
+          new_task = {k: v for k, v in task_def.items() if k in allowed and v is not None}
+
+          for container in new_task.get("containerDefinitions", []):
+              if container.get("name") == container_name:
+                  container["image"] = image
+                  break
+          else:
+              raise SystemExit(f"Container '{container_name}' not found in task definition")
+
+          with open(dest, "w", encoding="utf-8") as f:
+              json.dump(new_task, f)
+          PY
+
+          task_definition_arn="$(aws ecs register-task-definition \
+            --region "${AWS_REGION}" \
+            --cli-input-json "file://${new_task}" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)"
+
+          rm -f "${current_task}" "${new_task}"
+
+          echo "task_definition_arn=${task_definition_arn}" >> "${GITHUB_OUTPUT}"
+          echo "immutable_image=${immutable_image}" >> "${GITHUB_OUTPUT}"
+
+      - name: Update EventBridge targets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for rule in ${EVENTBRIDGE_RULES}; do
+            current_targets="$(mktemp)"
+            updated_targets="$(mktemp)"
+
+            aws events list-targets-by-rule \
+              --region "${AWS_REGION}" \
+              --rule "${rule}" \
+              --query 'Targets' > "${current_targets}"
+
+            python3 - "${current_targets}" "${updated_targets}" "${{ steps.taskdef.outputs.task_definition_arn }}" <<'PY'
+            import json
+            import sys
+
+            source, dest, task_definition_arn = sys.argv[1:4]
+
+            with open(source, "r", encoding="utf-8") as f:
+                targets = json.load(f)
+
+            allowed_target_keys = {
+                "Id",
+                "Arn",
+                "RoleArn",
+                "Input",
+                "InputPath",
+                "InputTransformer",
+                "KinesisParameters",
+                "RunCommandParameters",
+                "EcsParameters",
+                "BatchParameters",
+                "SqsParameters",
+                "HttpParameters",
+                "RedshiftDataParameters",
+                "SageMakerPipelineParameters",
+                "DeadLetterConfig",
+                "RetryPolicy",
+            }
+
+            updated = []
+            for target in targets:
+                trimmed = {k: v for k, v in target.items() if k in allowed_target_keys and v is not None}
+                ecs = trimmed.get("EcsParameters")
+                if isinstance(ecs, dict):
+                    ecs["TaskDefinitionArn"] = task_definition_arn
+                updated.append(trimmed)
+
+            with open(dest, "w", encoding="utf-8") as f:
+                json.dump(updated, f)
+            PY
+
+            failed_count="$(aws events put-targets \
+              --region "${AWS_REGION}" \
+              --rule "${rule}" \
+              --targets "file://${updated_targets}" \
+              --query 'FailedEntryCount' \
+              --output text)"
+
+            rm -f "${current_targets}" "${updated_targets}"
+
+            if [ "${failed_count}" != "0" ]; then
+              echo "Failed to update rule '${rule}' targets"
+              exit 1
+            fi
+          done
+
+      - name: Deployment summary
+        shell: bash
+        run: |
+          echo "Immutable image: ${{ steps.taskdef.outputs.immutable_image }}"
+          echo "Task definition: ${{ steps.taskdef.outputs.task_definition_arn }}"
+          echo "Updated rules: ${EVENTBRIDGE_RULES}"

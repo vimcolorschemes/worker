@@ -142,7 +142,14 @@ Publish a new worker image to ECR; subsequent scheduled tasks run with the updat
 
 ### CI deployment
 
-This repo includes `.github/workflows/deploy.yml` to build and push the worker image on every push to `main` (and on manual dispatch).
+This repo includes `.github/workflows/deploy.yml` to deploy on every push to `main` (and on manual dispatch).
+
+Deployment behavior:
+
+- Pushes two ECR tags: `${GITHUB_SHA}` and `latest`
+- Registers a new ECS task definition revision in the `run-job` family
+- Pins the ECS container image to the pushed image digest (`@sha256:...`)
+- Updates EventBridge rules (`import`, `update`, `generate`) to the new revision
 
 Set these repository-level GitHub Actions variables:
 
@@ -150,4 +157,9 @@ Set these repository-level GitHub Actions variables:
 - `AWS_REGISTRY_ID`
 - `AWS_ROLE_TO_ASSUME`
 
-The assumed role must trust GitHub OIDC (`token.actions.githubusercontent.com`) and allow ECR push for `vimcolorschemes/worker`.
+The assumed role must trust GitHub OIDC (`token.actions.githubusercontent.com`) and allow:
+
+- ECR push/read for `vimcolorschemes/worker`
+- ECS task definition read/register (`DescribeTaskDefinition`, `RegisterTaskDefinition`)
+- EventBridge target read/update (`ListTargetsByRule`, `PutTargets`)
+- `iam:PassRole` for task roles used by `run-job`
