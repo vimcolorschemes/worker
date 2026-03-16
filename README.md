@@ -116,3 +116,30 @@ bin/test --cover
 ### Format code
 
 `go fmt` can be easily used on all code using `bin/format`.
+
+## Cloud runtime and scheduling
+
+The worker runs in AWS as one-off ECS Fargate tasks triggered by EventBridge cron rules.
+
+### How it is triggered
+
+- `import`: `cron(0 13 * * ? *)`
+- `update`: `cron(0 15 * * ? *)`
+- `generate`: `cron(0 17 * * ? *)`
+
+All schedules are in UTC.
+
+### How jobs execute
+
+- EventBridge rules run ECS tasks directly.
+- Launch type is Fargate.
+- The worker ECS service stays at desired count `0`; jobs run from schedules, not a long-running service.
+- `import` uses the task default command.
+- `update` overrides the command to `update`.
+- `generate` overrides the command to `generate`.
+
+### Deploying updates
+
+Publish a new worker image to ECR; subsequent scheduled tasks run with the updated image.
+
+Side note: this repo includes a helper script at `bin/deploy` for publishing the image.
