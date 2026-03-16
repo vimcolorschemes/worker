@@ -31,7 +31,6 @@ I highly recommend setting up authentication (5000 calls for core API calls) to 
 
 To do that, you first need to create your personal access token with permissions to read public repositories. Follow instructions on how to do that [here](https://help.github.com/en/github/authenticating-to-github/creating-a-personal-access-token-for-the-command-line).
 
-
 ### Run a job
 
 To run a job, use the `bin/start` script:
@@ -75,7 +74,6 @@ Update only a specific repository using the `--repo` option.
 ```shell
 bin/start update --repo morhetz/gruvbox
 ```
-
 
 #### generate
 
@@ -142,15 +140,7 @@ All schedules are in UTC.
 
 Publish a new worker image to ECR; subsequent scheduled tasks run with the updated image.
 
-Side note: this repo includes a helper script at `bin/deploy` for publishing the image.
-
-`bin/deploy` pushes `vimcolorschemes/worker:latest` to ECR:
-
-```shell
-bin/deploy
-```
-
-### CI deployment (recommended)
+### CI deployment
 
 This repo includes `.github/workflows/deploy.yml` to build and push the worker image on every push to `main` (and on manual dispatch).
 
