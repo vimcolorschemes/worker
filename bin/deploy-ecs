@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/deploy-ecs --digest <sha256:digest> --output-file <path>
+
+Required environment variables:
+  AWS_REGION
+  AWS_ACCOUNT_ID
+  ECR_REPOSITORY
+  ECS_TASK_FAMILY
+  ECS_CONTAINER_NAME
+  EVENTBRIDGE_RULES
+EOF
+}
+
+require_var() {
+  local name="$1"
+  if [ -z "${!name:-}" ]; then
+    echo "Missing required environment variable: ${name}" >&2
+    exit 1
+  fi
+}
+
+digest=""
+output_file=""
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --digest)
+      digest="${2:-}"
+      shift 2
+      ;;
+    --output-file)
+      output_file="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [ -z "$digest" ] || [ -z "$output_file" ]; then
+  usage
+  exit 1
+fi
+
+require_var AWS_REGION
+require_var AWS_ACCOUNT_ID
+require_var ECR_REPOSITORY
+require_var ECS_TASK_FAMILY
+require_var ECS_CONTAINER_NAME
+require_var EVENTBRIDGE_RULES
+
+image_uri="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
+immutable_image="${image_uri}@${digest}"
+
+current_task="$(mktemp)"
+new_task="$(mktemp)"
+
+cleanup() {
+  rm -f "$current_task" "$new_task"
+}
+trap cleanup EXIT
+
+aws ecs describe-task-definition \
+  --task-definition "$ECS_TASK_FAMILY" \
+  --region "$AWS_REGION" \
+  --query taskDefinition > "$current_task"
+
+jq --arg image "$immutable_image" --arg name "$ECS_CONTAINER_NAME" '
+  {
+    family,
+    taskRoleArn,
+    executionRoleArn,
+    networkMode,
+    containerDefinitions,
+    volumes,
+    placementConstraints,
+    requiresCompatibilities,
+    cpu,
+    memory,
+    pidMode,
+    ipcMode,
+    proxyConfiguration,
+    inferenceAccelerators,
+    ephemeralStorage,
+    runtimePlatform
+  }
+  | del(.. | nulls)
+  | .containerDefinitions |= map(if .name == $name then .image = $image else . end)
+' "$current_task" > "$new_task"
+
+task_definition_arn="$(aws ecs register-task-definition \
+  --region "$AWS_REGION" \
+  --cli-input-json "file://${new_task}" \
+  --query 'taskDefinition.taskDefinitionArn' \
+  --output text)"
+
+for rule in $EVENTBRIDGE_RULES; do
+  current_targets="$(mktemp)"
+  updated_targets="$(mktemp)"
+
+  aws events list-targets-by-rule \
+    --region "$AWS_REGION" \
+    --rule "$rule" \
+    --query 'Targets' > "$current_targets"
+
+  jq --arg td "$task_definition_arn" '
+    map(
+      {
+        Id,
+        Arn,
+        RoleArn,
+        Input,
+        InputPath,
+        InputTransformer,
+        KinesisParameters,
+        RunCommandParameters,
+        EcsParameters,
+        BatchParameters,
+        SqsParameters,
+        HttpParameters,
+        RedshiftDataParameters,
+        SageMakerPipelineParameters,
+        DeadLetterConfig,
+        RetryPolicy
+      }
+      | if .EcsParameters then .EcsParameters.TaskDefinitionArn = $td else . end
+      | del(.. | nulls)
+    )
+  ' "$current_targets" > "$updated_targets"
+
+  failed_count="$(aws events put-targets \
+    --region "$AWS_REGION" \
+    --rule "$rule" \
+    --targets "file://${updated_targets}" \
+    --query 'FailedEntryCount' \
+    --output text)"
+
+  rm -f "$current_targets" "$updated_targets"
+
+  if [ "$failed_count" != "0" ]; then
+    echo "Failed to update EventBridge rule: ${rule}" >&2
+    exit 1
+  fi
+done
+
+{
+  echo "task_definition_arn=${task_definition_arn}"
+  echo "immutable_image=${immutable_image}"
+} >> "$output_file"

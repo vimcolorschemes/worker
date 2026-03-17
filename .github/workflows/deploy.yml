@@ -50,110 +50,12 @@ jobs:
             ${{ vars.AWS_REGISTRY_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/vimcolorschemes/worker:${{ github.sha }}
             ${{ vars.AWS_REGISTRY_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/vimcolorschemes/worker:latest
 
-      - name: Register ECS task definition revision
+      - name: Deploy digest-pinned ECS revision
         id: taskdef
         shell: bash
         run: |
-          set -euo pipefail
-
-          image_uri="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
-          immutable_image="${image_uri}@${{ steps.build.outputs.digest }}"
-
-          current_task="$(mktemp)"
-          new_task="$(mktemp)"
-
-          aws ecs describe-task-definition \
-            --task-definition "${ECS_TASK_FAMILY}" \
-            --region "${AWS_REGION}" \
-            --query taskDefinition > "${current_task}"
-
-          jq --arg image "${immutable_image}" --arg name "${ECS_CONTAINER_NAME}" '
-            {
-              family,
-              taskRoleArn,
-              executionRoleArn,
-              networkMode,
-              containerDefinitions,
-              volumes,
-              placementConstraints,
-              requiresCompatibilities,
-              cpu,
-              memory,
-              pidMode,
-              ipcMode,
-              proxyConfiguration,
-              inferenceAccelerators,
-              ephemeralStorage,
-              runtimePlatform
-            }
-            | del(.. | nulls)
-            | .containerDefinitions |= map(if .name == $name then .image = $image else . end)
-          ' "${current_task}" > "${new_task}"
-
-          task_definition_arn="$(aws ecs register-task-definition \
-            --region "${AWS_REGION}" \
-            --cli-input-json "file://${new_task}" \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)"
-
-          rm -f "${current_task}" "${new_task}"
-
-          echo "task_definition_arn=${task_definition_arn}" >> "${GITHUB_OUTPUT}"
-          echo "immutable_image=${immutable_image}" >> "${GITHUB_OUTPUT}"
-
-      - name: Update EventBridge targets
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          for rule in ${EVENTBRIDGE_RULES}; do
-            current_targets="$(mktemp)"
-            updated_targets="$(mktemp)"
-
-            aws events list-targets-by-rule \
-              --region "${AWS_REGION}" \
-              --rule "${rule}" \
-              --query 'Targets' > "${current_targets}"
-
-            jq --arg td "${{ steps.taskdef.outputs.task_definition_arn }}" '
-              map(
-                {
-                  Id,
-                  Arn,
-                  RoleArn,
-                  Input,
-                  InputPath,
-                  InputTransformer,
-                  KinesisParameters,
-                  RunCommandParameters,
-                  EcsParameters,
-                  BatchParameters,
-                  SqsParameters,
-                  HttpParameters,
-                  RedshiftDataParameters,
-                  SageMakerPipelineParameters,
-                  DeadLetterConfig,
-                  RetryPolicy
-                }
-                | if .EcsParameters then .EcsParameters.TaskDefinitionArn = $td else . end
-                | del(.. | nulls)
-              )
-            ' "${current_targets}" > "${updated_targets}"
-
-            failed_count="$(aws events put-targets \
-              --region "${AWS_REGION}" \
-              --rule "${rule}" \
-              --targets "file://${updated_targets}" \
-              --query 'FailedEntryCount' \
-              --output text)"
-
-            rm -f "${current_targets}" "${updated_targets}"
-
-            if [ "${failed_count}" != "0" ]; then
-              echo "Failed to update rule '${rule}' targets"
-              exit 1
-            fi
-          done
+          chmod +x bin/deploy-ecs
+          bin/deploy-ecs --digest "${{ steps.build.outputs.digest }}" --output-file "${GITHUB_OUTPUT}"
 
       - name: Deployment summary
         shell: bash
