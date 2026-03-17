@@ -109,7 +109,7 @@ bin/test --cover
 
 ### Lint
 
-[golint](https://github.com/golang/lint) is configured to run using `bin/lint`.
+[golangci-lint](https://golangci-lint.run/) is configured to run using `bin/lint`.
 
 ### Format code
 
