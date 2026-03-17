@@ -115,51 +115,6 @@ bin/test --cover
 
 `go fmt` can be easily used on all code using `bin/format`.
 
-## Cloud runtime and scheduling
+## Infrastructure and deployment
 
-The worker runs in AWS as one-off ECS Fargate tasks triggered by EventBridge cron rules.
-
-### How it is triggered
-
-- `import`: `cron(0 13 * * ? *)`
-- `update`: `cron(0 15 * * ? *)`
-- `generate`: `cron(0 17 * * ? *)`
-
-All schedules are in UTC.
-
-### How jobs execute
-
-- EventBridge rules run ECS tasks directly.
-- Launch type is Fargate.
-- The worker ECS service stays at desired count `0`; jobs run from schedules, not a long-running service.
-- `import` uses the task default command.
-- `update` overrides the command to `update`.
-- `generate` overrides the command to `generate`.
-
-### Deploying updates
-
-Publish a new worker image to ECR; subsequent scheduled tasks run with the updated image.
-
-### CI deployment
-
-This repo includes `.github/workflows/deploy.yml` to deploy on every push to `main` (and on manual dispatch).
-
-Deployment behavior:
-
-- Pushes two ECR tags: `${GITHUB_SHA}` and `latest`
-- Registers a new ECS task definition revision in the `run-job` family
-- Pins the ECS container image to the pushed image digest (`@sha256:...`)
-- Updates EventBridge rules (`import`, `update`, `generate`) to the new revision
-
-Set these repository-level GitHub Actions variables:
-
-- `AWS_REGION`
-- `AWS_REGISTRY_ID`
-- `AWS_ROLE_TO_ASSUME`
-
-The assumed role must trust GitHub OIDC (`token.actions.githubusercontent.com`) and allow:
-
-- ECR push/read for `vimcolorschemes/worker`
-- ECS task definition read/register (`DescribeTaskDefinition`, `RegisterTaskDefinition`)
-- EventBridge target read/update (`ListTargetsByRule`, `PutTargets`)
-- `iam:PassRole` for task roles used by `run-job`
+Infrastructure runtime, deployment flow, and Terraform setup are documented in `infra/README.md`.

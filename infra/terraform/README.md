@@ -1,5 +1,7 @@
 # Terraform Setup
 
+For runtime/deploy behavior and IAM expectations, see `infra/README.md`.
+
 This directory manages static AWS infrastructure for `vimcolorschemes/worker`.
 
 ## Layout
