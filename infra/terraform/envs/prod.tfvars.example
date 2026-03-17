@@ -1,0 +1,35 @@
+aws_region     = "us-east-1"
+aws_profile    = "YOUR_AWS_PROFILE"
+aws_account_id = "123456789012"
+project        = "vimcolorschemes"
+service        = "worker"
+environment    = "production"
+owner          = "YOUR_NAME"
+managed_by     = "terraform"
+github_repo    = "vimcolorschemes/worker"
+
+ecr_repository_name          = "vimcolorschemes/worker"
+ecs_cluster_name             = "vimcolorschemes-worker"
+ecs_task_family              = "run-job"
+ecs_container_name           = "vimcolorschemes-worker"
+ecs_task_execution_role_name = "ecsTaskExecutionRole"
+ecs_events_role_name         = "ecsEventsRole"
+cloudwatch_log_group_name    = "/ecs/run-job"
+
+default_subnet_ids = [
+  "subnet-xxxxxxxxxxxxxxxxx",
+]
+
+import_security_group_ids = [
+  "sg-xxxxxxxxxxxxxxxxx",
+]
+
+update_security_group_ids = [
+  "sg-yyyyyyyyyyyyyyyyy",
+]
+
+generate_security_group_ids = [
+  "sg-zzzzzzzzzzzzzzzzz",
+]
+
+bootstrap_task_definition_arn = "arn:aws:ecs:us-east-1:123456789012:task-definition/run-job:1"

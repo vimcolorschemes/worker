@@ -1,2 +1,13 @@
 # generate job temporary files
 .tmp
+
+# terraform
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.auto.tfvars
+infra/terraform/backend.hcl
+infra/terraform/*.tfvars
+infra/terraform/envs/*.tfvars
+!infra/terraform/backend.hcl.example
+!infra/terraform/envs/*.tfvars.example
