@@ -1,5 +1,3 @@
-version: "3"
-
 services:
   vimcolorschemes_worker_go:
     container_name: vimcolorschemes_worker_go
