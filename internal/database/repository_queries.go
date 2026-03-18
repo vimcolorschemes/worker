@@ -46,7 +46,7 @@ const (
 
 // queryRepositories executes a repository query and hydrates colorscheme data.
 func queryRepositories(query string, args ...any) ([]repository.Repository, error) {
-	rows, err := db.Query(query, args...)
+	rows, err := queryWithTransientRetry(query, args...)
 	if err != nil {
 		return nil, err
 	}
