@@ -85,10 +85,6 @@ var schemaStatements = []string{
 	// Generate queue lookup by latest generate event per repository.
 	`CREATE INDEX IF NOT EXISTS idx_repository_job_events_job_repository_created
 		ON repository_job_events(job, repository_id, created_at DESC)`,
-
-	// Generate queue lookup with materialized latest-generate timestamp.
-	`CREATE INDEX IF NOT EXISTS idx_repositories_generate_due
-		ON repositories(is_eligible, pushed_at, last_generate_event_at)`,
 }
 
 func initializeSchema(db *sql.DB) error {
@@ -99,6 +95,10 @@ func initializeSchema(db *sql.DB) error {
 	}
 
 	if err := ensureRepositoryColumns(db); err != nil {
+		return err
+	}
+
+	if err := ensureRepositoryIndexes(db); err != nil {
 		return err
 	}
 
@@ -117,6 +117,12 @@ func ensureRepositoryColumns(db *sql.DB) error {
 	}
 
 	return nil
+}
+
+func ensureRepositoryIndexes(db *sql.DB) error {
+	_, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_repositories_generate_due
+		ON repositories(is_eligible, pushed_at, last_generate_event_at)`)
+	return err
 }
 
 func columnExists(db *sql.DB, tableName string, columnName string) bool {
