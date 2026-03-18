@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	rdebug "runtime/debug"
 	"strings"
 	"time"
 
@@ -12,7 +13,9 @@ import (
 	"github.com/vimcolorschemes/worker/internal/database"
 )
 
-var jobRunnerMap = map[string]interface{}{
+type jobRunner func(force bool, debug bool, repoKey string) map[string]interface{}
+
+var jobRunnerMap = map[string]jobRunner{
 	"import":   cli.Import,
 	"update":   cli.Update,
 	"generate": cli.Generate,
@@ -46,14 +49,50 @@ func main() {
 
 	fmt.Println()
 
-	data := runner.(func(force bool, debug bool, repoKey string) map[string]interface{})(force, debug, repoKey)
+	data, runErr, stackTrace := runJobWithRecovery(runner, force, debug, repoKey)
 
 	elapsedTime := time.Since(startTime)
+	if runErr != nil {
+		reportData := map[string]interface{}{
+			"status": "error",
+			"error":  runErr.Error(),
+		}
+		if stackTrace != "" {
+			reportData["stackTrace"] = stackTrace
+		}
+
+		database.CreateReport(job, elapsedTime.Seconds(), reportData)
+
+		fmt.Println()
+		log.Printf("Elapsed time: %s\n", elapsedTime)
+		log.Print(":wq")
+		log.Printf("Job failed: %s", runErr)
+		if stackTrace != "" {
+			log.Print(stackTrace)
+		}
+		os.Exit(1)
+	}
+
 	database.CreateReport(job, elapsedTime.Seconds(), data)
 
 	fmt.Println()
 	log.Printf("Elapsed time: %s\n", elapsedTime)
 	log.Print(":wq")
+}
+
+func runJobWithRecovery(runner jobRunner, force bool, debug bool, repoKey string) (data map[string]interface{}, runErr error, stackTrace string) {
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			return
+		}
+
+		runErr = fmt.Errorf("panic: %v", recovered)
+		stackTrace = string(rdebug.Stack())
+	}()
+
+	data = runner(force, debug, repoKey)
+	return data, nil, ""
 }
 
 func getJobArgs(osArgs []string) (string, bool, bool, string, error) {
