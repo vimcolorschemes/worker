@@ -1,12 +1,12 @@
 module github.com/vimcolorschemes/worker
 
-go 1.23
+go 1.23.0
 
 require (
 	github.com/google/go-github/v68 v68.0.0
 	github.com/joho/godotenv v1.5.1
 	github.com/tursodatabase/go-libsql v0.0.0-20251219133454-43644db490ff
-	golang.org/x/oauth2 v0.25.0
+	golang.org/x/oauth2 v0.27.0
 )
 
 require (
