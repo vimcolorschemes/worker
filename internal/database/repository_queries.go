@@ -38,32 +38,6 @@ const (
 	`
 )
 
-// queryRepositories executes a repository query and hydrates colorscheme data.
-func queryRepositories(query string, args ...any) ([]repository.Repository, error) {
-	rows, err := queryWithTransientRetry(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-
-	var repositories []repository.Repository
-	for rows.Next() {
-		repo, err := scanRepositoryWithColorschemes(rows)
-		if err != nil {
-			return nil, err
-		}
-		repositories = append(repositories, repo)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return repositories, nil
-}
-
 // queryRepositoriesBasic executes a repository query without hydrating colorscheme data.
 func queryRepositoriesBasic(query string, args ...any) ([]repository.Repository, error) {
 	rows, err := queryWithTransientRetry(query, args...)

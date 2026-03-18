@@ -49,7 +49,7 @@ func main() {
 
 	fmt.Println()
 
-	data, runErr, stackTrace := runJobWithRecovery(runner, force, debug, repoKey)
+	data, stackTrace, runErr := runJobWithRecovery(runner, force, debug, repoKey)
 
 	elapsedTime := time.Since(startTime)
 	if runErr != nil {
@@ -84,7 +84,7 @@ func main() {
 	log.Print(":wq")
 }
 
-func runJobWithRecovery(runner jobRunner, force bool, debug bool, repoKey string) (data map[string]interface{}, runErr error, stackTrace string) {
+func runJobWithRecovery(runner jobRunner, force bool, debug bool, repoKey string) (data map[string]interface{}, stackTrace string, runErr error) {
 	defer func() {
 		recovered := recover()
 		if recovered == nil {
@@ -96,7 +96,7 @@ func runJobWithRecovery(runner jobRunner, force bool, debug bool, repoKey string
 	}()
 
 	data = runner(force, debug, repoKey)
-	return data, nil, ""
+	return data, "", nil
 }
 
 func getJobArgs(osArgs []string) (string, bool, bool, string, error) {

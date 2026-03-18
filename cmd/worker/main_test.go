@@ -122,7 +122,7 @@ func TestRunJobWithRecovery(t *testing.T) {
 			return map[string]interface{}{"repositoryCount": 2}
 		}
 
-		data, err, stackTrace := runJobWithRecovery(runner, false, false, "")
+		data, stackTrace, err := runJobWithRecovery(runner, false, false, "")
 
 		if err != nil {
 			t.Fatalf("runJobWithRecovery error = %v, want nil", err)
@@ -142,7 +142,7 @@ func TestRunJobWithRecovery(t *testing.T) {
 			panic("boom")
 		}
 
-		data, err, stackTrace := runJobWithRecovery(runner, false, false, "")
+		data, stackTrace, err := runJobWithRecovery(runner, false, false, "")
 
 		if err == nil {
 			t.Fatal("runJobWithRecovery error = nil, want error")
