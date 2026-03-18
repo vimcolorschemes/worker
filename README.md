@@ -2,7 +2,7 @@
   <img alt="vimcolorschemes worker" src="https://github.com/vimcolorschemes/worker/blob/media/logo.png?raw=true" width="400" />
 </h1>
 <p align="center" style="border:none">
-  I search for editor color schemes, and store them. That's about it.
+  I search for vim and nvim color schemes, and store them. That's about it.
 </p>
 
 ## Getting started
