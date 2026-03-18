@@ -8,7 +8,9 @@ import (
 func TestCreateReport(t *testing.T) {
 	t.Run("inserts a report row", func(t *testing.T) {
 		setupTestDB(t)
-		CreateReport("import", 1.5, map[string]interface{}{})
+		if err := CreateReport("import", 1.5, map[string]interface{}{}); err != nil {
+			t.Fatalf("CreateReport returned error: %v", err)
+		}
 
 		var count int
 		err := db.QueryRow("SELECT count(*) FROM reports").Scan(&count)
@@ -22,7 +24,9 @@ func TestCreateReport(t *testing.T) {
 
 	t.Run("marshals data map to JSON", func(t *testing.T) {
 		setupTestDB(t)
-		CreateReport("import", 1.5, map[string]interface{}{"count": 5})
+		if err := CreateReport("import", 1.5, map[string]interface{}{"count": 5}); err != nil {
+			t.Fatalf("CreateReport returned error: %v", err)
+		}
 
 		var data string
 		err := db.QueryRow("SELECT data FROM reports").Scan(&data)
@@ -31,6 +35,18 @@ func TestCreateReport(t *testing.T) {
 		}
 		if !strings.Contains(data, "count") {
 			t.Fatalf("data = %q, want it to contain %q", data, "count")
+		}
+	})
+
+	t.Run("returns error when database is unavailable", func(t *testing.T) {
+		setupTestDB(t)
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+
+		err := CreateReport("import", 1.5, map[string]interface{}{})
+		if err == nil {
+			t.Fatal("CreateReport error = nil, want error")
 		}
 	})
 }

@@ -61,7 +61,9 @@ func main() {
 			reportData["stackTrace"] = stackTrace
 		}
 
-		database.CreateReport(job, elapsedTime.Seconds(), reportData)
+		if err := database.CreateReport(job, elapsedTime.Seconds(), reportData); err != nil {
+			log.Printf("Error creating report: %s", err)
+		}
 
 		fmt.Println()
 		log.Printf("Elapsed time: %s\n", elapsedTime)
@@ -73,7 +75,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	database.CreateReport(job, elapsedTime.Seconds(), data)
+	if err := database.CreateReport(job, elapsedTime.Seconds(), data); err != nil {
+		log.Printf("Error creating report: %s", err)
+	}
 
 	fmt.Println()
 	log.Printf("Elapsed time: %s\n", elapsedTime)
