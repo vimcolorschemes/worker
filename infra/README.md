@@ -47,6 +47,17 @@ The assumed role must trust GitHub OIDC (`token.actions.githubusercontent.com`) 
 - EventBridge target read/update (`ListTargetsByRule`, `PutTargets`)
 - `iam:PassRole` for `ecsTaskExecutionRole` and `ecsEventsRole`
 
+## Runtime secrets
+
+The ECS task definition should inject these environment variables from AWS Secrets Manager:
+
+- `GITHUB_TOKEN` from `vimcolorschemes/worker/github_token`
+- `DATABASE_URL` from `vimcolorschemes/worker/database_url`
+- `DATABASE_AUTH_TOKEN` from `vimcolorschemes/worker/database_auth_token`
+
+`DATABASE_URL` is required by the worker and should point to a `libsql://...` endpoint in production.
+For production deploys, keep all three values in ECS task `secrets` (not plain `environment`).
+
 ## Terraform
 
 Terraform modules and run instructions are in `infra/terraform/README.md`.

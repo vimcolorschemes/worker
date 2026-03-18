@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [[ -f .env ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  printf "DATABASE_URL is not set in .env\n" >&2
+  exit 1
+fi
+
+if [[ "${DATABASE_URL}" != file:* ]]; then
+  printf "DATABASE_URL must be a local file URL (file:...)\n" >&2
+  printf "Use bin/reset-turso-db for remote DBs.\n" >&2
+  exit 1
+fi
+
+db_path="${DATABASE_URL#file:}"
+db_path="${db_path%%\?*}"
+
+printf "This will delete local SQLite DB file '%s'. Continue? [y/N] " "$db_path"
+read -r answer
+if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
+  printf "Cancelled.\n"
+  exit 1
+fi
+
+rm -f "$db_path"
+
+printf "Deleted local DB files for %s\n" "$db_path"
+printf "Run a worker job to recreate schema, for example:\n"
+printf "bin/start import --repo morhetz/gruvbox\n"

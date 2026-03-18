@@ -2,7 +2,7 @@
   <img alt="vimcolorschemes worker" src="https://github.com/vimcolorschemes/worker/blob/media/logo.png?raw=true" width="400" />
 </h1>
 <p align="center" style="border:none">
-  I search for vim color schemes, and store them. That's about it.
+  I search for editor color schemes, and store them. That's about it.
 </p>
 
 ## Getting started
@@ -11,18 +11,43 @@ The worker is a CLI used to import and manage the data for [vimcolorschemes](htt
 
 ### Requirements:
 
-- [mongodb-community](https://docs.mongodb.com/manual/installation/#mongodb-community-edition-installation-tutorials)
 - [golang](https://go.dev)
-
-_Note_: The MongoDB database can also be ran from [the app docker setup](https://docs.vimcolorschemes.com/#/installation-guide?id=_1-docker).
+- A Turso database URL (or a local libSQL/SQLite file URL)
 
 ### Set up the environment variables
 
 Update the values in `.env` to your needs.
 
+You can start from `.env.example` (and `.env.docker.example` for Docker, `.env.deploy.example` for deploys).
+
 > TIP: Read the comments on the dotenv file.
 
 The `.env` is automatically picked up by CLI when it runs.
+
+#### Database (Turso/libSQL)
+
+The worker uses the `libsql` driver, so it supports both local and remote Turso setups.
+
+Local database example:
+
+```shell
+export DATABASE_URL=file:./data/vimcolorschemes.db
+export DATABASE_AUTH_TOKEN=
+```
+
+Remote Turso example:
+
+```shell
+export DATABASE_URL=libsql://your-database.turso.io
+export DATABASE_AUTH_TOKEN=your-turso-auth-token
+```
+
+Optional remote replica mode with a local sync file:
+
+```shell
+export DATABASE_URL='libsql://your-database.turso.io?syncUrl=file%3A.%2Fdata%2Freplica.db'
+export DATABASE_AUTH_TOKEN=your-turso-auth-token
+```
 
 #### Github queries
 
@@ -77,7 +102,7 @@ bin/start update --repo morhetz/gruvbox
 
 #### generate
 
-Generate color data for the vim color scheme previews
+Generate color data for color scheme previews
 
 ```shell
 bin/start generate

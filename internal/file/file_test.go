@@ -8,8 +8,11 @@ import (
 var target = ".vimcolorschemes-file-test.tmp"
 
 func cleanUp(t *testing.T) {
+	t.Helper()
 	if _, err := os.Stat(target); !os.IsNotExist(err) {
-		os.Remove(target)
+		if err := os.Remove(target); err != nil {
+			t.Fatalf("error removing %s: %v", target, err)
+		}
 	}
 }
 

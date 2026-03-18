@@ -12,62 +12,60 @@ import (
 
 // Repository represents a repository as it's stored in the database
 type Repository struct {
-	ID                     int64                        `bson:"_id,omitempty"`
-	Owner                  Owner                        `bson:"owner"`
-	Name                   string                       `bson:"name"`
-	GithubURL              string                       `bson:"githubURL"`
-	StargazersCount        int                          `bson:"stargazersCount"`
-	StargazersCountHistory []StargazersCountHistoryItem `bson:"stargazersCountHistory"`
-	WeekStargazersCount    int                          `bson:"weekStargazersCount"`
-	GithubCreatedAt        time.Time                    `bson:"githubCreatedAt"`
-	PushedAt               time.Time                    `bson:"pushedAt"`
-	VimColorSchemes        []VimColorScheme             `bson:"vimColorSchemes,omitempty"`
-	UpdateValid            bool                         `bson:"updateValid"`
-	UpdatedAt              time.Time                    `bson:"updatedAt"`
-	GenerateValid          bool                         `bson:"generateValid"`
-	GeneratedAt            time.Time                    `bson:"generatedAt"`
+	ID                     int64                        `json:"id"`
+	Owner                  Owner                        `json:"owner"`
+	Name                   string                       `json:"name"`
+	GithubURL              string                       `json:"githubURL"`
+	StargazersCount        int                          `json:"stargazersCount"`
+	StargazersCountHistory []StargazersCountHistoryItem `json:"stargazersCountHistory"`
+	WeekStargazersCount    int                          `json:"weekStargazersCount"`
+	GithubCreatedAt        time.Time                    `json:"githubCreatedAt"`
+	PushedAt               time.Time                    `json:"pushedAt"`
+	Colorschemes           []Colorscheme                `json:"colorschemes,omitempty"`
+	IsEligible             bool                         `json:"isEligible"`
+	UpdatedAt              time.Time                    `json:"updatedAt"`
 }
 
 // Owner represents the owner of a repository
 type Owner struct {
-	Name      string `bson:"name"`
-	AvatarURL string `bson:"avatarURL"`
+	Name      string `json:"name"`
+	AvatarURL string `json:"avatarURL"`
 }
 
 // StargazersCountHistoryItem represents a repository's stargazers count at a given date
 type StargazersCountHistoryItem struct {
-	Date            time.Time `bson:"date"`
-	StargazersCount int       `bson:"stargazersCount"`
+	Date            time.Time `json:"date"`
+	StargazersCount int       `json:"stargazersCount"`
 }
 
-// VimColorScheme represents a vim color scheme's meta data
-type VimColorScheme struct {
-	Name        string               `bson:"name"`
-	Data        VimColorSchemeData   `bson:"data"`
-	Backgrounds []VimBackgroundValue `bson:"backgrounds"`
+// Colorscheme represents a colorscheme's metadata
+type Colorscheme struct {
+	Name        string            `json:"name"`
+	Data        ColorschemeData   `json:"data"`
+	Backgrounds []BackgroundValue `json:"backgrounds"`
 }
 
-// VimColorSchemeData represents the color values for light and dark backgrounds
-type VimColorSchemeData struct {
-	Light []VimColorSchemeGroup `bson:"light,omitempty"`
-	Dark  []VimColorSchemeGroup `bson:"dark,omitempty"`
+// ColorschemeData represents the color values for light and dark backgrounds
+type ColorschemeData struct {
+	Light []ColorschemeGroup `json:"light,omitempty"`
+	Dark  []ColorschemeGroup `json:"dark,omitempty"`
 }
 
-// VimColorSchemeGroup represents a vim color scheme group's data
-type VimColorSchemeGroup struct {
-	Name    string `bson:"name"`
-	HexCode string `bson:"hexCode"`
+// ColorschemeGroup represents a colorscheme group's data
+type ColorschemeGroup struct {
+	Name    string `json:"name"`
+	HexCode string `json:"hexCode"`
 }
 
-// VimBackgroundValue sets up an enum containing the possible values for background in vim
-type VimBackgroundValue string
+// BackgroundValue sets up an enum containing possible background values
+type BackgroundValue string
 
 const (
-	// LightBackground represents light background value for vim
-	LightBackground VimBackgroundValue = "light"
+	// LightBackground represents light background value
+	LightBackground BackgroundValue = "light"
 
-	// DarkBackground represents light background value for vim
-	DarkBackground VimBackgroundValue = "dark"
+	// DarkBackground represents dark background value
+	DarkBackground BackgroundValue = "dark"
 )
 
 // UniquifyRepositories makes sure no repository is listed twice in a list
@@ -107,7 +105,7 @@ func (repository Repository) AppendToStargazersCountHistory() []StargazersCountH
 	// remove present entries for today
 	for index := 0; index < len(history); {
 		item := history[index]
-		if item.Date == today {
+		if item.Date.Equal(today) {
 			history = append(history[:index], history[index+1:]...)
 		} else {
 			index++
@@ -148,11 +146,10 @@ func (repository Repository) ComputeTrendingStargazersCount(dayCount int) int {
 	return lastDayCount - firstDayCount
 }
 
-// IsValidAfterUpdate returns true if a repository is considered
-// valid from our standards after an update job
-func (repository Repository) IsValidAfterUpdate() bool {
-	var defaultTime time.Time
-	if repository.PushedAt == defaultTime {
+// IsEligibleAfterUpdate returns true if a repository is considered
+// eligible from our standards after an update job
+func (repository Repository) IsEligibleAfterUpdate() bool {
+	if repository.PushedAt.IsZero() {
 		log.Print("Repository last commit date is not valid")
 		return false
 	}
@@ -169,21 +166,6 @@ func (repository Repository) IsValidAfterUpdate() bool {
 
 	if !date.IsSameDay(repository.StargazersCountHistory[0].Date, date.Today()) {
 		log.Print("Repository stargazers count history last entry is not today")
-		return false
-	}
-
-	return true
-}
-
-// IsValidAfterGenerate returns true if a repository is considered
-// valid from our standards after a generate job
-func (repository Repository) IsValidAfterGenerate() bool {
-	if !repository.UpdateValid {
-		return false
-	}
-
-	if len(repository.VimColorSchemes) == 0 {
-		log.Print("Repository does not have a valid colorscheme")
 		return false
 	}
 

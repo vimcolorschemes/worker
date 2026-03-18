@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"log"
 	"os"
+	rdebug "runtime/debug"
 	"strings"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/vimcolorschemes/worker/cli"
 	"github.com/vimcolorschemes/worker/internal/database"
 )
 
-var jobRunnerMap = map[string]interface{}{
+type jobRunner func(force bool, debug bool, repoKey string) map[string]interface{}
+
+var jobRunnerMap = map[string]jobRunner{
 	"import":   cli.Import,
 	"update":   cli.Update,
 	"generate": cli.Generate,
@@ -48,19 +49,59 @@ func main() {
 
 	fmt.Println()
 
-	data := runner.(func(force bool, debug bool, repoKey string) bson.M)(force, debug, repoKey)
+	data, stackTrace, runErr := runJobWithRecovery(runner, force, debug, repoKey)
 
 	elapsedTime := time.Since(startTime)
-	database.CreateReport(job, elapsedTime.Seconds(), data)
+	if runErr != nil {
+		reportData := map[string]interface{}{
+			"status": "error",
+			"error":  runErr.Error(),
+		}
+		if stackTrace != "" {
+			reportData["stackTrace"] = stackTrace
+		}
+
+		if err := database.CreateReport(job, elapsedTime.Seconds(), reportData); err != nil {
+			log.Printf("Error creating report: %s", err)
+		}
+
+		fmt.Println()
+		log.Printf("Elapsed time: %s\n", elapsedTime)
+		log.Print(":wq")
+		log.Printf("Job failed: %s", runErr)
+		if stackTrace != "" {
+			log.Print(stackTrace)
+		}
+		os.Exit(1)
+	}
+
+	if err := database.CreateReport(job, elapsedTime.Seconds(), data); err != nil {
+		log.Printf("Error creating report: %s", err)
+	}
 
 	fmt.Println()
 	log.Printf("Elapsed time: %s\n", elapsedTime)
 	log.Print(":wq")
 }
 
+func runJobWithRecovery(runner jobRunner, force bool, debug bool, repoKey string) (data map[string]interface{}, stackTrace string, runErr error) {
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			return
+		}
+
+		runErr = fmt.Errorf("panic: %v", recovered)
+		stackTrace = string(rdebug.Stack())
+	}()
+
+	data = runner(force, debug, repoKey)
+	return data, "", nil
+}
+
 func getJobArgs(osArgs []string) (string, bool, bool, string, error) {
 	if len(osArgs) < 2 {
-		return "", false, false, "", errors.New("Please provide an argument")
+		return "", false, false, "", errors.New("please provide an argument")
 	}
 
 	job := osArgs[1]

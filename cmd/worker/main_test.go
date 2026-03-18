@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestGetJobArg(t *testing.T) {
 	t.Run("should return job and false force", func(t *testing.T) {
@@ -109,6 +112,52 @@ func TestGetJobArg(t *testing.T) {
 
 		if jobArg != "" {
 			t.Errorf("Incorrect result for getJobArgs; got: %s, want: %s", jobArg, "")
+		}
+	})
+}
+
+func TestRunJobWithRecovery(t *testing.T) {
+	t.Run("returns runner data on success", func(t *testing.T) {
+		runner := func(_force bool, _debug bool, _repoKey string) map[string]interface{} {
+			return map[string]interface{}{"repositoryCount": 2}
+		}
+
+		data, stackTrace, err := runJobWithRecovery(runner, false, false, "")
+
+		if err != nil {
+			t.Fatalf("runJobWithRecovery error = %v, want nil", err)
+		}
+
+		if stackTrace != "" {
+			t.Fatalf("stackTrace = %q, want empty", stackTrace)
+		}
+
+		if data["repositoryCount"] != 2 {
+			t.Fatalf("repositoryCount = %v, want 2", data["repositoryCount"])
+		}
+	})
+
+	t.Run("captures panic and returns stack trace", func(t *testing.T) {
+		runner := func(_force bool, _debug bool, _repoKey string) map[string]interface{} {
+			panic("boom")
+		}
+
+		data, stackTrace, err := runJobWithRecovery(runner, false, false, "")
+
+		if err == nil {
+			t.Fatal("runJobWithRecovery error = nil, want error")
+		}
+
+		if !strings.Contains(err.Error(), "panic: boom") {
+			t.Fatalf("error = %q, want it to contain %q", err.Error(), "panic: boom")
+		}
+
+		if stackTrace == "" {
+			t.Fatal("stackTrace = empty, want stack trace")
+		}
+
+		if data != nil {
+			t.Fatalf("data = %v, want nil", data)
 		}
 	})
 }

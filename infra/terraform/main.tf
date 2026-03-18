@@ -39,13 +39,13 @@ resource "aws_secretsmanager_secret" "github_token" {
   tags = merge(local.tags, { Purpose = "runtime-secret" })
 }
 
-resource "aws_secretsmanager_secret" "mongodb_password" {
-  name = "vimcolorschemes/worker/mongodb_password"
+resource "aws_secretsmanager_secret" "database_url" {
+  name = "vimcolorschemes/worker/database_url"
   tags = merge(local.tags, { Purpose = "runtime-secret" })
 }
 
-resource "aws_secretsmanager_secret" "mongodb_connection_string" {
-  name = "vimcolorschemes/worker/mongodb_connection_string"
+resource "aws_secretsmanager_secret" "database_auth_token" {
+  name = "vimcolorschemes/worker/database_auth_token"
   tags = merge(local.tags, { Purpose = "runtime-secret" })
 }
 
@@ -61,8 +61,8 @@ resource "aws_iam_role_policy" "ecs_task_execution_secret_access" {
         Action = ["secretsmanager:GetSecretValue"]
         Resource = [
           aws_secretsmanager_secret.github_token.arn,
-          aws_secretsmanager_secret.mongodb_password.arn,
-          aws_secretsmanager_secret.mongodb_connection_string.arn,
+          aws_secretsmanager_secret.database_url.arn,
+          aws_secretsmanager_secret.database_auth_token.arn,
         ]
       }
     ]

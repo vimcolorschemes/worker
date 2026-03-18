@@ -9,8 +9,6 @@ import (
 	"github.com/vimcolorschemes/worker/internal/dotenv"
 	"github.com/vimcolorschemes/worker/internal/github"
 
-	"go.mongodb.org/mongo-driver/bson"
-
 	gogithub "github.com/google/go-github/v68/github"
 )
 
@@ -40,8 +38,8 @@ func init() {
 	repositoryCountLimitPerPage = int(math.Min(float64(repositoryCountLimit), 100))
 }
 
-// Import potential vim color scheme repositories from Github
-func Import(_force bool, _debug bool, repoKey string) bson.M {
+// Import potential colorscheme repositories from Github
+func Import(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	log.Printf("Repository limit: %d", repositoryCountLimit)
 
 	var repositories []*gogithub.Repository
@@ -62,22 +60,21 @@ func Import(_force bool, _debug bool, repoKey string) bson.M {
 	log.Print("Upserting ", len(repositories), " repositories")
 	for _, repository := range repositories {
 		log.Print("Upserting ", *repository.Name)
-		repositoryUpdateObject := getImportRepositoryObject(repository)
-		database.UpsertRepository(*repository.ID, repositoryUpdateObject)
+		data := getImportData(repository)
+		database.UpsertRepositoryFromImport(data)
 	}
 
-	return bson.M{"repositoryCount": len(repositories)}
+	return map[string]interface{}{"repositoryCount": len(repositories)}
 }
 
-func getImportRepositoryObject(repository *gogithub.Repository) bson.M {
-	return bson.M{
-		"_id":             repository.GetID(),
-		"owner.name":      repository.GetOwner().GetLogin(),
-		"owner.avatarURL": repository.GetOwner().GetAvatarURL(),
-		"name":            repository.GetName(),
-		"description":     repository.GetDescription(),
-		"githubURL":       repository.GetHTMLURL(),
-		"githubCreatedAt": repository.GetCreatedAt().Time,
-		"pushedAt":        repository.GetPushedAt().Time,
+func getImportData(repository *gogithub.Repository) database.ImportData {
+	return database.ImportData{
+		ID:              repository.GetID(),
+		OwnerName:       repository.GetOwner().GetLogin(),
+		OwnerAvatarURL:  repository.GetOwner().GetAvatarURL(),
+		Name:            repository.GetName(),
+		GithubURL:       repository.GetHTMLURL(),
+		GithubCreatedAt: repository.GetCreatedAt().Time,
+		PushedAt:        repository.GetPushedAt().Time,
 	}
 }

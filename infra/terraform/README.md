@@ -41,3 +41,8 @@ This module is configured to let CI keep owning deploy-time task definition revi
 
 - EventBridge target `task_definition_arn` changes are ignored in Terraform.
 - Secrets are modeled as `aws_secretsmanager_secret` only (secret values are not managed here).
+- Runtime secret names expected by the worker are:
+  - `vimcolorschemes/worker/github_token`
+  - `vimcolorschemes/worker/database_url`
+  - `vimcolorschemes/worker/database_auth_token`
+- ECS task definitions should map these as container `secrets`; do not set them as plain container `environment` values.
