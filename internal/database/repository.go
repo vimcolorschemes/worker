@@ -50,7 +50,7 @@ const (
 
 // GetRepositories gets all repositories stored in the database.
 func GetRepositories() ([]repository.Repository, error) {
-	return queryRepositories(queryAllRepositories)
+	return queryRepositoriesBasic(queryAllRepositories)
 }
 
 // GetRepository gets the repository matching the repository key.
@@ -71,7 +71,7 @@ func GetRepository(repoKey string) (repository.Repository, error) {
 
 // GetRepositoriesToGenerate gets all repositories that are due for a preview generate.
 func GetRepositoriesToGenerate() ([]repository.Repository, error) {
-	return queryRepositories(queryRepositoriesToGenerate)
+	return queryRepositoriesBasic(queryRepositoriesToGenerate)
 }
 
 // UpsertRepositoryFromImport inserts or updates a repository from import data.
