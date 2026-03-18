@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"strings"
 )
 
 var schemaStatements = []string{
@@ -17,6 +18,7 @@ var schemaStatements = []string{
 		week_stargazers_count    INTEGER NOT NULL DEFAULT 0,
 		github_created_at        DATETIME,
 		pushed_at                DATETIME,
+		last_generate_event_at   DATETIME,
 		is_eligible              BOOLEAN NOT NULL DEFAULT 0,
 		updated_at               DATETIME
 	)`,
@@ -83,6 +85,10 @@ var schemaStatements = []string{
 	// Generate queue lookup by latest generate event per repository.
 	`CREATE INDEX IF NOT EXISTS idx_repository_job_events_job_repository_created
 		ON repository_job_events(job, repository_id, created_at DESC)`,
+
+	// Generate queue lookup with materialized latest-generate timestamp.
+	`CREATE INDEX IF NOT EXISTS idx_repositories_generate_due
+		ON repositories(is_eligible, pushed_at, last_generate_event_at)`,
 }
 
 func initializeSchema(db *sql.DB) error {
@@ -92,5 +98,67 @@ func initializeSchema(db *sql.DB) error {
 		}
 	}
 
+	if err := ensureRepositoryColumns(db); err != nil {
+		return err
+	}
+
+	if err := backfillLastGenerateEventAt(db); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func ensureRepositoryColumns(db *sql.DB) error {
+	if !columnExists(db, "repositories", "last_generate_event_at") {
+		if _, err := db.Exec("ALTER TABLE repositories ADD COLUMN last_generate_event_at DATETIME"); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func columnExists(db *sql.DB, tableName string, columnName string) bool {
+	rows, err := db.Query("PRAGMA table_info(" + tableName + ")")
+	if err != nil {
+		return false
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	for rows.Next() {
+		var cid int
+		var name string
+		var colType string
+		var notNull int
+		var defaultValue interface{}
+		var pk int
+
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &defaultValue, &pk); err != nil {
+			return false
+		}
+
+		if name == columnName {
+			return true
+		}
+	}
+
+	return false
+}
+
+func backfillLastGenerateEventAt(db *sql.DB) error {
+	_, err := db.Exec(`
+		UPDATE repositories
+		SET last_generate_event_at = (
+			SELECT MAX(created_at)
+			FROM repository_job_events
+			WHERE repository_id = repositories.id
+			  AND job = 'generate'
+		)
+		WHERE last_generate_event_at IS NULL
+	`)
+
+	return err
 }

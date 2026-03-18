@@ -193,6 +193,11 @@ func TestGetRepositoriesToGenerate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("insert generate event: %v", err)
 		}
+
+		_, err = db.Exec(`UPDATE repositories SET last_generate_event_at = ? WHERE id = ?`, createdAt, id)
+		if err != nil {
+			t.Fatalf("update repo last_generate_event_at: %v", err)
+		}
 	}
 
 	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -402,6 +407,23 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		}
 	})
 
+	t.Run("keeps only latest success event per repo and job", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		UpdateRepositoryFromGenerate(1, GenerateData{})
+		UpdateRepositoryFromGenerate(1, GenerateData{})
+
+		var eventCount int
+		err := db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE repository_id = 1 AND job = 'generate' AND status = 'success'`).Scan(&eventCount)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if eventCount != 1 {
+			t.Fatalf("eventCount = %d, want 1", eventCount)
+		}
+	})
+
 	t.Run("stores capped error message for generate failure", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
@@ -422,6 +444,38 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		}
 		if len(errorMessage) != 2048 {
 			t.Fatalf("len(errorMessage) = %d, want 2048", len(errorMessage))
+		}
+	})
+
+	t.Run("keeps only latest event per status", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		if err := CreateRepositoryGenerateErrorEvent(1, "first"); err != nil {
+			t.Fatalf("CreateRepositoryGenerateErrorEvent: %v", err)
+		}
+		if err := CreateRepositoryGenerateErrorEvent(1, "second"); err != nil {
+			t.Fatalf("CreateRepositoryGenerateErrorEvent: %v", err)
+		}
+		UpdateRepositoryFromGenerate(1, GenerateData{})
+		UpdateRepositoryFromGenerate(1, GenerateData{})
+
+		var errorCount int
+		err := db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE repository_id = 1 AND job = 'generate' AND status = 'error'`).Scan(&errorCount)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if errorCount != 1 {
+			t.Fatalf("errorCount = %d, want 1", errorCount)
+		}
+
+		var successCount int
+		err = db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE repository_id = 1 AND job = 'generate' AND status = 'success'`).Scan(&successCount)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if successCount != 1 {
+			t.Fatalf("successCount = %d, want 1", successCount)
 		}
 	})
 }

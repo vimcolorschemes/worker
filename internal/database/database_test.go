@@ -112,6 +112,7 @@ func TestInitializeSchemaCreatesExpectedIndexes(t *testing.T) {
 		"idx_repositories_stargazers_count_id",
 		"idx_repositories_github_created_at_id",
 		"idx_repositories_owner_week_stars_id_nocase",
+		"idx_repositories_generate_due",
 		"idx_colorschemes_repository_id_id",
 		"idx_colorscheme_groups_scheme_id_id",
 		"idx_colorscheme_groups_background_scheme_id",

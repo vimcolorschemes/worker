@@ -119,7 +119,7 @@ func UpdateRepositoryFromUpdate(id int64, data UpdateData) {
 
 // UpdateRepositoryFromGenerate updates a repository with generate job data.
 func UpdateRepositoryFromGenerate(id int64, data GenerateData) {
-	tx, err := db.Begin()
+	tx, err := beginWithTransientRetry()
 	if err != nil {
 		panic(err)
 	}
@@ -187,7 +187,28 @@ func createRepositoryJobEvent(exec repositoryJobEventExecutor, repositoryID int6
 		trimmedErrorMessage = trimmedErrorMessage[:maxJobEventErrorMessageLength]
 	}
 
+	if job == jobGenerate {
+		_, err := exec.Exec(
+			"UPDATE repositories SET last_generate_event_at = ? WHERE id = ?",
+			createdAt,
+			repositoryID,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	_, err := exec.Exec(
+		"DELETE FROM repository_job_events WHERE repository_id = ? AND job = ? AND status = ?",
+		repositoryID,
+		job,
+		status,
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = exec.Exec(
 		"INSERT INTO repository_job_events (repository_id, job, status, error_message, created_at) VALUES (?, ?, ?, ?, ?)",
 		repositoryID,
 		job,

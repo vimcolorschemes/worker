@@ -59,3 +59,21 @@ func queryWithTransientRetry(query string, args ...any) (*sql.Rows, error) {
 
 	return db.Query(query, args...)
 }
+
+func beginWithTransientRetry() (*sql.Tx, error) {
+	tx, err := db.Begin()
+	if err == nil {
+		return tx, nil
+	}
+
+	if !isTransientLibSQLError(err) {
+		return nil, err
+	}
+
+	log.Printf("DB begin failed with transient libsql error, retrying once: %s", err)
+	if pingErr := db.Ping(); pingErr != nil {
+		return nil, fmt.Errorf("ping before begin retry: %w", pingErr)
+	}
+
+	return db.Begin()
+}
