@@ -26,15 +26,16 @@ func TestUpsertRepositoryFromImport(t *testing.T) {
 			OwnerName:       "owner",
 			OwnerAvatarURL:  "https://avatar",
 			Name:            "repo",
+			Description:     "A vim colorscheme repository",
 			GithubURL:       "https://github.com/owner/repo",
 			GithubCreatedAt: now,
 			PushedAt:        now,
 		})
 
 		var id int64
-		var ownerName, ownerAvatarURL, name, githubURL string
-		err := db.QueryRow(`SELECT id, owner_name, owner_avatar_url, name, github_url FROM repositories WHERE id = 1`).
-			Scan(&id, &ownerName, &ownerAvatarURL, &name, &githubURL)
+		var ownerName, ownerAvatarURL, name, description, githubURL string
+		err := db.QueryRow(`SELECT id, owner_name, owner_avatar_url, name, description, github_url FROM repositories WHERE id = 1`).
+			Scan(&id, &ownerName, &ownerAvatarURL, &name, &description, &githubURL)
 		if err != nil {
 			t.Fatalf("query row: %v", err)
 		}
@@ -50,6 +51,9 @@ func TestUpsertRepositoryFromImport(t *testing.T) {
 		if name != "repo" {
 			t.Fatalf("name = %q, want %q", name, "repo")
 		}
+		if description != "A vim colorscheme repository" {
+			t.Fatalf("description = %q, want %q", description, "A vim colorscheme repository")
+		}
 		if githubURL != "https://github.com/owner/repo" {
 			t.Fatalf("github_url = %q, want %q", githubURL, "https://github.com/owner/repo")
 		}
@@ -58,11 +62,11 @@ func TestUpsertRepositoryFromImport(t *testing.T) {
 	t.Run("updates existing repository on conflict", func(t *testing.T) {
 		setupTestDB(t)
 		now := time.Now().UTC().Truncate(time.Second)
-		UpsertRepositoryFromImport(ImportData{ID: 1, OwnerName: "owner", Name: "repo", PushedAt: now})
-		UpsertRepositoryFromImport(ImportData{ID: 1, OwnerName: "new-owner", Name: "new-repo", PushedAt: now})
+		UpsertRepositoryFromImport(ImportData{ID: 1, OwnerName: "owner", Name: "repo", Description: "old", PushedAt: now})
+		UpsertRepositoryFromImport(ImportData{ID: 1, OwnerName: "new-owner", Name: "new-repo", Description: "new", PushedAt: now})
 
-		var ownerName, name string
-		err := db.QueryRow(`SELECT owner_name, name FROM repositories WHERE id = 1`).Scan(&ownerName, &name)
+		var ownerName, name, description string
+		err := db.QueryRow(`SELECT owner_name, name, description FROM repositories WHERE id = 1`).Scan(&ownerName, &name, &description)
 		if err != nil {
 			t.Fatalf("query row: %v", err)
 		}
@@ -71,6 +75,9 @@ func TestUpsertRepositoryFromImport(t *testing.T) {
 		}
 		if name != "new-repo" {
 			t.Fatalf("name = %q, want %q", name, "new-repo")
+		}
+		if description != "new" {
+			t.Fatalf("description = %q, want %q", description, "new")
 		}
 	})
 

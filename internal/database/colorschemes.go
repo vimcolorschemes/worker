@@ -80,7 +80,7 @@ func scanRepository(s scannable) (repository.Repository, error) {
 	var githubCreatedAt, pushedAt, updatedAt sql.NullTime
 
 	err := s.Scan(
-		&repo.ID, &repo.Owner.Name, &repo.Owner.AvatarURL, &repo.Name, &repo.GithubURL,
+		&repo.ID, &repo.Owner.Name, &repo.Owner.AvatarURL, &repo.Name, &repo.Description, &repo.GithubURL,
 		&repo.StargazersCount, &historyJSON, &repo.WeekStargazersCount,
 		&githubCreatedAt, &pushedAt,
 		&repo.IsEligible, &updatedAt,

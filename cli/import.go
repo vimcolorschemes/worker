@@ -73,6 +73,7 @@ func getImportData(repository *gogithub.Repository) database.ImportData {
 		OwnerName:       repository.GetOwner().GetLogin(),
 		OwnerAvatarURL:  repository.GetOwner().GetAvatarURL(),
 		Name:            repository.GetName(),
+		Description:     repository.GetDescription(),
 		GithubURL:       repository.GetHTMLURL(),
 		GithubCreatedAt: repository.GetCreatedAt().Time,
 		PushedAt:        repository.GetPushedAt().Time,

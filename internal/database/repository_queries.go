@@ -8,6 +8,7 @@ const (
 		owner_name,
 		owner_avatar_url,
 		name,
+		description,
 		github_url,
 		stargazers_count,
 		stargazers_count_history,

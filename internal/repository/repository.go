@@ -15,6 +15,7 @@ type Repository struct {
 	ID                     int64                        `json:"id"`
 	Owner                  Owner                        `json:"owner"`
 	Name                   string                       `json:"name"`
+	Description            string                       `json:"description"`
 	GithubURL              string                       `json:"githubURL"`
 	StargazersCount        int                          `json:"stargazersCount"`
 	StargazersCountHistory []StargazersCountHistoryItem `json:"stargazersCountHistory"`

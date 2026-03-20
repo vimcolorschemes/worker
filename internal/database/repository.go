@@ -17,6 +17,7 @@ type ImportData struct {
 	OwnerName       string
 	OwnerAvatarURL  string
 	Name            string
+	Description     string
 	GithubURL       string
 	GithubCreatedAt time.Time
 	PushedAt        time.Time
@@ -76,16 +77,17 @@ func GetRepositoriesToGenerate() ([]repository.Repository, error) {
 
 // UpsertRepositoryFromImport inserts or updates a repository from import data.
 func UpsertRepositoryFromImport(data ImportData) {
-	_, err := db.Exec(`INSERT INTO repositories (id, owner_name, owner_avatar_url, name, github_url, github_created_at, pushed_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+	_, err := db.Exec(`INSERT INTO repositories (id, owner_name, owner_avatar_url, name, description, github_url, github_created_at, pushed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			owner_name = excluded.owner_name,
 			owner_avatar_url = excluded.owner_avatar_url,
 			name = excluded.name,
+			description = excluded.description,
 			github_url = excluded.github_url,
 			github_created_at = excluded.github_created_at,
 			pushed_at = excluded.pushed_at`,
-		data.ID, data.OwnerName, data.OwnerAvatarURL, data.Name, data.GithubURL, data.GithubCreatedAt, data.PushedAt)
+		data.ID, data.OwnerName, data.OwnerAvatarURL, data.Name, data.Description, data.GithubURL, data.GithubCreatedAt, data.PushedAt)
 	if err != nil {
 		log.Printf("Error upserting repository: %s", err)
 		panic(err)
