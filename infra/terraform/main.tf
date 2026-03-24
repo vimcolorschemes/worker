@@ -49,6 +49,11 @@ resource "aws_secretsmanager_secret" "database_auth_token" {
   tags = merge(local.tags, { Purpose = "runtime-secret" })
 }
 
+resource "aws_secretsmanager_secret" "publish_webhook_url" {
+  name = "vimcolorschemes/worker/publish_webhook_url"
+  tags = merge(local.tags, { Purpose = "runtime-secret" })
+}
+
 resource "aws_iam_role_policy" "ecs_task_execution_secret_access" {
   name = "VimcolorschemesWorkerRuntimeSecretsRead"
   role = var.ecs_task_execution_role_name
@@ -63,6 +68,7 @@ resource "aws_iam_role_policy" "ecs_task_execution_secret_access" {
           aws_secretsmanager_secret.github_token.arn,
           aws_secretsmanager_secret.database_url.arn,
           aws_secretsmanager_secret.database_auth_token.arn,
+          aws_secretsmanager_secret.publish_webhook_url.arn,
         ]
       }
     ]
@@ -80,7 +86,7 @@ resource "aws_cloudwatch_event_rule" "import" {
 resource "aws_cloudwatch_event_rule" "update" {
   name                = "update"
   description         = "Runs the vimcolorschemes update job"
-  schedule_expression = "cron(0 15 * * ? *)"
+  schedule_expression = "cron(30 13 * * ? *)"
   state               = "ENABLED"
   tags                = local.tags
 }
@@ -88,7 +94,15 @@ resource "aws_cloudwatch_event_rule" "update" {
 resource "aws_cloudwatch_event_rule" "generate" {
   name                = "generate"
   description         = "Runs the vimcolorschemes generate job"
-  schedule_expression = "cron(0 17 * * ? *)"
+  schedule_expression = "cron(0 14 * * ? *)"
+  state               = "ENABLED"
+  tags                = local.tags
+}
+
+resource "aws_cloudwatch_event_rule" "publish" {
+  name                = "publish"
+  description         = "Runs the vimcolorschemes publish job"
+  schedule_expression = "cron(30 14 * * ? *)"
   state               = "ENABLED"
   tags                = local.tags
 }
@@ -173,6 +187,38 @@ resource "aws_cloudwatch_event_target" "generate" {
     network_configuration {
       subnets          = var.default_subnet_ids
       security_groups  = var.generate_security_group_ids
+      assign_public_ip = true
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [ecs_target[0].task_definition_arn]
+  }
+}
+
+resource "aws_cloudwatch_event_target" "publish" {
+  rule      = aws_cloudwatch_event_rule.publish.name
+  target_id = "publish"
+  arn       = aws_ecs_cluster.worker.arn
+  role_arn  = local.ecs_events_role_arn
+  input = jsonencode({
+    containerOverrides = [
+      {
+        name    = var.ecs_container_name
+        command = ["publish"]
+      }
+    ]
+  })
+
+  ecs_target {
+    task_count          = 1
+    launch_type         = "FARGATE"
+    platform_version    = "LATEST"
+    task_definition_arn = var.bootstrap_task_definition_arn
+
+    network_configuration {
+      subnets          = var.default_subnet_ids
+      security_groups  = var.publish_security_group_ids
       assign_public_ip = true
     }
   }
@@ -275,6 +321,7 @@ resource "aws_iam_policy" "github_deploy_ecs_events" {
           aws_cloudwatch_event_rule.import.arn,
           aws_cloudwatch_event_rule.update.arn,
           aws_cloudwatch_event_rule.generate.arn,
+          aws_cloudwatch_event_rule.publish.arn,
         ]
       },
       {

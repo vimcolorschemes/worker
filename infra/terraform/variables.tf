@@ -98,6 +98,11 @@ variable "generate_security_group_ids" {
   default = ["sg-zzzzzzzzzzzzzzzzz"]
 }
 
+variable "publish_security_group_ids" {
+  type    = list(string)
+  default = ["sg-ppppppppppppppppp"]
+}
+
 variable "bootstrap_task_definition_arn" {
   type    = string
   default = "arn:aws:ecs:us-east-1:123456789012:task-definition/run-job:1"

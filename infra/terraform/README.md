@@ -45,4 +45,5 @@ This module is configured to let CI keep owning deploy-time task definition revi
   - `vimcolorschemes/worker/github_token`
   - `vimcolorschemes/worker/database_url`
   - `vimcolorschemes/worker/database_auth_token`
+  - `vimcolorschemes/worker/publish_webhook_url`
 - ECS task definitions should map these as container `secrets`; do not set them as plain container `environment` values.

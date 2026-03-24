@@ -64,6 +64,7 @@ require_var EVENTBRIDGE_RULES
 
 image_uri="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
 immutable_image="${image_uri}@${digest}"
+publish_webhook_secret_name="vimcolorschemes/worker/publish_webhook_url"
 
 current_task="$(mktemp)"
 new_task="$(mktemp)"
@@ -78,7 +79,9 @@ aws ecs describe-task-definition \
   --region "$AWS_REGION" \
   --query taskDefinition > "$current_task"
 
-jq --arg image "$immutable_image" --arg name "$ECS_CONTAINER_NAME" '
+jq --arg image "$immutable_image" \
+  --arg name "$ECS_CONTAINER_NAME" \
+  --arg publishWebhookSecretName "$publish_webhook_secret_name" '
   {
     family,
     taskRoleArn,
@@ -98,7 +101,16 @@ jq --arg image "$immutable_image" --arg name "$ECS_CONTAINER_NAME" '
     runtimePlatform
   }
   | del(.. | nulls)
-  | .containerDefinitions |= map(if .name == $name then .image = $image else . end)
+  | .containerDefinitions |= map(
+      if .name == $name then
+        .image = $image
+        | .secrets = ((.secrets // [])
+          | map(select(.name != "PUBLISH_WEBHOOK_URL"))
+          + [{name: "PUBLISH_WEBHOOK_URL", valueFrom: $publishWebhookSecretName}])
+      else
+        .
+      end
+    )
 ' "$current_task" > "$new_task"
 
 task_definition_arn="$(aws ecs register-task-definition \

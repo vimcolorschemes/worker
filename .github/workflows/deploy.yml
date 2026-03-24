@@ -22,7 +22,7 @@ jobs:
       ECR_REPOSITORY: vimcolorschemes/worker
       ECS_TASK_FAMILY: run-job
       ECS_CONTAINER_NAME: vimcolorschemes-worker
-      EVENTBRIDGE_RULES: import update generate
+      EVENTBRIDGE_RULES: import update generate publish
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
