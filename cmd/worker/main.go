@@ -19,6 +19,7 @@ var jobRunnerMap = map[string]jobRunner{
 	"import":   cli.Import,
 	"update":   cli.Update,
 	"generate": cli.Generate,
+	"publish":  cli.Publish,
 }
 
 func main() {

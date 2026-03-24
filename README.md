@@ -120,6 +120,14 @@ Generate preview data for only a specific repository using the `--repo` option.
 bin/start generate --repo morhetz/gruvbox
 ```
 
+#### publish
+
+Trigger the frontend deploy webhook after the latest `import`, `update`, and `generate` reports for today all succeeded.
+
+```shell
+bin/start publish
+```
+
 ### Run tests
 
 ```shell

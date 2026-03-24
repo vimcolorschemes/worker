@@ -3,6 +3,7 @@ package database
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCreateReport(t *testing.T) {
@@ -49,4 +50,82 @@ func TestCreateReport(t *testing.T) {
 			t.Fatal("CreateReport error = nil, want error")
 		}
 	})
+}
+
+func TestGetLatestReportStatuses(t *testing.T) {
+	t.Run("returns latest status for each job on the requested day", func(t *testing.T) {
+		setupTestDB(t)
+
+		day := time.Date(2026, time.March, 23, 0, 0, 0, 0, time.UTC)
+		insertReport(t, "import", day.Add(time.Hour), `{"repositoryCount":1}`)
+		insertReport(t, "update", day.Add(2*time.Hour), `{"repositoryCount":1}`)
+		insertReport(t, "generate", day.Add(3*time.Hour), `{"repositoryCount":1}`)
+
+		statuses, err := GetLatestReportStatuses([]string{"import", "update", "generate"}, day)
+		if err != nil {
+			t.Fatalf("GetLatestReportStatuses returned error: %v", err)
+		}
+
+		for _, job := range []string{"import", "update", "generate"} {
+			if got := statuses[job]; got != "success" {
+				t.Fatalf("statuses[%q] = %q, want %q", job, got, "success")
+			}
+		}
+	})
+
+	t.Run("uses the latest report when a job reruns", func(t *testing.T) {
+		setupTestDB(t)
+
+		day := time.Date(2026, time.March, 23, 0, 0, 0, 0, time.UTC)
+		insertReport(t, "generate", day.Add(time.Hour), `{"repositoryCount":1}`)
+		insertReport(t, "generate", day.Add(2*time.Hour), `{"status":"error","error":"boom"}`)
+
+		statuses, err := GetLatestReportStatuses([]string{"generate"}, day)
+		if err != nil {
+			t.Fatalf("GetLatestReportStatuses returned error: %v", err)
+		}
+
+		if got := statuses["generate"]; got != "error" {
+			t.Fatalf("statuses[%q] = %q, want %q", "generate", got, "error")
+		}
+	})
+
+	t.Run("marks jobs missing when they have no report that day", func(t *testing.T) {
+		setupTestDB(t)
+
+		day := time.Date(2026, time.March, 23, 0, 0, 0, 0, time.UTC)
+		insertReport(t, "import", day.Add(-time.Hour), `{"repositoryCount":1}`)
+
+		statuses, err := GetLatestReportStatuses([]string{"import", "update"}, day)
+		if err != nil {
+			t.Fatalf("GetLatestReportStatuses returned error: %v", err)
+		}
+
+		for _, job := range []string{"import", "update"} {
+			if got := statuses[job]; got != "missing" {
+				t.Fatalf("statuses[%q] = %q, want %q", job, got, "missing")
+			}
+		}
+	})
+
+	t.Run("returns error for invalid report data", func(t *testing.T) {
+		setupTestDB(t)
+
+		day := time.Date(2026, time.March, 23, 0, 0, 0, 0, time.UTC)
+		insertReport(t, "import", day.Add(time.Hour), `not-json`)
+
+		_, err := GetLatestReportStatuses([]string{"import"}, day)
+		if err == nil {
+			t.Fatal("GetLatestReportStatuses error = nil, want error")
+		}
+	})
+}
+
+func insertReport(t *testing.T, job string, reportTime time.Time, data string) {
+	t.Helper()
+
+	_, err := db.Exec("INSERT INTO reports (date, job, elapsed_time, data) VALUES (?, ?, ?, ?)", reportTime, job, 1.5, data)
+	if err != nil {
+		t.Fatalf("insert report: %v", err)
+	}
 }

@@ -161,3 +161,9 @@ func TestRunJobWithRecovery(t *testing.T) {
 		}
 	})
 }
+
+func TestJobRunnerMapIncludesPublish(t *testing.T) {
+	if jobRunnerMap["publish"] == nil {
+		t.Fatal("jobRunnerMap[\"publish\"] = nil, want runner")
+	}
+}
