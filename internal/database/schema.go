@@ -20,7 +20,8 @@ var schemaStatements = []string{
 		pushed_at                DATETIME,
 		last_generate_event_at   DATETIME,
 		is_eligible              BOOLEAN NOT NULL DEFAULT 0,
-		updated_at               DATETIME
+		updated_at               DATETIME,
+		featured_rank            INTEGER
 	)`,
 	`CREATE TABLE IF NOT EXISTS repository_job_events (
 		id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,6 +86,10 @@ var schemaStatements = []string{
 	// Generate queue lookup by latest generate event per repository.
 	`CREATE INDEX IF NOT EXISTS idx_repository_job_events_job_repository_created
 		ON repository_job_events(job, repository_id, created_at DESC)`,
+
+	// Unique index for featured repositories (partial - only non-null values).
+	`CREATE UNIQUE INDEX IF NOT EXISTS idx_repositories_featured_rank
+		ON repositories(featured_rank) WHERE featured_rank IS NOT NULL`,
 }
 
 func initializeSchema(db *sql.DB) error {
@@ -112,6 +117,12 @@ func initializeSchema(db *sql.DB) error {
 func ensureRepositoryColumns(db *sql.DB) error {
 	if !columnExists(db, "repositories", "last_generate_event_at") {
 		if _, err := db.Exec("ALTER TABLE repositories ADD COLUMN last_generate_event_at DATETIME"); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+			return err
+		}
+	}
+
+	if !columnExists(db, "repositories", "featured_rank") {
+		if _, err := db.Exec("ALTER TABLE repositories ADD COLUMN featured_rank INTEGER"); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
 			return err
 		}
 	}
