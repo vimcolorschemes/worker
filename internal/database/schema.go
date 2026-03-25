@@ -86,10 +86,6 @@ var schemaStatements = []string{
 	// Generate queue lookup by latest generate event per repository.
 	`CREATE INDEX IF NOT EXISTS idx_repository_job_events_job_repository_created
 		ON repository_job_events(job, repository_id, created_at DESC)`,
-
-	// Unique index for featured repositories (partial - only non-null values).
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_repositories_featured_rank
-		ON repositories(featured_rank) WHERE featured_rank IS NOT NULL`,
 }
 
 func initializeSchema(db *sql.DB) error {
@@ -133,6 +129,12 @@ func ensureRepositoryColumns(db *sql.DB) error {
 func ensureRepositoryIndexes(db *sql.DB) error {
 	_, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_repositories_generate_due
 		ON repositories(is_eligible, pushed_at, last_generate_event_at)`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_repositories_featured_rank
+		ON repositories(featured_rank) WHERE featured_rank IS NOT NULL`)
 	return err
 }
 
