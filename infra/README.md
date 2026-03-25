@@ -34,7 +34,7 @@ Deployment behavior:
 - Pushes two ECR tags: `${GITHUB_SHA}` and `latest`
 - Registers a new ECS task definition revision in the `run-job` family
 - Pins the ECS container image to the pushed image digest (`@sha256:...`)
-- Ensures the ECS container maps `PUBLISH_WEBHOOK_URL` from Secrets Manager
+- Ensures the ECS container sets `PUBLISH_WEBHOOK_URL` as plain ECS environment
 - Updates EventBridge rules (`import`, `update`, `generate`, `publish`) to the new revision
 
 Required GitHub Actions repo variables:
@@ -42,6 +42,7 @@ Required GitHub Actions repo variables:
 - `AWS_REGION`
 - `AWS_REGISTRY_ID`
 - `AWS_ROLE_TO_ASSUME`
+- `PUBLISH_WEBHOOK_URL`
 
 The assumed role must trust GitHub OIDC (`token.actions.githubusercontent.com`) and allow:
 
@@ -57,10 +58,13 @@ The ECS task definition should inject these environment variables from AWS Secre
 - `GITHUB_TOKEN` from `vimcolorschemes/worker/github_token`
 - `DATABASE_URL` from `vimcolorschemes/worker/database_url`
 - `DATABASE_AUTH_TOKEN` from `vimcolorschemes/worker/database_auth_token`
-- `PUBLISH_WEBHOOK_URL` from `vimcolorschemes/worker/publish_webhook_url`
+
+The ECS task definition should set this non-secret variable as plain container environment:
+
+- `PUBLISH_WEBHOOK_URL`
 
 `DATABASE_URL` is required by the worker and should point to a `libsql://...` endpoint in production.
-For production deploys, keep all four values in ECS task `secrets` (not plain `environment`).
+For production deploys, keep the true secrets in ECS task `secrets`; `PUBLISH_WEBHOOK_URL` can stay in plain `environment`.
 
 ## Terraform
 

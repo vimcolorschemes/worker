@@ -14,6 +14,7 @@ Required environment variables:
   ECS_TASK_FAMILY
   ECS_CONTAINER_NAME
   EVENTBRIDGE_RULES
+  PUBLISH_WEBHOOK_URL
 EOF
 }
 
@@ -61,10 +62,10 @@ require_var ECR_REPOSITORY
 require_var ECS_TASK_FAMILY
 require_var ECS_CONTAINER_NAME
 require_var EVENTBRIDGE_RULES
+require_var PUBLISH_WEBHOOK_URL
 
 image_uri="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
 immutable_image="${image_uri}@${digest}"
-publish_webhook_secret_name="vimcolorschemes/worker/publish_webhook_url"
 
 current_task="$(mktemp)"
 new_task="$(mktemp)"
@@ -81,7 +82,7 @@ aws ecs describe-task-definition \
 
 jq --arg image "$immutable_image" \
   --arg name "$ECS_CONTAINER_NAME" \
-  --arg publishWebhookSecretName "$publish_webhook_secret_name" '
+  --arg publishWebhookURL "$PUBLISH_WEBHOOK_URL" '
   {
     family,
     taskRoleArn,
@@ -104,9 +105,11 @@ jq --arg image "$immutable_image" \
   | .containerDefinitions |= map(
       if .name == $name then
         .image = $image
-        | .secrets = ((.secrets // [])
+        | .environment = ((.environment // [])
           | map(select(.name != "PUBLISH_WEBHOOK_URL"))
-          + [{name: "PUBLISH_WEBHOOK_URL", valueFrom: $publishWebhookSecretName}])
+          + [{name: "PUBLISH_WEBHOOK_URL", value: $publishWebhookURL}])
+        | .secrets = ((.secrets // [])
+          | map(select(.name != "PUBLISH_WEBHOOK_URL")))
       else
         .
       end

@@ -49,11 +49,6 @@ resource "aws_secretsmanager_secret" "database_auth_token" {
   tags = merge(local.tags, { Purpose = "runtime-secret" })
 }
 
-resource "aws_secretsmanager_secret" "publish_webhook_url" {
-  name = "vimcolorschemes/worker/publish_webhook_url"
-  tags = merge(local.tags, { Purpose = "runtime-secret" })
-}
-
 resource "aws_iam_role_policy" "ecs_task_execution_secret_access" {
   name = "VimcolorschemesWorkerRuntimeSecretsRead"
   role = var.ecs_task_execution_role_name
@@ -68,7 +63,6 @@ resource "aws_iam_role_policy" "ecs_task_execution_secret_access" {
           aws_secretsmanager_secret.github_token.arn,
           aws_secretsmanager_secret.database_url.arn,
           aws_secretsmanager_secret.database_auth_token.arn,
-          aws_secretsmanager_secret.publish_webhook_url.arn,
         ]
       }
     ]

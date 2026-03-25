@@ -23,6 +23,7 @@ jobs:
       ECS_TASK_FAMILY: run-job
       ECS_CONTAINER_NAME: vimcolorschemes-worker
       EVENTBRIDGE_RULES: import update generate publish
+      PUBLISH_WEBHOOK_URL: ${{ vars.PUBLISH_WEBHOOK_URL }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
