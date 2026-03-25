@@ -25,6 +25,7 @@ type Repository struct {
 	Colorschemes           []Colorscheme                `json:"colorschemes,omitempty"`
 	IsEligible             bool                         `json:"isEligible"`
 	UpdatedAt              time.Time                    `json:"updatedAt"`
+	FeaturedRank           *int                         `json:"featuredRank,omitempty"`
 }
 
 // Owner represents the owner of a repository
