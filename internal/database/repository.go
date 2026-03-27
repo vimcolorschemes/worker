@@ -135,6 +135,21 @@ func UpdateRepositoryFromGenerate(id int64, data GenerateData) {
 		panic(err)
 	}
 
+	hasDark, hasLight := 0, 0
+	for _, scheme := range data.Colorschemes {
+		if len(scheme.Data.Dark) > 0 {
+			hasDark = 1
+		}
+		if len(scheme.Data.Light) > 0 {
+			hasLight = 1
+		}
+	}
+	_, err = tx.Exec("UPDATE repositories SET has_dark = ?, has_light = ? WHERE id = ?", hasDark, hasLight, id)
+	if err != nil {
+		log.Printf("Error updating has_dark/has_light: %s", err)
+		panic(err)
+	}
+
 	for _, scheme := range data.Colorschemes {
 		result, err := tx.Exec("INSERT INTO colorschemes (repository_id, name) VALUES (?, ?)", id, scheme.Name)
 		if err != nil {

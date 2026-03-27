@@ -21,7 +21,9 @@ var schemaStatements = []string{
 		last_generate_event_at   DATETIME,
 		is_eligible              BOOLEAN NOT NULL DEFAULT 0,
 		updated_at               DATETIME,
-		featured_rank            INTEGER
+		featured_rank            INTEGER,
+		has_dark                 INTEGER NOT NULL DEFAULT 0,
+		has_light                INTEGER NOT NULL DEFAULT 0
 	)`,
 	`CREATE TABLE IF NOT EXISTS repository_job_events (
 		id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,6 +109,10 @@ func initializeSchema(db *sql.DB) error {
 		return err
 	}
 
+	if err := backfillBackgrounds(db); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -123,6 +129,18 @@ func ensureRepositoryColumns(db *sql.DB) error {
 		}
 	}
 
+	if !columnExists(db, "repositories", "has_dark") {
+		if _, err := db.Exec("ALTER TABLE repositories ADD COLUMN has_dark INTEGER NOT NULL DEFAULT 0"); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+			return err
+		}
+	}
+
+	if !columnExists(db, "repositories", "has_light") {
+		if _, err := db.Exec("ALTER TABLE repositories ADD COLUMN has_light INTEGER NOT NULL DEFAULT 0"); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -135,6 +153,12 @@ func ensureRepositoryIndexes(db *sql.DB) error {
 
 	_, err = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_repositories_featured_rank
 		ON repositories(featured_rank) WHERE featured_rank IS NOT NULL`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_repositories_has_dark_has_light
+		ON repositories(has_dark, has_light)`)
 	return err
 }
 
@@ -177,6 +201,21 @@ func backfillLastGenerateEventAt(db *sql.DB) error {
 			  AND job = 'generate'
 		)
 		WHERE last_generate_event_at IS NULL
+	`)
+
+	return err
+}
+
+func backfillBackgrounds(db *sql.DB) error {
+	_, err := db.Exec(`
+		UPDATE repositories SET
+		  has_dark  = (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
+		               FROM colorschemes cs JOIN colorscheme_groups csg ON csg.colorscheme_id = cs.id
+		               WHERE cs.repository_id = repositories.id AND csg.background = 'dark'),
+		  has_light = (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
+		               FROM colorschemes cs JOIN colorscheme_groups csg ON csg.colorscheme_id = cs.id
+		               WHERE cs.repository_id = repositories.id AND csg.background = 'light')
+		WHERE has_dark = 0 AND has_light = 0
 	`)
 
 	return err
