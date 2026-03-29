@@ -1,6 +1,6 @@
 module github.com/vimcolorschemes/worker
 
-go 1.23.0
+go 1.26.1
 
 require (
 	github.com/google/go-github/v68 v68.0.0
