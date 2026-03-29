@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,18 @@ func insertTestRepo(t *testing.T, id int64, ownerName, name string) {
 	if err != nil {
 		t.Fatalf("insert test repo: %v", err)
 	}
+}
+
+func countSearchMatches(t *testing.T, term string) int {
+	t.Helper()
+
+	var count int
+	err := db.QueryRow(`SELECT COUNT(*) FROM repositories_search WHERE repositories_search MATCH ?`, term).Scan(&count)
+	if err != nil {
+		t.Fatalf("count search matches for %q: %v", term, err)
+	}
+
+	return count
 }
 
 func TestUpsertRepositoryFromImport(t *testing.T) {
@@ -93,6 +106,123 @@ func TestUpsertRepositoryFromImport(t *testing.T) {
 		}
 		if eventCount != 1 {
 			t.Fatalf("eventCount = %d, want 1", eventCount)
+		}
+	})
+
+	t.Run("keeps trigram search index in sync", func(t *testing.T) {
+		setupTestDB(t)
+		now := time.Now().UTC().Truncate(time.Second)
+		UpsertRepositoryFromImport(ImportData{ID: 1, OwnerName: "morhetz", Name: "gruvbox", Description: "retro groove", PushedAt: now})
+
+		initialMatches := countSearchMatches(t, "gruv")
+		if initialMatches != 1 {
+			t.Fatalf("initialMatches = %d, want 1", initialMatches)
+		}
+
+		UpsertRepositoryFromImport(ImportData{ID: 1, OwnerName: "morhetz", Name: "tokyonight", Description: "city lights", PushedAt: now})
+
+		oldMatches := countSearchMatches(t, "gruv")
+		if oldMatches != 0 {
+			t.Fatalf("oldMatches = %d, want 0", oldMatches)
+		}
+
+		newMatches := countSearchMatches(t, "night")
+		if newMatches != 1 {
+			t.Fatalf("newMatches = %d, want 1", newMatches)
+		}
+	})
+}
+
+func TestRepositoriesSearchTriggers(t *testing.T) {
+	t.Run("backfills existing repositories during migration", func(t *testing.T) {
+		databasePath := filepath.Join(t.TempDir(), "test.db")
+		unmigratedDB, err := sql.Open("libsql", "file:"+databasePath)
+		if err != nil {
+			t.Fatalf("sql.Open returned error: %v", err)
+		}
+		defer func() {
+			_ = unmigratedDB.Close()
+		}()
+
+		if _, err := unmigratedDB.Exec(`CREATE TABLE repositories (
+			id INTEGER PRIMARY KEY,
+			owner_name TEXT NOT NULL DEFAULT '',
+			owner_avatar_url TEXT NOT NULL DEFAULT '',
+			name TEXT NOT NULL DEFAULT '',
+			description TEXT NOT NULL DEFAULT '',
+			github_url TEXT NOT NULL DEFAULT '',
+			stargazers_count INTEGER NOT NULL DEFAULT 0,
+			stargazers_count_history TEXT NOT NULL DEFAULT '[]',
+			week_stargazers_count INTEGER NOT NULL DEFAULT 0,
+			github_created_at DATETIME,
+			pushed_at DATETIME,
+			last_generate_event_at DATETIME,
+			is_eligible BOOLEAN NOT NULL DEFAULT 0,
+			updated_at DATETIME,
+			featured_rank INTEGER,
+			has_dark INTEGER NOT NULL DEFAULT 0,
+			has_light INTEGER NOT NULL DEFAULT 0
+		)`); err != nil {
+			t.Fatalf("create repositories table: %v", err)
+		}
+
+		if _, err := unmigratedDB.Exec(`INSERT INTO repositories (id, owner_name, name, description) VALUES (1, 'morhetz', 'gruvbox', 'retro groove')`); err != nil {
+			t.Fatalf("seed repositories row: %v", err)
+		}
+
+		if _, err := unmigratedDB.Exec(`CREATE TABLE goose_db_version (id INTEGER PRIMARY KEY AUTOINCREMENT, version_id bigint NOT NULL, is_applied boolean NOT NULL, tstamp timestamp DEFAULT (datetime('now')))`); err != nil {
+			t.Fatalf("create goose_db_version table: %v", err)
+		}
+
+		if _, err := unmigratedDB.Exec(`INSERT INTO goose_db_version (version_id, is_applied) VALUES (1, 1)`); err != nil {
+			t.Fatalf("seed goose version: %v", err)
+		}
+
+		if err := applyMigrations(unmigratedDB); err != nil {
+			t.Fatalf("applyMigrations returned error: %v", err)
+		}
+
+		db = unmigratedDB
+		defer func() {
+			db = nil
+		}()
+
+		if got := countSearchMatches(t, "gruv"); got != 1 {
+			t.Fatalf("countSearchMatches(gruv) = %d, want 1", got)
+		}
+	})
+
+	t.Run("removes deleted repositories from search index", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "morhetz", "gruvbox")
+
+		if got := countSearchMatches(t, "gruv"); got != 1 {
+			t.Fatalf("countSearchMatches(gruv) before delete = %d, want 1", got)
+		}
+
+		if _, err := db.Exec(`DELETE FROM repositories WHERE id = ?`, 1); err != nil {
+			t.Fatalf("delete repository: %v", err)
+		}
+
+		if got := countSearchMatches(t, "gruv"); got != 0 {
+			t.Fatalf("countSearchMatches(gruv) after delete = %d, want 0", got)
+		}
+	})
+
+	t.Run("ignores updates to non-search columns", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "morhetz", "gruvbox")
+
+		if got := countSearchMatches(t, "gruv"); got != 1 {
+			t.Fatalf("countSearchMatches(gruv) before non-search update = %d, want 1", got)
+		}
+
+		if _, err := db.Exec(`UPDATE repositories SET stargazers_count = ?, week_stargazers_count = ? WHERE id = ?`, 42, 7, 1); err != nil {
+			t.Fatalf("update repository stats: %v", err)
+		}
+
+		if got := countSearchMatches(t, "gruv"); got != 1 {
+			t.Fatalf("countSearchMatches(gruv) after non-search update = %d, want 1", got)
 		}
 	})
 }
