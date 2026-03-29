@@ -13,8 +13,13 @@ jobs:
   run:
     runs-on: ubuntu-latest
     steps:
+      - name: Install go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.26.1
       - uses: actions/checkout@v6
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
+          install-mode: goinstall
           version: latest
