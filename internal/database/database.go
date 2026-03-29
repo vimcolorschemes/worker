@@ -57,7 +57,7 @@ func init() {
 		panic(err)
 	}
 
-	err = initializeSchema(db)
+	err = applyMigrations(db)
 	if err != nil {
 		panic(err)
 	}

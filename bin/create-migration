@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+	printf 'usage: %s <name>\n' "$0" >&2
+	exit 1
+fi
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
+	-dir "$repo_root/internal/database/migrations" \
+	create "$1" sql
