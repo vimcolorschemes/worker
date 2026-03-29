@@ -1,9 +1,6 @@
 package database
 
-import (
-	"database/sql"
-	"strings"
-)
+import "database/sql"
 
 var schemaStatements = []string{
 	`CREATE TABLE IF NOT EXISTS repositories (
@@ -73,6 +70,18 @@ var schemaStatements = []string{
 	`CREATE INDEX IF NOT EXISTS idx_repositories_owner_week_stars_id_nocase
 		ON repositories(owner_name COLLATE NOCASE, week_stargazers_count DESC, id)`,
 
+	// Generate queue lookup by repo eligibility and freshness.
+	`CREATE INDEX IF NOT EXISTS idx_repositories_generate_due
+		ON repositories(is_eligible, pushed_at, last_generate_event_at)`,
+
+	// Unique featured slots when set.
+	`CREATE UNIQUE INDEX IF NOT EXISTS idx_repositories_featured_rank
+		ON repositories(featured_rank) WHERE featured_rank IS NOT NULL`,
+
+	// Background availability filters.
+	`CREATE INDEX IF NOT EXISTS idx_repositories_has_dark_has_light
+		ON repositories(has_dark, has_light)`,
+
 	// Fast existence checks and joins for repository colorschemes.
 	`CREATE INDEX IF NOT EXISTS idx_colorschemes_repository_id_id
 		ON colorschemes(repository_id, id)`,
@@ -97,126 +106,5 @@ func initializeSchema(db *sql.DB) error {
 		}
 	}
 
-	if err := ensureRepositoryColumns(db); err != nil {
-		return err
-	}
-
-	if err := ensureRepositoryIndexes(db); err != nil {
-		return err
-	}
-
-	if err := backfillLastGenerateEventAt(db); err != nil {
-		return err
-	}
-
-	if err := backfillBackgrounds(db); err != nil {
-		return err
-	}
-
 	return nil
-}
-
-func ensureRepositoryColumns(db *sql.DB) error {
-	if !columnExists(db, "repositories", "last_generate_event_at") {
-		if _, err := db.Exec("ALTER TABLE repositories ADD COLUMN last_generate_event_at DATETIME"); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
-			return err
-		}
-	}
-
-	if !columnExists(db, "repositories", "featured_rank") {
-		if _, err := db.Exec("ALTER TABLE repositories ADD COLUMN featured_rank INTEGER"); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
-			return err
-		}
-	}
-
-	if !columnExists(db, "repositories", "has_dark") {
-		if _, err := db.Exec("ALTER TABLE repositories ADD COLUMN has_dark INTEGER NOT NULL DEFAULT 0"); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
-			return err
-		}
-	}
-
-	if !columnExists(db, "repositories", "has_light") {
-		if _, err := db.Exec("ALTER TABLE repositories ADD COLUMN has_light INTEGER NOT NULL DEFAULT 0"); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func ensureRepositoryIndexes(db *sql.DB) error {
-	_, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_repositories_generate_due
-		ON repositories(is_eligible, pushed_at, last_generate_event_at)`)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_repositories_featured_rank
-		ON repositories(featured_rank) WHERE featured_rank IS NOT NULL`)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_repositories_has_dark_has_light
-		ON repositories(has_dark, has_light)`)
-	return err
-}
-
-func columnExists(db *sql.DB, tableName string, columnName string) bool {
-	rows, err := db.Query("PRAGMA table_info(" + tableName + ")")
-	if err != nil {
-		return false
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-
-	for rows.Next() {
-		var cid int
-		var name string
-		var colType string
-		var notNull int
-		var defaultValue interface{}
-		var pk int
-
-		if err := rows.Scan(&cid, &name, &colType, &notNull, &defaultValue, &pk); err != nil {
-			return false
-		}
-
-		if name == columnName {
-			return true
-		}
-	}
-
-	return false
-}
-
-func backfillLastGenerateEventAt(db *sql.DB) error {
-	_, err := db.Exec(`
-		UPDATE repositories
-		SET last_generate_event_at = (
-			SELECT MAX(created_at)
-			FROM repository_job_events
-			WHERE repository_id = repositories.id
-			  AND job = 'generate'
-		)
-		WHERE last_generate_event_at IS NULL
-	`)
-
-	return err
-}
-
-func backfillBackgrounds(db *sql.DB) error {
-	_, err := db.Exec(`
-		UPDATE repositories SET
-		  has_dark  = (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
-		               FROM colorschemes cs JOIN colorscheme_groups csg ON csg.colorscheme_id = cs.id
-		               WHERE cs.repository_id = repositories.id AND csg.background = 'dark'),
-		  has_light = (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
-		               FROM colorschemes cs JOIN colorscheme_groups csg ON csg.colorscheme_id = cs.id
-		               WHERE cs.repository_id = repositories.id AND csg.background = 'light')
-		WHERE has_dark = 0 AND has_light = 0
-	`)
-
-	return err
 }

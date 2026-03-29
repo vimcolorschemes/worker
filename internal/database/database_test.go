@@ -113,6 +113,8 @@ func TestInitializeSchemaCreatesExpectedIndexes(t *testing.T) {
 		"idx_repositories_github_created_at_id",
 		"idx_repositories_owner_week_stars_id_nocase",
 		"idx_repositories_generate_due",
+		"idx_repositories_featured_rank",
+		"idx_repositories_has_dark_has_light",
 		"idx_colorschemes_repository_id_id",
 		"idx_colorscheme_groups_scheme_id_id",
 		"idx_colorscheme_groups_background_scheme_id",
@@ -126,5 +128,24 @@ func TestInitializeSchemaCreatesExpectedIndexes(t *testing.T) {
 		if actual != indexName {
 			t.Fatalf("created index %q, want %q", actual, indexName)
 		}
+	}
+}
+
+func TestInitializeSchemaIsIdempotent(t *testing.T) {
+	databasePath := filepath.Join(t.TempDir(), "test.db")
+	db, err := sql.Open("libsql", "file:"+databasePath)
+	if err != nil {
+		t.Fatalf("sql.Open returned error: %v", err)
+	}
+	defer func() {
+		_ = db.Close()
+	}()
+
+	if err := initializeSchema(db); err != nil {
+		t.Fatalf("first initializeSchema returned error: %v", err)
+	}
+
+	if err := initializeSchema(db); err != nil {
+		t.Fatalf("second initializeSchema returned error: %v", err)
 	}
 }
