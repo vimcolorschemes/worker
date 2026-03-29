@@ -77,7 +77,9 @@ func triggerPublishWebhook(webhookURL string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("call vercel webhook: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return response.StatusCode, fmt.Errorf("vercel webhook returned status %d", response.StatusCode)
