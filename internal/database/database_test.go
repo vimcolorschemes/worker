@@ -17,8 +17,8 @@ func setupTestDB(t *testing.T) {
 	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
 		t.Fatalf("PRAGMA foreign_keys returned error: %v", err)
 	}
-	if err := initializeSchema(db); err != nil {
-		t.Fatalf("initializeSchema returned error: %v", err)
+	if err := applyMigrations(db); err != nil {
+		t.Fatalf("applyMigrations returned error: %v", err)
 	}
 	t.Cleanup(func() {
 		_ = db.Close()
@@ -66,7 +66,7 @@ func TestBuildDatabaseURL(t *testing.T) {
 	}
 }
 
-func TestInitializeSchemaCreatesAllTables(t *testing.T) {
+func TestApplyMigrationsCreatesAllTables(t *testing.T) {
 	databasePath := filepath.Join(t.TempDir(), "test.db")
 	db, err := sql.Open("libsql", "file:"+databasePath)
 	if err != nil {
@@ -76,11 +76,11 @@ func TestInitializeSchemaCreatesAllTables(t *testing.T) {
 		_ = db.Close()
 	}()
 
-	if err := initializeSchema(db); err != nil {
-		t.Fatalf("initializeSchema returned error: %v", err)
+	if err := applyMigrations(db); err != nil {
+		t.Fatalf("applyMigrations returned error: %v", err)
 	}
 
-	for _, tableName := range []string{"repositories", "repository_job_events", "colorschemes", "colorscheme_groups", "reports"} {
+	for _, tableName := range []string{"repositories", "repository_job_events", "colorschemes", "colorscheme_groups", "reports", "goose_db_version"} {
 		var actual string
 		err := db.QueryRow("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", tableName).Scan(&actual)
 		if err != nil {
@@ -92,7 +92,7 @@ func TestInitializeSchemaCreatesAllTables(t *testing.T) {
 	}
 }
 
-func TestInitializeSchemaCreatesExpectedIndexes(t *testing.T) {
+func TestApplyMigrationsCreatesExpectedIndexes(t *testing.T) {
 	databasePath := filepath.Join(t.TempDir(), "test.db")
 	db, err := sql.Open("libsql", "file:"+databasePath)
 	if err != nil {
@@ -102,8 +102,8 @@ func TestInitializeSchemaCreatesExpectedIndexes(t *testing.T) {
 		_ = db.Close()
 	}()
 
-	if err := initializeSchema(db); err != nil {
-		t.Fatalf("initializeSchema returned error: %v", err)
+	if err := applyMigrations(db); err != nil {
+		t.Fatalf("applyMigrations returned error: %v", err)
 	}
 
 	for _, indexName := range []string{
@@ -131,7 +131,7 @@ func TestInitializeSchemaCreatesExpectedIndexes(t *testing.T) {
 	}
 }
 
-func TestInitializeSchemaIsIdempotent(t *testing.T) {
+func TestApplyMigrationsIsIdempotent(t *testing.T) {
 	databasePath := filepath.Join(t.TempDir(), "test.db")
 	db, err := sql.Open("libsql", "file:"+databasePath)
 	if err != nil {
@@ -141,11 +141,11 @@ func TestInitializeSchemaIsIdempotent(t *testing.T) {
 		_ = db.Close()
 	}()
 
-	if err := initializeSchema(db); err != nil {
-		t.Fatalf("first initializeSchema returned error: %v", err)
+	if err := applyMigrations(db); err != nil {
+		t.Fatalf("first applyMigrations returned error: %v", err)
 	}
 
-	if err := initializeSchema(db); err != nil {
-		t.Fatalf("second initializeSchema returned error: %v", err)
+	if err := applyMigrations(db); err != nil {
+		t.Fatalf("second applyMigrations returned error: %v", err)
 	}
 }
