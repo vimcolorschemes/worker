@@ -80,7 +80,7 @@ func TestApplyMigrationsCreatesAllTables(t *testing.T) {
 		t.Fatalf("applyMigrations returned error: %v", err)
 	}
 
-	for _, tableName := range []string{"repositories", "repository_job_events", "colorschemes", "colorscheme_groups", "reports", "goose_db_version"} {
+	for _, tableName := range []string{"repositories", "repositories_search", "repository_job_events", "colorschemes", "colorscheme_groups", "reports", "goose_db_version"} {
 		var actual string
 		err := db.QueryRow("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", tableName).Scan(&actual)
 		if err != nil {
@@ -88,6 +88,36 @@ func TestApplyMigrationsCreatesAllTables(t *testing.T) {
 		}
 		if actual != tableName {
 			t.Fatalf("created table %q, want %q", actual, tableName)
+		}
+	}
+}
+
+func TestApplyMigrationsCreatesExpectedTriggers(t *testing.T) {
+	databasePath := filepath.Join(t.TempDir(), "test.db")
+	db, err := sql.Open("libsql", "file:"+databasePath)
+	if err != nil {
+		t.Fatalf("sql.Open returned error: %v", err)
+	}
+	defer func() {
+		_ = db.Close()
+	}()
+
+	if err := applyMigrations(db); err != nil {
+		t.Fatalf("applyMigrations returned error: %v", err)
+	}
+
+	for _, triggerName := range []string{
+		"repositories_search_ai",
+		"repositories_search_ad",
+		"repositories_search_au",
+	} {
+		var actual string
+		err := db.QueryRow("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = ?", triggerName).Scan(&actual)
+		if err != nil {
+			t.Fatalf("trigger %q was not created: %v", triggerName, err)
+		}
+		if actual != triggerName {
+			t.Fatalf("created trigger %q, want %q", actual, triggerName)
 		}
 	}
 }
