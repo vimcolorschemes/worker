@@ -15,6 +15,7 @@ locals {
   github_deploy_policy_schedule = "vimcolorschemes-worker-deploy-ecs-events-policy"
   human_deployer_role_name      = "vimcolorschemes-worker-human-deployer-role"
   operator_user_name            = "vimcolorschemes-worker-operator"
+  alerts_topic_name             = "vimcolorschemes-worker-job-notifications"
 }
 
 resource "aws_ecr_repository" "worker" {
@@ -69,6 +70,24 @@ resource "aws_iam_role_policy" "ecs_task_execution_secret_access" {
   })
 }
 
+resource "aws_iam_role_policy" "ecs_task_execution_notifications" {
+  count = length(var.alert_email_addresses) > 0 ? 1 : 0
+
+  name = "VimcolorschemesWorkerNotificationsPublish"
+  role = var.ecs_task_execution_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["sns:Publish"]
+        Resource = [aws_sns_topic.job_notifications[0].arn]
+      }
+    ]
+  })
+}
+
 resource "aws_cloudwatch_event_rule" "import" {
   name                = "import"
   description         = "Runs the vimcolorschemes import job"
@@ -99,6 +118,97 @@ resource "aws_cloudwatch_event_rule" "publish" {
   schedule_expression = "cron(30 14 * * ? *)"
   state               = "ENABLED"
   tags                = local.tags
+}
+
+resource "aws_sns_topic" "job_notifications" {
+  count = length(var.alert_email_addresses) > 0 ? 1 : 0
+
+  name = local.alerts_topic_name
+  tags = merge(local.tags, { Purpose = "alerts" })
+}
+
+resource "aws_sns_topic_policy" "job_notifications" {
+  count = length(var.alert_email_addresses) > 0 ? 1 : 0
+
+  arn = aws_sns_topic.job_notifications[0].arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowEventBridgePublish"
+        Effect = "Allow"
+        Principal = {
+          Service = "events.amazonaws.com"
+        }
+        Action   = "sns:Publish"
+        Resource = aws_sns_topic.job_notifications[0].arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = aws_cloudwatch_event_rule.job_failures[0].arn
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_sns_topic_subscription" "job_notifications_email" {
+  count = length(var.alert_email_addresses)
+
+  topic_arn = aws_sns_topic.job_notifications[0].arn
+  protocol  = "email"
+  endpoint  = var.alert_email_addresses[count.index]
+}
+
+resource "aws_cloudwatch_event_rule" "job_failures" {
+  count = length(var.alert_email_addresses) > 0 ? 1 : 0
+
+  name        = "run-job-failures"
+  description = "Alerts when a vimcolorschemes worker ECS task exits with a non-zero status"
+  event_pattern = jsonencode({
+    source      = ["aws.ecs"]
+    detail-type = ["ECS Task State Change"]
+    detail = {
+      clusterArn    = [aws_ecs_cluster.worker.arn]
+      lastStatus    = ["STOPPED"]
+      desiredStatus = ["STOPPED"]
+      group         = ["family:${var.ecs_task_family}"]
+      containers = {
+        name = [var.ecs_container_name]
+        exitCode = [
+          {
+            "anything-but" = 0
+          }
+        ]
+      }
+    }
+  })
+  tags = merge(local.tags, { Purpose = "alerts" })
+}
+
+resource "aws_cloudwatch_event_target" "job_failures_sns" {
+  count = length(var.alert_email_addresses) > 0 ? 1 : 0
+
+  rule      = aws_cloudwatch_event_rule.job_failures[0].name
+  target_id = "job-failure-email"
+  arn       = aws_sns_topic.job_notifications[0].arn
+
+  input_transformer {
+    input_paths = {
+      taskArn       = "$.detail.taskArn"
+      stoppedReason = "$.detail.stoppedReason"
+      stopCode      = "$.detail.stopCode"
+      group         = "$.detail.group"
+      startedAt     = "$.detail.startedAt"
+      stoppedAt     = "$.detail.stoppedAt"
+      region        = "$.region"
+    }
+
+    input_template = <<EOF
+"vimcolorschemes worker job failed in production\n\nFamily: <group>\nTask: <taskArn>\nRegion: <region>\nStarted: <startedAt>\nStopped: <stoppedAt>\nStop code: <stopCode>\nStopped reason: <stoppedReason>"
+EOF
+  }
 }
 
 resource "aws_cloudwatch_event_target" "import" {

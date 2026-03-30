@@ -7,6 +7,9 @@ environment    = "production"
 owner          = "YOUR_NAME"
 managed_by     = "terraform"
 github_repo    = "vimcolorschemes/worker"
+alert_email_addresses = [
+  "alerts@example.com",
+]
 
 ecr_repository_name          = "vimcolorschemes/worker"
 ecs_cluster_name             = "vimcolorschemes-worker"

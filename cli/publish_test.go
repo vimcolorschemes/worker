@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vimcolorschemes/worker/internal/database"
 )
 
 func TestValidatePublishPrerequisites(t *testing.T) {
@@ -90,4 +92,70 @@ func TestTriggerPublishWebhook(t *testing.T) {
 			t.Fatalf("statusCode = %d, want %d", statusCode, http.StatusBadGateway)
 		}
 	})
+}
+
+func TestBuildDailyJobSummary(t *testing.T) {
+	day := time.Date(2026, time.March, 29, 0, 0, 0, 0, time.UTC)
+	reports := map[string]database.JobReport{
+		"import": {
+			Job:         "import",
+			Date:        day.Add(time.Hour),
+			ElapsedTime: 12.5,
+			Status:      "success",
+			Data: map[string]interface{}{
+				"repositoryCount": float64(2934),
+			},
+		},
+		"update": {
+			Job:         "update",
+			Date:        day.Add(2 * time.Hour),
+			ElapsedTime: 18.2,
+			Status:      "success",
+			Data: map[string]interface{}{
+				"repositoryCount":      float64(2934),
+				"repositoryErrorCount": float64(2),
+			},
+		},
+		"generate": {
+			Job:         "generate",
+			Date:        day.Add(3 * time.Hour),
+			ElapsedTime: 25.4,
+			Status:      "success",
+			Data: map[string]interface{}{
+				"repositoryCount":        float64(120),
+				"repositoryErrorCount":   float64(1),
+				"repositoryErrorSamples": []interface{}{"owner/repo: boom"},
+			},
+		},
+	}
+	publishResult := map[string]interface{}{
+		"responseStatusCode": float64(201),
+		"webhookTriggered":   true,
+		"notificationStatus": "sent",
+		"jobStatuses": map[string]interface{}{
+			"import":   "success",
+			"update":   "success",
+			"generate": "success",
+		},
+	}
+
+	body := buildDailyJobSummary(day, reports, publishResult, map[string]int{"error": 1}, []string{"clone failed"})
+
+	for _, want := range []string{
+		"vimcolorschemes production daily summary for 2026-03-29",
+		"import: success",
+		"repositoryCount: 2934",
+		"update: success",
+		"repositoryErrorCount: 2",
+		"generate: success",
+		"repositoryEventErrors: 1",
+		"sampleError: clone failed",
+		"publish: success",
+		"jobStatuses: generate=success, import=success, update=success",
+		"notificationStatus: sent",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("summary = %q, want it to contain %q", body, want)
+		}
+	}
 }

@@ -107,3 +107,8 @@ variable "bootstrap_task_definition_arn" {
   type    = string
   default = "arn:aws:ecs:us-east-1:123456789012:task-definition/run-job:1"
 }
+
+variable "alert_email_addresses" {
+  type    = list(string)
+  default = []
+}

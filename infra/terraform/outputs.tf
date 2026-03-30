@@ -25,3 +25,7 @@ output "event_rule_arns" {
     generate = aws_cloudwatch_event_rule.generate.arn
   }
 }
+
+output "job_notifications_topic_arn" {
+  value = length(aws_sns_topic.job_notifications) > 0 ? aws_sns_topic.job_notifications[0].arn : null
+}

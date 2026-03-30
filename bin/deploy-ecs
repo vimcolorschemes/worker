@@ -14,6 +14,7 @@ Required environment variables:
   ECS_TASK_FAMILY
   ECS_CONTAINER_NAME
   EVENTBRIDGE_RULES
+  JOB_NOTIFICATIONS_TOPIC_ARN
   PUBLISH_WEBHOOK_URL
 EOF
 }
@@ -62,6 +63,7 @@ require_var ECR_REPOSITORY
 require_var ECS_TASK_FAMILY
 require_var ECS_CONTAINER_NAME
 require_var EVENTBRIDGE_RULES
+require_var JOB_NOTIFICATIONS_TOPIC_ARN
 require_var PUBLISH_WEBHOOK_URL
 
 image_uri="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
@@ -82,6 +84,7 @@ aws ecs describe-task-definition \
 
 jq --arg image "$immutable_image" \
   --arg name "$ECS_CONTAINER_NAME" \
+  --arg jobNotificationsTopicArn "$JOB_NOTIFICATIONS_TOPIC_ARN" \
   --arg publishWebhookURL "$PUBLISH_WEBHOOK_URL" '
   {
     family,
@@ -106,10 +109,13 @@ jq --arg image "$immutable_image" \
       if .name == $name then
         .image = $image
         | .environment = ((.environment // [])
-          | map(select(.name != "PUBLISH_WEBHOOK_URL"))
-          + [{name: "PUBLISH_WEBHOOK_URL", value: $publishWebhookURL}])
+          | map(select(.name != "JOB_NOTIFICATIONS_TOPIC_ARN" and .name != "PUBLISH_WEBHOOK_URL"))
+          + [
+              {name: "JOB_NOTIFICATIONS_TOPIC_ARN", value: $jobNotificationsTopicArn},
+              {name: "PUBLISH_WEBHOOK_URL", value: $publishWebhookURL}
+            ])
         | .secrets = ((.secrets // [])
-          | map(select(.name != "PUBLISH_WEBHOOK_URL")))
+          | map(select(.name != "JOB_NOTIFICATIONS_TOPIC_ARN" and .name != "PUBLISH_WEBHOOK_URL")))
       else
         .
       end

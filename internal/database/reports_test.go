@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -121,11 +122,103 @@ func TestGetLatestReportStatuses(t *testing.T) {
 	})
 }
 
+func TestGetLatestReports(t *testing.T) {
+	t.Run("returns the latest full report payloads", func(t *testing.T) {
+		setupTestDB(t)
+
+		day := time.Date(2026, time.March, 23, 0, 0, 0, 0, time.UTC)
+		insertReport(t, "import", day.Add(time.Hour), `{"repositoryCount":1}`)
+		insertReport(t, "import", day.Add(2*time.Hour), `{"repositoryCount":2}`)
+
+		reports, err := GetLatestReports([]string{"import", "generate"}, day)
+		if err != nil {
+			t.Fatalf("GetLatestReports returned error: %v", err)
+		}
+
+		importReport, ok := reports["import"]
+		if !ok {
+			t.Fatal("reports[\"import\"] missing")
+		}
+
+		if importReport.Status != "success" {
+			t.Fatalf("status = %q, want %q", importReport.Status, "success")
+		}
+
+		if got := importReport.Data["repositoryCount"]; got != float64(2) {
+			t.Fatalf("repositoryCount = %v, want 2", got)
+		}
+
+		if _, ok := reports["generate"]; ok {
+			t.Fatal("reports[\"generate\"] present, want missing")
+		}
+	})
+}
+
+func TestCountRepositoryJobEvents(t *testing.T) {
+	t.Run("counts events by status for the requested day", func(t *testing.T) {
+		setupTestDB(t)
+
+		day := time.Date(2026, time.March, 23, 0, 0, 0, 0, time.UTC)
+		insertRepositoryJobEvent(t, 1, "generate", "error", "boom", day.Add(time.Hour))
+		insertRepositoryJobEvent(t, 2, "generate", "error", "bang", day.Add(2*time.Hour))
+		insertRepositoryJobEvent(t, 3, "generate", "success", "", day.Add(3*time.Hour))
+		insertRepositoryJobEvent(t, 4, "generate", "error", "old", day.Add(-time.Hour))
+
+		counts, err := CountRepositoryJobEvents("generate", day)
+		if err != nil {
+			t.Fatalf("CountRepositoryJobEvents returned error: %v", err)
+		}
+
+		if counts["error"] != 2 {
+			t.Fatalf("counts[\"error\"] = %d, want 2", counts["error"])
+		}
+
+		if counts["success"] != 1 {
+			t.Fatalf("counts[\"success\"] = %d, want 1", counts["success"])
+		}
+	})
+}
+
+func TestListRepositoryJobEventMessages(t *testing.T) {
+	t.Run("returns latest messages for the requested day", func(t *testing.T) {
+		setupTestDB(t)
+
+		day := time.Date(2026, time.March, 23, 0, 0, 0, 0, time.UTC)
+		insertRepositoryJobEvent(t, 1, "generate", "error", "second", day.Add(2*time.Hour))
+		insertRepositoryJobEvent(t, 2, "generate", "error", "first", day.Add(time.Hour))
+		insertRepositoryJobEvent(t, 3, "generate", "success", "", day.Add(3*time.Hour))
+
+		messages, err := ListRepositoryJobEventMessages("generate", "error", day, 5)
+		if err != nil {
+			t.Fatalf("ListRepositoryJobEventMessages returned error: %v", err)
+		}
+
+		got := strings.Join(messages, ",")
+		if got != "first,second" {
+			t.Fatalf("messages = %q, want %q", got, "first,second")
+		}
+	})
+}
+
 func insertReport(t *testing.T, job string, reportTime time.Time, data string) {
 	t.Helper()
 
 	_, err := db.Exec("INSERT INTO reports (date, job, elapsed_time, data) VALUES (?, ?, ?, ?)", reportTime, job, 1.5, data)
 	if err != nil {
 		t.Fatalf("insert report: %v", err)
+	}
+}
+
+func insertRepositoryJobEvent(t *testing.T, repositoryID int64, job string, status string, errorMessage string, createdAt time.Time) {
+	t.Helper()
+
+	_, err := db.Exec(`INSERT INTO repositories (id, owner_name, name) VALUES (?, ?, ?)`, repositoryID, "owner", fmt.Sprintf("repo-%d", repositoryID))
+	if err != nil {
+		t.Fatalf("insert repository: %v", err)
+	}
+
+	_, err = db.Exec(`INSERT INTO repository_job_events (repository_id, job, status, error_message, created_at) VALUES (?, ?, ?, ?, ?)`, repositoryID, job, status, errorMessage, createdAt)
+	if err != nil {
+		t.Fatalf("insert repository job event: %v", err)
 	}
 }
