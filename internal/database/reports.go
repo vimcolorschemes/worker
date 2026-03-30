@@ -99,15 +99,6 @@ func GetLatestReports(jobs []string, day time.Time) (map[string]JobReport, error
 	return reports, nil
 }
 
-func reportStatusFromData(data string) (string, error) {
-	payload, err := parseReportData(data)
-	if err != nil {
-		return "", err
-	}
-
-	return reportStatusFromPayload(payload), nil
-}
-
 // CountRepositoryJobEvents returns counts per status for a repository job on the provided UTC day.
 func CountRepositoryJobEvents(job string, day time.Time) (map[string]int, error) {
 	day = date.RoundTimeToDate(day.UTC())
