@@ -28,34 +28,41 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	}
 
 	log.Print(len(repositories), " repositories to update")
+	repositoryErrorCount := 0
 
 	for index, repository := range repositories {
 		fmt.Println()
 
 		log.Print("Updating ", index, " of ", len(repositories), ": ", repository.Owner.Name, "/", repository.Name)
 
-		updatedRepository := updateRepository(repository)
+		updatedRepository, hadError := updateRepository(repository)
+		if hadError {
+			repositoryErrorCount++
+		}
 
 		data := getUpdateData(updatedRepository)
 
 		database.UpdateRepositoryFromUpdate(repository.ID, data)
 	}
 
-	return map[string]interface{}{"repositoryCount": len(repositories)}
+	return map[string]interface{}{
+		"repositoryCount":      len(repositories),
+		"repositoryErrorCount": repositoryErrorCount,
+	}
 }
 
-func updateRepository(repository repoHelper.Repository) repoHelper.Repository {
+func updateRepository(repository repoHelper.Repository) (repoHelper.Repository, bool) {
 	githubRepository, err := github.GetRepository(repository.Owner.Name, repository.Name)
 	if err != nil {
 		log.Print("Error fetching ", repository.Owner.Name, "/", repository.Name)
 		repository.IsEligible = false
-		return repository
+		return repository, true
 	}
 
 	if githubRepository.PushedAt == nil {
 		log.Print("No commits on ", repository.Owner.Name, "/", repository.Name)
 		repository.IsEligible = false
-		return repository
+		return repository, true
 	}
 
 	repository.PushedAt = githubRepository.PushedAt.Time
@@ -73,7 +80,7 @@ func updateRepository(repository repoHelper.Repository) repoHelper.Repository {
 	repository.IsEligible = repository.IsEligibleAfterUpdate()
 	log.Printf("Eligible after update: %v", repository.IsEligible)
 
-	return repository
+	return repository, false
 }
 
 func getUpdateData(repository repoHelper.Repository) database.UpdateData {

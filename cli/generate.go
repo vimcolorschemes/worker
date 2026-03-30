@@ -53,6 +53,8 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 	}
 
 	log.Printf("Generating previews for %d repositories", len(repositories))
+	repositoryErrorCount := 0
+	repositoryErrorSamples := []string{}
 
 	for index, repository := range repositories {
 		log.Print("\nGenerating previews for ", repository.Owner.Name, "/", repository.Name, " (", index+1, "/", len(repositories), ")")
@@ -61,6 +63,8 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 		err := installPlugin(repository.GithubURL, key)
 		if err != nil {
 			log.Printf("Error installing plugin: %s", err)
+			repositoryErrorCount++
+			repositoryErrorSamples = appendRepositoryErrorSample(repositoryErrorSamples, repository, err)
 			if eventErr := database.CreateRepositoryGenerateErrorEvent(repository.ID, err.Error()); eventErr != nil {
 				log.Printf("Error creating generate failure event: %s", eventErr)
 			}
@@ -74,6 +78,8 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 		}
 		if dataError != nil {
 			log.Printf("Error getting color data: %s", dataError)
+			repositoryErrorCount++
+			repositoryErrorSamples = appendRepositoryErrorSample(repositoryErrorSamples, repository, dataError)
 			if eventErr := database.CreateRepositoryGenerateErrorEvent(repository.ID, dataError.Error()); eventErr != nil {
 				log.Printf("Error creating generate failure event: %s", eventErr)
 			}
@@ -111,7 +117,11 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 
 	cleanUp()
 
-	return map[string]interface{}{"repositoryCount": len(repositories)}
+	return map[string]interface{}{
+		"repositoryCount":        len(repositories),
+		"repositoryErrorCount":   repositoryErrorCount,
+		"repositoryErrorSamples": repositoryErrorSamples,
+	}
 }
 
 func updateRepositoryAfterGenerate(repository repoHelper.Repository) {
@@ -338,4 +348,12 @@ func isDefaultColorscheme(name string) bool {
 	}
 
 	return defaultNames[name]
+}
+
+func appendRepositoryErrorSample(samples []string, repository repoHelper.Repository, err error) []string {
+	if len(samples) >= 5 {
+		return samples
+	}
+
+	return append(samples, fmt.Sprintf("%s/%s: %s", repository.Owner.Name, repository.Name, err))
 }
