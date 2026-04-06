@@ -70,6 +70,14 @@ func GetRepository(repoKey string) (repository.Repository, error) {
 	return repo, nil
 }
 
+// DeleteRepository removes a repository row by id. Foreign keys on
+// colorschemes, colorscheme_groups, and repository_job_events are declared
+// ON DELETE CASCADE, so SQLite removes the related rows for us.
+func DeleteRepository(id int64) error {
+	_, err := db.Exec("DELETE FROM repositories WHERE id = ?", id)
+	return err
+}
+
 // GetRepositoriesToGenerate gets all repositories that are due for a preview generate.
 func GetRepositoriesToGenerate() ([]repository.Repository, error) {
 	return queryRepositoriesBasic(queryRepositoriesToGenerate)

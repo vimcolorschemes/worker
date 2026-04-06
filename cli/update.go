@@ -29,15 +29,20 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 
 	log.Print(len(repositories), " repositories to update")
 	repositoryErrorCount := 0
+	repositoryDeletedCount := 0
 
 	for index, repository := range repositories {
 		fmt.Println()
 
 		log.Print("Updating ", index, " of ", len(repositories), ": ", repository.Owner.Name, "/", repository.Name)
 
-		updatedRepository, hadError := updateRepository(repository)
+		updatedRepository, hadError, deleted := updateRepository(repository)
 		if hadError {
 			repositoryErrorCount++
+		}
+		if deleted {
+			repositoryDeletedCount++
+			continue
 		}
 
 		data := getUpdateData(updatedRepository)
@@ -46,23 +51,35 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"repositoryCount":      len(repositories),
-		"repositoryErrorCount": repositoryErrorCount,
+		"repositoryCount":        len(repositories),
+		"repositoryErrorCount":   repositoryErrorCount,
+		"repositoryDeletedCount": repositoryDeletedCount,
 	}
 }
 
-func updateRepository(repository repoHelper.Repository) (repoHelper.Repository, bool) {
+func updateRepository(repository repoHelper.Repository) (repoHelper.Repository, bool, bool) {
 	githubRepository, err := github.GetRepository(repository.Owner.Name, repository.Name)
 	if err != nil {
-		log.Print("Error fetching ", repository.Owner.Name, "/", repository.Name)
+		log.Printf("Error fetching %s/%s: %v", repository.Owner.Name, repository.Name, err)
+		if github.Is404(err) {
+			// Repo was deleted, renamed, or made private — prune it so we
+			// stop trying every day. Cascade clears colorschemes and events.
+			if delErr := database.DeleteRepository(repository.ID); delErr != nil {
+				log.Printf("Error deleting repository %s/%s: %v", repository.Owner.Name, repository.Name, delErr)
+				repository.IsEligible = false
+				return repository, true, false
+			}
+			log.Printf("Deleted repository %s/%s (404 from Github)", repository.Owner.Name, repository.Name)
+			return repository, true, true
+		}
 		repository.IsEligible = false
-		return repository, true
+		return repository, true, false
 	}
 
 	if githubRepository.PushedAt == nil {
 		log.Print("No commits on ", repository.Owner.Name, "/", repository.Name)
 		repository.IsEligible = false
-		return repository, true
+		return repository, true, false
 	}
 
 	repository.PushedAt = githubRepository.PushedAt.Time
@@ -80,7 +97,7 @@ func updateRepository(repository repoHelper.Repository) (repoHelper.Repository, 
 	repository.IsEligible = repository.IsEligibleAfterUpdate()
 	log.Printf("Eligible after update: %v", repository.IsEligible)
 
-	return repository, false
+	return repository, false, false
 }
 
 func getUpdateData(repository repoHelper.Repository) database.UpdateData {
