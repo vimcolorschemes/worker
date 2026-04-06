@@ -161,7 +161,7 @@ func formatJobSummary(job string, report database.JobReport, includeGenerateEven
 	lines = append(lines, fmt.Sprintf("  ran_at: %s", report.Date.UTC().Format(time.RFC3339)))
 	lines = append(lines, fmt.Sprintf("  elapsed_seconds: %.3f", report.ElapsedTime))
 
-	for _, key := range []string{"repositoryCount", "repositoryErrorCount", "responseStatusCode", "webhookTriggered", "notificationStatus"} {
+	for _, key := range []string{"repositoryCount", "repositoryErrorCount", "repositoryDeletedCount", "responseStatusCode", "webhookTriggered", "notificationStatus"} {
 		if value, ok := report.Data[key]; ok {
 			lines = append(lines, fmt.Sprintf("  %s: %v", key, value))
 		}

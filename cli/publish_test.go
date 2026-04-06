@@ -112,8 +112,9 @@ func TestBuildDailyJobSummary(t *testing.T) {
 			ElapsedTime: 18.2,
 			Status:      "success",
 			Data: map[string]interface{}{
-				"repositoryCount":      float64(2934),
-				"repositoryErrorCount": float64(2),
+				"repositoryCount":        float64(2934),
+				"repositoryErrorCount":   float64(2),
+				"repositoryDeletedCount": float64(3),
 			},
 		},
 		"generate": {
@@ -147,6 +148,7 @@ func TestBuildDailyJobSummary(t *testing.T) {
 		"repositoryCount: 2934",
 		"update: success",
 		"repositoryErrorCount: 2",
+		"repositoryDeletedCount: 3",
 		"generate: success",
 		"repositoryEventErrors: 1",
 		"sampleError: clone failed",

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -39,6 +40,17 @@ func init() {
 	tc := oauth2.NewClient(ctx, ts)
 
 	client = gogithub.NewClient(tc)
+}
+
+// Is404 reports whether err is a Github API "not found" response. This is the
+// signal we use to prune repositories that no longer exist (deleted, renamed,
+// or made private) so the update job stops wasting work on them.
+func Is404(err error) bool {
+	var errResp *gogithub.ErrorResponse
+	if !errors.As(err, &errResp) || errResp.Response == nil {
+		return false
+	}
+	return errResp.Response.StatusCode == http.StatusNotFound
 }
 
 // GetRepository gets a repository from the Github API using a repository's owner and name
