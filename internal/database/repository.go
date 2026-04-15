@@ -30,6 +30,7 @@ type UpdateData struct {
 	StargazersCountHistory []repository.StargazersCountHistoryItem
 	WeekStargazersCount    int
 	IsEligible             bool
+	IsDisabled             bool
 	UpdatedAt              time.Time
 }
 
@@ -83,6 +84,12 @@ func GetRepositoriesToGenerate() ([]repository.Repository, error) {
 	return queryRepositoriesBasic(queryRepositoriesToGenerate)
 }
 
+// SetRepositoryDisabled updates the manual/system scheduler override flag.
+func SetRepositoryDisabled(id int64, disabled bool) error {
+	_, err := db.Exec("UPDATE repositories SET is_disabled = ? WHERE id = ?", disabled, id)
+	return err
+}
+
 // UpsertRepositoryFromImport inserts or updates a repository from import data.
 func UpsertRepositoryFromImport(data ImportData) {
 	_, err := db.Exec(`INSERT INTO repositories (id, owner_name, owner_avatar_url, name, description, github_url, github_created_at, pushed_at)
@@ -114,8 +121,8 @@ func UpdateRepositoryFromUpdate(id int64, data UpdateData) {
 		panic(err)
 	}
 
-	_, err = db.Exec(`UPDATE repositories SET pushed_at = ?, stargazers_count = ?, stargazers_count_history = ?, week_stargazers_count = ?, is_eligible = ?, updated_at = ? WHERE id = ?`,
-		data.PushedAt, data.StargazersCount, string(historyJSON), data.WeekStargazersCount, data.IsEligible, data.UpdatedAt, id)
+	_, err = db.Exec(`UPDATE repositories SET pushed_at = ?, stargazers_count = ?, stargazers_count_history = ?, week_stargazers_count = ?, is_eligible = ?, is_disabled = ?, updated_at = ? WHERE id = ?`,
+		data.PushedAt, data.StargazersCount, string(historyJSON), data.WeekStargazersCount, data.IsEligible, data.IsDisabled, data.UpdatedAt, id)
 	if err != nil {
 		log.Printf("Error updating repository: %s", err)
 		panic(err)

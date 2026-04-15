@@ -16,6 +16,7 @@ const (
 		github_created_at,
 		pushed_at,
 		is_eligible,
+		is_disabled,
 		updated_at
 	`
 
@@ -29,12 +30,14 @@ const (
 	queryAllRepositories = `
 		SELECT ` + repositorySelectColumns + `
 		FROM repositories
+		WHERE is_disabled = 0
 	`
 
 	queryRepositoriesToGenerate = `
 		SELECT ` + repositorySelectColumns + `
 		FROM repositories
-		WHERE is_eligible = 1
+		WHERE is_disabled = 0
+		  AND is_eligible = 1
 		  AND (last_generate_event_at IS NULL OR pushed_at > last_generate_event_at)
 	`
 )

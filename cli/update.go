@@ -5,10 +5,14 @@ import (
 	"log"
 	"time"
 
+	gogithub "github.com/google/go-github/v68/github"
 	"github.com/vimcolorschemes/worker/internal/database"
 	"github.com/vimcolorschemes/worker/internal/github"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
 )
+
+var getGithubRepository = github.GetRepository
+var isGithub404 = github.Is404
 
 // Update the imported repositories with all kinds of useful information
 func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
@@ -30,6 +34,7 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	log.Print(len(repositories), " repositories to update")
 	repositoryErrorCount := 0
 	repositoryDeletedCount := 0
+	repositoryDisabledCount := 0
 
 	for index, repository := range repositories {
 		fmt.Println()
@@ -44,6 +49,9 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 			repositoryDeletedCount++
 			continue
 		}
+		if updatedRepository.IsDisabled && !repository.IsDisabled {
+			repositoryDisabledCount++
+		}
 
 		data := getUpdateData(updatedRepository)
 
@@ -51,17 +59,18 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"repositoryCount":        len(repositories),
-		"repositoryErrorCount":   repositoryErrorCount,
-		"repositoryDeletedCount": repositoryDeletedCount,
+		"repositoryCount":         len(repositories),
+		"repositoryErrorCount":    repositoryErrorCount,
+		"repositoryDeletedCount":  repositoryDeletedCount,
+		"repositoryDisabledCount": repositoryDisabledCount,
 	}
 }
 
 func updateRepository(repository repoHelper.Repository) (repoHelper.Repository, bool, bool) {
-	githubRepository, err := github.GetRepository(repository.Owner.Name, repository.Name)
+	githubRepository, err := getGithubRepository(repository.Owner.Name, repository.Name)
 	if err != nil {
 		log.Printf("Error fetching %s/%s: %v", repository.Owner.Name, repository.Name, err)
-		if github.Is404(err) {
+		if isGithub404(err) {
 			// Repo was deleted, renamed, or made private — prune it so we
 			// stop trying every day. Cascade clears colorschemes and events.
 			if delErr := database.DeleteRepository(repository.ID); delErr != nil {
@@ -79,7 +88,9 @@ func updateRepository(repository repoHelper.Repository) (repoHelper.Repository, 
 	if githubRepository.PushedAt == nil {
 		log.Print("No commits on ", repository.Owner.Name, "/", repository.Name)
 		repository.IsEligible = false
-		return repository, true, false
+		repository.IsDisabled = true
+		log.Print("Automatically disabled ", repository.Owner.Name, "/", repository.Name, " because it has no commits")
+		return repository, false, false
 	}
 
 	repository.PushedAt = githubRepository.PushedAt.Time
@@ -95,6 +106,8 @@ func updateRepository(repository repoHelper.Repository) (repoHelper.Repository, 
 
 	log.Print("Checking if ", repository.Owner.Name, "/", repository.Name, " is eligible")
 	repository.IsEligible = repository.IsEligibleAfterUpdate()
+	// A successful update means the repo is active — clear any prior disable flag
+	repository.IsDisabled = false
 	log.Printf("Eligible after update: %v", repository.IsEligible)
 
 	return repository, false, false
@@ -107,6 +120,9 @@ func getUpdateData(repository repoHelper.Repository) database.UpdateData {
 		StargazersCountHistory: repository.StargazersCountHistory,
 		WeekStargazersCount:    repository.WeekStargazersCount,
 		IsEligible:             repository.IsEligible,
+		IsDisabled:             repository.IsDisabled,
 		UpdatedAt:              time.Now(),
 	}
 }
+
+var _ func(string, string) (*gogithub.Repository, error) = getGithubRepository

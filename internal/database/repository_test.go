@@ -256,6 +256,27 @@ func TestGetRepositories(t *testing.T) {
 			t.Fatalf("expected IDs 1 and 2, got %v", ids)
 		}
 	})
+
+	t.Run("excludes disabled repositories", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner1", "repo1")
+		insertTestRepo(t, 2, "owner2", "repo2")
+
+		if err := SetRepositoryDisabled(2, true); err != nil {
+			t.Fatalf("SetRepositoryDisabled: %v", err)
+		}
+
+		repos, err := GetRepositories()
+		if err != nil {
+			t.Fatalf("GetRepositories returned error: %v", err)
+		}
+		if len(repos) != 1 {
+			t.Fatalf("len(repos) = %d, want 1", len(repos))
+		}
+		if repos[0].ID != 1 {
+			t.Fatalf("ID = %d, want 1", repos[0].ID)
+		}
+	})
 }
 
 func TestGetRepository(t *testing.T) {
@@ -288,6 +309,23 @@ func TestGetRepository(t *testing.T) {
 		}
 		if repo.ID != 1 {
 			t.Fatalf("ID = %d, want 1", repo.ID)
+		}
+	})
+
+	t.Run("returns disabled repository for direct lookup", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		if err := SetRepositoryDisabled(1, true); err != nil {
+			t.Fatalf("SetRepositoryDisabled: %v", err)
+		}
+
+		repo, err := GetRepository("owner/repo")
+		if err != nil {
+			t.Fatalf("GetRepository returned error: %v", err)
+		}
+		if !repo.IsDisabled {
+			t.Fatal("IsDisabled = false, want true")
 		}
 	})
 
@@ -384,6 +422,24 @@ func TestGetRepositoriesToGenerate(t *testing.T) {
 		}
 	})
 
+	t.Run("excludes disabled repos", func(t *testing.T) {
+		setupTestDB(t)
+		insertRepoForGenerate(t, 1, 1, base.Add(time.Hour))
+		insertGenerateEvent(t, 1, base)
+
+		if err := SetRepositoryDisabled(1, true); err != nil {
+			t.Fatalf("SetRepositoryDisabled: %v", err)
+		}
+
+		repos, err := GetRepositoriesToGenerate()
+		if err != nil {
+			t.Fatalf("GetRepositoriesToGenerate returned error: %v", err)
+		}
+		if len(repos) != 0 {
+			t.Fatalf("len(repos) = %d, want 0", len(repos))
+		}
+	})
+
 	t.Run("includes repos where no generate event exists", func(t *testing.T) {
 		setupTestDB(t)
 		insertRepoForGenerate(t, 1, 1, base)
@@ -424,6 +480,22 @@ func TestUpdateRepositoryFromUpdate(t *testing.T) {
 		}
 		if !isEligible {
 			t.Fatal("is_eligible = false, want true")
+		}
+	})
+
+	t.Run("updates disabled flag", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		UpdateRepositoryFromUpdate(1, UpdateData{IsDisabled: true})
+
+		var isDisabled bool
+		err := db.QueryRow(`SELECT is_disabled FROM repositories WHERE id = 1`).Scan(&isDisabled)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if !isDisabled {
+			t.Fatal("is_disabled = false, want true")
 		}
 	})
 
