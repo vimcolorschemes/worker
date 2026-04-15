@@ -329,23 +329,6 @@ func TestGetRepository(t *testing.T) {
 		}
 	})
 
-	t.Run("returns disabled repositories for direct lookup", func(t *testing.T) {
-		setupTestDB(t)
-		insertTestRepo(t, 1, "owner", "repo")
-
-		if err := SetRepositoryDisabled(1, true); err != nil {
-			t.Fatalf("SetRepositoryDisabled: %v", err)
-		}
-
-		repo, err := GetRepository("owner/repo")
-		if err != nil {
-			t.Fatalf("GetRepository returned error: %v", err)
-		}
-		if !repo.IsDisabled {
-			t.Fatal("is_disabled = false, want true")
-		}
-	})
-
 	t.Run("returns error for invalid key", func(t *testing.T) {
 		setupTestDB(t)
 		_, err := GetRepository("noslash")

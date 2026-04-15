@@ -27,8 +27,8 @@ func TestUpdateRepository(t *testing.T) {
 			Name:  "repo",
 		})
 
-		if !hadError {
-			t.Fatal("hadError = false, want true")
+		if hadError {
+			t.Fatal("hadError = true, want false")
 		}
 		if deleted {
 			t.Fatal("deleted = true, want false")

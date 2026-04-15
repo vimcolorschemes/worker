@@ -34,6 +34,7 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	log.Print(len(repositories), " repositories to update")
 	repositoryErrorCount := 0
 	repositoryDeletedCount := 0
+	repositoryDisabledCount := 0
 
 	for index, repository := range repositories {
 		fmt.Println()
@@ -48,6 +49,9 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 			repositoryDeletedCount++
 			continue
 		}
+		if updatedRepository.IsDisabled && !repository.IsDisabled {
+			repositoryDisabledCount++
+		}
 
 		data := getUpdateData(updatedRepository)
 
@@ -55,9 +59,10 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"repositoryCount":        len(repositories),
-		"repositoryErrorCount":   repositoryErrorCount,
-		"repositoryDeletedCount": repositoryDeletedCount,
+		"repositoryCount":         len(repositories),
+		"repositoryErrorCount":    repositoryErrorCount,
+		"repositoryDeletedCount":  repositoryDeletedCount,
+		"repositoryDisabledCount": repositoryDisabledCount,
 	}
 }
 
@@ -85,7 +90,7 @@ func updateRepository(repository repoHelper.Repository) (repoHelper.Repository, 
 		repository.IsEligible = false
 		repository.IsDisabled = true
 		log.Print("Automatically disabled ", repository.Owner.Name, "/", repository.Name, " because it has no commits")
-		return repository, true, false
+		return repository, false, false
 	}
 
 	repository.PushedAt = githubRepository.PushedAt.Time
@@ -101,6 +106,8 @@ func updateRepository(repository repoHelper.Repository) (repoHelper.Repository, 
 
 	log.Print("Checking if ", repository.Owner.Name, "/", repository.Name, " is eligible")
 	repository.IsEligible = repository.IsEligibleAfterUpdate()
+	// A successful update means the repo is active — clear any prior disable flag
+	repository.IsDisabled = false
 	log.Printf("Eligible after update: %v", repository.IsEligible)
 
 	return repository, false, false
