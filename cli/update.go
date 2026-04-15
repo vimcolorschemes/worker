@@ -5,10 +5,14 @@ import (
 	"log"
 	"time"
 
+	gogithub "github.com/google/go-github/v68/github"
 	"github.com/vimcolorschemes/worker/internal/database"
 	"github.com/vimcolorschemes/worker/internal/github"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
 )
+
+var getGithubRepository = github.GetRepository
+var isGithub404 = github.Is404
 
 // Update the imported repositories with all kinds of useful information
 func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
@@ -58,10 +62,10 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 }
 
 func updateRepository(repository repoHelper.Repository) (repoHelper.Repository, bool, bool) {
-	githubRepository, err := github.GetRepository(repository.Owner.Name, repository.Name)
+	githubRepository, err := getGithubRepository(repository.Owner.Name, repository.Name)
 	if err != nil {
 		log.Printf("Error fetching %s/%s: %v", repository.Owner.Name, repository.Name, err)
-		if github.Is404(err) {
+		if isGithub404(err) {
 			// Repo was deleted, renamed, or made private — prune it so we
 			// stop trying every day. Cascade clears colorschemes and events.
 			if delErr := database.DeleteRepository(repository.ID); delErr != nil {
@@ -79,6 +83,8 @@ func updateRepository(repository repoHelper.Repository) (repoHelper.Repository, 
 	if githubRepository.PushedAt == nil {
 		log.Print("No commits on ", repository.Owner.Name, "/", repository.Name)
 		repository.IsEligible = false
+		repository.IsDisabled = true
+		log.Print("Automatically disabled ", repository.Owner.Name, "/", repository.Name, " because it has no commits")
 		return repository, true, false
 	}
 
@@ -107,6 +113,9 @@ func getUpdateData(repository repoHelper.Repository) database.UpdateData {
 		StargazersCountHistory: repository.StargazersCountHistory,
 		WeekStargazersCount:    repository.WeekStargazersCount,
 		IsEligible:             repository.IsEligible,
+		IsDisabled:             repository.IsDisabled,
 		UpdatedAt:              time.Now(),
 	}
 }
+
+var _ func(string, string) (*gogithub.Repository, error) = getGithubRepository

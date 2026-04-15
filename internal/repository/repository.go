@@ -24,6 +24,7 @@ type Repository struct {
 	PushedAt               time.Time                    `json:"pushedAt"`
 	Colorschemes           []Colorscheme                `json:"colorschemes,omitempty"`
 	IsEligible             bool                         `json:"isEligible"`
+	IsDisabled             bool                         `json:"isDisabled"`
 	UpdatedAt              time.Time                    `json:"updatedAt"`
 	FeaturedRank           *int                         `json:"featuredRank,omitempty"`
 }
