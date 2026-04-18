@@ -140,10 +140,11 @@ func TestBuildDailyJobSummary(t *testing.T) {
 		},
 	}
 
-	body := buildDailyJobSummary(day, reports, publishResult, map[string]int{"error": 1}, []string{"clone failed"})
+	body := buildDailyJobSummary(day, reports, publishResult, map[string]int{"error": 1}, []string{"clone failed"}, frontendURL)
 
 	for _, want := range []string{
-		"vimcolorschemes production daily summary for 2026-03-29",
+		"vimcolorschemes daily summary for 2026-03-29",
+		"page_url: https://vimcolorschemes.com",
 		"import: success",
 		"repositoryCount: 2934",
 		"update: success",

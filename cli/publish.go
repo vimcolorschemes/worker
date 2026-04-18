@@ -26,6 +26,8 @@ var publishNotificationNow = func() time.Time {
 	return time.Now().UTC()
 }
 
+const frontendURL = "https://vimcolorschemes.com"
+
 // Publish triggers a frontend deployment after the daily jobs succeed.
 func Publish(_force bool, _debug bool, _repoKey string) map[string]interface{} {
 	statuses, err := database.GetLatestReportStatuses(publishRequiredJobs, publishNow())
@@ -120,8 +122,8 @@ func sendDailyJobSummary(ctx context.Context, publishResult map[string]interface
 		return fmt.Errorf("load generate event messages: %w", err)
 	}
 
-	subject := fmt.Sprintf("vimcolorschemes prod daily summary %s", day.Format("2006-01-02"))
-	body := buildDailyJobSummary(day, reports, publishResult, generateEventCounts, generateErrorMessages)
+	subject := fmt.Sprintf("vimcolorschemes daily summary %s", day.Format("2006-01-02"))
+	body := buildDailyJobSummary(day, reports, publishResult, generateEventCounts, generateErrorMessages, frontendURL)
 
 	if err := notify.PublishJobNotification(ctx, subject, body); err != nil {
 		return fmt.Errorf("send job summary notification: %w", err)
@@ -130,10 +132,14 @@ func sendDailyJobSummary(ctx context.Context, publishResult map[string]interface
 	return nil
 }
 
-func buildDailyJobSummary(day time.Time, reports map[string]database.JobReport, publishResult map[string]interface{}, generateEventCounts map[string]int, generateErrorMessages []string) string {
+func buildDailyJobSummary(day time.Time, reports map[string]database.JobReport, publishResult map[string]interface{}, generateEventCounts map[string]int, generateErrorMessages []string, frontendURL string) string {
 	lines := []string{
-		fmt.Sprintf("vimcolorschemes production daily summary for %s", day.Format("2006-01-02")),
+		fmt.Sprintf("vimcolorschemes daily summary for %s", day.Format("2006-01-02")),
 		"",
+	}
+
+	if frontendURL != "" {
+		lines = append(lines, fmt.Sprintf("page_url: %s", frontendURL), "")
 	}
 
 	for _, job := range []string{"import", "update", "generate"} {
