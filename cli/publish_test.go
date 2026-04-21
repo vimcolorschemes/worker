@@ -143,19 +143,25 @@ func TestBuildDailyJobSummary(t *testing.T) {
 	body := buildDailyJobSummary(day, reports, publishResult, map[string]int{"error": 1}, []string{"clone failed"}, frontendURL)
 
 	for _, want := range []string{
-		"vimcolorschemes daily summary for 2026-03-29",
-		"page_url: https://vimcolorschemes.com",
-		"import: success",
-		"repositoryCount: 2934",
-		"update: success",
-		"repositoryErrorCount: 2",
-		"repositoryDeletedCount: 3",
-		"generate: success",
-		"repositoryEventErrors: 1",
-		"sampleError: clone failed",
-		"publish: success",
-		"jobStatuses: generate=success, import=success, update=success",
-		"notificationStatus: sent",
+		"vimcolorschemes — Daily Summary",
+		"2026-03-29",
+		"https://vimcolorschemes.com",
+		"Import · success",
+		"Repositories:  2,934",
+		"Duration:      12.5s",
+		"Update · success",
+		"Errors:        2",
+		"Pruned:        3",
+		"Generate · success",
+		"Event errors:  1",
+		"Recent errors:",
+		"- clone failed",
+		"- owner/repo: boom",
+		"Publish · success",
+		"Status code:   201",
+		"Webhook:       triggered",
+		"Notification:  sent",
+		"Job statuses:  generate=success, import=success, update=success",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("summary = %q, want it to contain %q", body, want)
