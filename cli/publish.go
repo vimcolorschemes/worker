@@ -219,7 +219,7 @@ func writeJobSection(b *strings.Builder, job string, report database.JobReport, 
 	if names, ok := report.Data["repositoryDeletedNames"].([]interface{}); ok && len(names) > 0 {
 		b.WriteString("\n  Pruned repositories:\n")
 		for _, name := range names {
-			b.WriteString(fmt.Sprintf("    - %v\n", name))
+			b.WriteString(fmt.Sprintf("    - %v (https://github.com/%v)\n", name, name))
 		}
 	}
 
