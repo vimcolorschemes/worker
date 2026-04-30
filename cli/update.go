@@ -33,7 +33,7 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 
 	log.Print(len(repositories), " repositories to update")
 	repositoryErrorCount := 0
-	repositoryDeletedCount := 0
+	repositoryDeletedNames := []string{}
 	repositoryDisabledCount := 0
 
 	for index, repository := range repositories {
@@ -46,7 +46,7 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 			repositoryErrorCount++
 		}
 		if deleted {
-			repositoryDeletedCount++
+			repositoryDeletedNames = append(repositoryDeletedNames, fmt.Sprintf("%s/%s", repository.Owner.Name, repository.Name))
 			continue
 		}
 		if updatedRepository.IsDisabled && !repository.IsDisabled {
@@ -61,7 +61,8 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	return map[string]interface{}{
 		"repositoryCount":         len(repositories),
 		"repositoryErrorCount":    repositoryErrorCount,
-		"repositoryDeletedCount":  repositoryDeletedCount,
+		"repositoryDeletedCount":  len(repositoryDeletedNames),
+		"repositoryDeletedNames":  repositoryDeletedNames,
 		"repositoryDisabledCount": repositoryDisabledCount,
 	}
 }
