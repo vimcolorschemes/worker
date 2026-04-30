@@ -115,6 +115,7 @@ func TestBuildDailyJobSummary(t *testing.T) {
 				"repositoryCount":        float64(2934),
 				"repositoryErrorCount":   float64(2),
 				"repositoryDeletedCount": float64(3),
+				"repositoryDeletedNames": []interface{}{"owner1/repo1", "owner2/repo2", "owner3/repo3"},
 			},
 		},
 		"generate": {
@@ -152,6 +153,10 @@ func TestBuildDailyJobSummary(t *testing.T) {
 		"Update · success",
 		"Errors:        2",
 		"Pruned:        3",
+		"Pruned repositories:",
+		"- owner1/repo1",
+		"- owner2/repo2",
+		"- owner3/repo3",
 		"Generate · success",
 		"Event errors:  1",
 		"Recent errors:",

@@ -216,6 +216,13 @@ func writeJobSection(b *strings.Builder, job string, report database.JobReport, 
 
 	writeSummaryRows(b, rows)
 
+	if names, ok := report.Data["repositoryDeletedNames"].([]interface{}); ok && len(names) > 0 {
+		b.WriteString("\n  Pruned repositories:\n")
+		for _, name := range names {
+			b.WriteString(fmt.Sprintf("    - %v\n", name))
+		}
+	}
+
 	var errorSamples []string
 	if includeGenerateEvents {
 		errorSamples = append(errorSamples, generateErrorMessages...)
