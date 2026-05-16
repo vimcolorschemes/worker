@@ -1,13 +1,8 @@
-<h1 align="center">
-  <img alt="vimcolorschemes worker" src="https://github.com/vimcolorschemes/worker/blob/media/logo.png?raw=true" width="400" />
-</h1>
-<p align="center" style="border:none">
-  I search for vim and nvim color schemes, and store them. That's about it.
-</p>
-
-## Getting started
+# `vimcolorschemes/worker`
 
 The worker is a CLI used to import and manage the data for [vimcolorschemes](https://github.com/vimcolorschemes/vimcolorschemes).
+
+## Getting started
 
 ### Requirements:
 
