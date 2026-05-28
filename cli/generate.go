@@ -1,16 +1,20 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/vimcolorschemes/worker/internal/database"
 	file "github.com/vimcolorschemes/worker/internal/file"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
 )
+
+const previewGenerationTimeout = 30 * time.Second
 
 var tmpDirectoryPath string
 var packDirectoryPath string
@@ -212,16 +216,19 @@ func setupRuntime() {
 func captureDefaultColorschemes() {
 	log.Print("Capturing default colorschemes")
 
-	cmd := exec.Command("nvim", "-u", vimrcPath, "--headless",
+	ctx, cancel := context.WithTimeout(context.Background(), previewGenerationTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "nvim", "-u", vimrcPath, "--headless",
 		"-c", fmt.Sprintf("lua require('extractor').colorschemes({ output_path = '%s' })", defaultColorschemeFilePath),
 		"-c", "qa!")
 
-	log.Printf("Running %s", cmd)
+	log.Printf("Running %s (timeout: %s)", cmd, previewGenerationTimeout)
 	cmd.Stdout = os.Stdout
 
 	err := cmd.Run()
 	if err != nil {
-		log.Panic(err)
+		log.Panic(wrapCommandError(ctx, "capturing default colorschemes", err))
 	}
 
 	content, err := file.GetLocalFileContent(defaultColorschemeFilePath)
@@ -249,10 +256,16 @@ func installPlugin(gitRepositoryURL string, path string) error {
 
 	target := fmt.Sprintf("%s/%s", packDirectoryPath, path)
 
-	cmd := exec.Command("git", "clone", gitRepositoryURL, target)
+	ctx, cancel := context.WithTimeout(context.Background(), previewGenerationTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "git", "clone", gitRepositoryURL, target)
+
+	log.Printf("Running %s (timeout: %s)", cmd, previewGenerationTimeout)
+
 	err := cmd.Run()
 	if err != nil {
-		return err
+		return wrapCommandError(ctx, "installing "+path, err)
 	}
 
 	return nil
@@ -306,16 +319,19 @@ func executePreviewGenerator() error {
 
 	args = append(args, "./vim/code_sample.vim")
 
-	cmd := exec.Command("nvim", args...)
+	ctx, cancel := context.WithTimeout(context.Background(), previewGenerationTimeout)
+	defer cancel()
 
-	log.Printf("Running %s", cmd)
+	cmd := exec.CommandContext(ctx, "nvim", args...)
+
+	log.Printf("Running %s (timeout: %s)", cmd, previewGenerationTimeout)
 
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 
 	err := cmd.Run()
 	if err != nil {
-		return err
+		return wrapCommandError(ctx, "preview generation", err)
 	}
 
 	return nil
@@ -337,6 +353,14 @@ func getGenerateData(repository repoHelper.Repository) database.GenerateData {
 	return database.GenerateData{
 		Colorschemes: repository.Colorschemes,
 	}
+}
+
+// wrapCommandError returns an error message that distinguishes timeout from other failures.
+func wrapCommandError(ctx context.Context, action string, err error) error {
+	if ctx.Err() == context.DeadlineExceeded {
+		return fmt.Errorf("%s timed out after %s", action, previewGenerationTimeout)
+	}
+	return fmt.Errorf("%s failed: %w", action, err)
 }
 
 func isDefaultColorscheme(name string) bool {
