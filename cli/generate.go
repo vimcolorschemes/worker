@@ -228,7 +228,7 @@ func captureDefaultColorschemes() {
 
 	err := cmd.Run()
 	if err != nil {
-		log.Panic(fmt.Errorf("capturing default colorschemes %s failed: %w", formatTimeoutError(ctx, err), err))
+		log.Panic(wrapCommandError(ctx, "capturing default colorschemes", err))
 	}
 
 	content, err := file.GetLocalFileContent(defaultColorschemeFilePath)
@@ -265,7 +265,7 @@ func installPlugin(gitRepositoryURL string, path string) error {
 
 	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("installing %s %s failed: %w", path, formatTimeoutError(ctx, err), err)
+		return wrapCommandError(ctx, "installing "+path, err)
 	}
 
 	return nil
@@ -331,7 +331,7 @@ func executePreviewGenerator() error {
 
 	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("preview generation %s failed: %w", formatTimeoutError(ctx, err), err)
+		return wrapCommandError(ctx, "preview generation", err)
 	}
 
 	return nil
@@ -355,12 +355,12 @@ func getGenerateData(repository repoHelper.Repository) database.GenerateData {
 	}
 }
 
-// formatTimeoutError returns an informative suffix for timeout vs other errors.
-func formatTimeoutError(ctx context.Context, err error) string {
+// wrapCommandError returns an error message that distinguishes timeout from other failures.
+func wrapCommandError(ctx context.Context, action string, err error) error {
 	if ctx.Err() == context.DeadlineExceeded {
-		return fmt.Sprintf("timed out after %s", previewGenerationTimeout)
+		return fmt.Errorf("%s timed out after %s", action, previewGenerationTimeout)
 	}
-	return "non-timeout"
+	return fmt.Errorf("%s failed: %w", action, err)
 }
 
 func isDefaultColorscheme(name string) bool {
