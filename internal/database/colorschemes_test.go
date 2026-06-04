@@ -52,6 +52,41 @@ func TestLoadColorschemes(t *testing.T) {
 		}
 	})
 
+	t.Run("returns highlight attributes", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+		if _, err := db.Exec(`INSERT INTO colorschemes (id, repository_id, name) VALUES (1, 1, 'myscheme')`); err != nil {
+			t.Fatalf("insert colorscheme: %v", err)
+		}
+		if _, err := db.Exec(`
+			INSERT INTO colorscheme_groups (
+				colorscheme_id,
+				background,
+				name,
+				hex_code,
+				bold,
+				italic,
+				underline,
+				undercurl,
+				underdouble,
+				underdotted,
+				underdashed,
+				strikethrough,
+				reverse
+			) VALUES (1, 'dark', 'Comment', '#778899', 1, 1, 1, 1, 1, 1, 1, 1, 1)`); err != nil {
+			t.Fatalf("insert colorscheme_group: %v", err)
+		}
+
+		schemes, err := loadColorschemes(1)
+		if err != nil {
+			t.Fatalf("loadColorschemes: %v", err)
+		}
+		group := schemes[0].Data.Dark[0]
+		if !group.Bold || !group.Italic || !group.Underline || !group.Undercurl || !group.Underdouble || !group.Underdotted || !group.Underdashed || !group.Strikethrough || !group.Reverse {
+			t.Fatalf("highlight attributes were not all loaded: %+v", group)
+		}
+	})
+
 	t.Run("derives backgrounds from groups", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")

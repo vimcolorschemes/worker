@@ -183,8 +183,36 @@ func UpdateRepositoryFromGenerate(id int64, data GenerateData) {
 			{repository.DarkBackground, scheme.Data.Dark},
 		} {
 			for _, group := range bg.groups {
-				_, err = tx.Exec("INSERT INTO colorscheme_groups (colorscheme_id, background, name, hex_code) VALUES (?, ?, ?, ?)",
-					schemeID, bg.value, group.Name, group.HexCode)
+				_, err = tx.Exec(`
+					INSERT INTO colorscheme_groups (
+						colorscheme_id,
+						background,
+						name,
+						hex_code,
+						bold,
+						italic,
+						underline,
+						undercurl,
+						underdouble,
+						underdotted,
+						underdashed,
+						strikethrough,
+						reverse
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					schemeID,
+					bg.value,
+					group.Name,
+					group.HexCode,
+					group.Bold,
+					group.Italic,
+					group.Underline,
+					group.Undercurl,
+					group.Underdouble,
+					group.Underdotted,
+					group.Underdashed,
+					group.Strikethrough,
+					group.Reverse,
+				)
 				if err != nil {
 					log.Printf("Error inserting colorscheme group: %s", err)
 					panic(err)

@@ -200,6 +200,50 @@ func TestRepositoryDisabledMigrationRoundTrip(t *testing.T) {
 	}
 }
 
+func TestApplyMigrationsAddsColorschemeGroupHighlightAttributes(t *testing.T) {
+	databasePath := filepath.Join(t.TempDir(), "test.db")
+	db, err := sql.Open("libsql", "file:"+databasePath)
+	if err != nil {
+		t.Fatalf("sql.Open returned error: %v", err)
+	}
+	defer func() {
+		_ = db.Close()
+	}()
+
+	if err := applyMigrations(db); err != nil {
+		t.Fatalf("applyMigrations returned error: %v", err)
+	}
+
+	for _, columnName := range []string{
+		"bold",
+		"italic",
+		"underline",
+		"undercurl",
+		"underdouble",
+		"underdotted",
+		"underdashed",
+		"strikethrough",
+		"reverse",
+	} {
+		var name string
+		var notNull int
+		var defaultValue sql.NullString
+		err := db.QueryRow("SELECT name, \"notnull\", dflt_value FROM pragma_table_info('colorscheme_groups') WHERE name = ?", columnName).Scan(&name, &notNull, &defaultValue)
+		if err != nil {
+			t.Fatalf("query column info for %q: %v", columnName, err)
+		}
+		if name != columnName {
+			t.Fatalf("column name = %q, want %q", name, columnName)
+		}
+		if notNull != 1 {
+			t.Fatalf("%s notnull = %d, want 1", columnName, notNull)
+		}
+		if !defaultValue.Valid || defaultValue.String != "0" {
+			t.Fatalf("%s defaultValue = %q, want %q", columnName, defaultValue.String, "0")
+		}
+	}
+}
+
 func TestApplyMigrationsCreatesExpectedTriggers(t *testing.T) {
 	databasePath := filepath.Join(t.TempDir(), "test.db")
 	db, err := sql.Open("libsql", "file:"+databasePath)

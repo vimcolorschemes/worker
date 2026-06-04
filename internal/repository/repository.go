@@ -56,8 +56,17 @@ type ColorschemeData struct {
 
 // ColorschemeGroup represents a colorscheme group's data
 type ColorschemeGroup struct {
-	Name    string `json:"name"`
-	HexCode string `json:"hexCode"`
+	Name          string `json:"name"`
+	HexCode       string `json:"hexCode"`
+	Bold          bool   `json:"bold,omitempty"`
+	Italic        bool   `json:"italic,omitempty"`
+	Underline     bool   `json:"underline,omitempty"`
+	Undercurl     bool   `json:"undercurl,omitempty"`
+	Underdouble   bool   `json:"underdouble,omitempty"`
+	Underdotted   bool   `json:"underdotted,omitempty"`
+	Underdashed   bool   `json:"underdashed,omitempty"`
+	Strikethrough bool   `json:"strikethrough,omitempty"`
+	Reverse       bool   `json:"reverse,omitempty"`
 }
 
 // BackgroundValue sets up an enum containing possible background values

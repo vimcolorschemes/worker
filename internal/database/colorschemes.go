@@ -9,7 +9,21 @@ import (
 
 func loadColorschemes(repositoryID int64) ([]repository.Colorscheme, error) {
 	rows, err := db.Query(`
-		SELECT cs.id, cs.name, csg.background, csg.name, csg.hex_code
+		SELECT
+			cs.id,
+			cs.name,
+			csg.background,
+			csg.name,
+			csg.hex_code,
+			csg.bold,
+			csg.italic,
+			csg.underline,
+			csg.undercurl,
+			csg.underdouble,
+			csg.underdotted,
+			csg.underdashed,
+			csg.strikethrough,
+			csg.reverse
 		FROM colorschemes cs
 		LEFT JOIN colorscheme_groups csg ON csg.colorscheme_id = cs.id
 		WHERE cs.repository_id = ?
@@ -31,8 +45,24 @@ func loadColorschemes(repositoryID int64) ([]repository.Colorscheme, error) {
 		var schemeID int64
 		var schemeName string
 		var bg, groupName, hexCode sql.NullString
+		var bold, italic, underline, undercurl, underdouble, underdotted, underdashed, strikethrough, reverse sql.NullBool
 
-		if err := rows.Scan(&schemeID, &schemeName, &bg, &groupName, &hexCode); err != nil {
+		if err := rows.Scan(
+			&schemeID,
+			&schemeName,
+			&bg,
+			&groupName,
+			&hexCode,
+			&bold,
+			&italic,
+			&underline,
+			&undercurl,
+			&underdouble,
+			&underdotted,
+			&underdashed,
+			&strikethrough,
+			&reverse,
+		); err != nil {
 			return nil, err
 		}
 
@@ -44,7 +74,19 @@ func loadColorschemes(repositoryID int64) ([]repository.Colorscheme, error) {
 		}
 
 		if bg.Valid {
-			group := repository.ColorschemeGroup{Name: groupName.String, HexCode: hexCode.String}
+			group := repository.ColorschemeGroup{
+				Name:          groupName.String,
+				HexCode:       hexCode.String,
+				Bold:          bold.Bool,
+				Italic:        italic.Bool,
+				Underline:     underline.Bool,
+				Undercurl:     undercurl.Bool,
+				Underdouble:   underdouble.Bool,
+				Underdotted:   underdotted.Bool,
+				Underdashed:   underdashed.Bool,
+				Strikethrough: strikethrough.Bool,
+				Reverse:       reverse.Bool,
+			}
 			s := &schemes[entry.index]
 			switch repository.BackgroundValue(bg.String) {
 			case repository.LightBackground:

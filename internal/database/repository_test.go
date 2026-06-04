@@ -170,6 +170,24 @@ func TestRepositoriesSearchTriggers(t *testing.T) {
 			t.Fatalf("seed repositories row: %v", err)
 		}
 
+		if _, err := unmigratedDB.Exec(`CREATE TABLE colorschemes (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			repository_id INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+			name TEXT NOT NULL
+		)`); err != nil {
+			t.Fatalf("create colorschemes table: %v", err)
+		}
+
+		if _, err := unmigratedDB.Exec(`CREATE TABLE colorscheme_groups (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			colorscheme_id INTEGER NOT NULL REFERENCES colorschemes(id) ON DELETE CASCADE,
+			background TEXT NOT NULL,
+			name TEXT NOT NULL,
+			hex_code TEXT NOT NULL
+		)`); err != nil {
+			t.Fatalf("create colorscheme_groups table: %v", err)
+		}
+
 		if _, err := unmigratedDB.Exec(`CREATE TABLE goose_db_version (id INTEGER PRIMARY KEY AUTOINCREMENT, version_id bigint NOT NULL, is_applied boolean NOT NULL, tstamp timestamp DEFAULT (datetime('now')))`); err != nil {
 			t.Fatalf("create goose_db_version table: %v", err)
 		}
@@ -551,8 +569,23 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 				{
 					Name: "myscheme",
 					Data: repository.ColorschemeData{
-						Light: []repository.ColorschemeGroup{{Name: "Normal", HexCode: "#ffffff"}},
-						Dark:  []repository.ColorschemeGroup{{Name: "Normal", HexCode: "#000000"}},
+						Light: []repository.ColorschemeGroup{{
+							Name:      "Normal",
+							HexCode:   "#ffffff",
+							Bold:      true,
+							Italic:    true,
+							Underline: true,
+						}},
+						Dark: []repository.ColorschemeGroup{{
+							Name:          "Normal",
+							HexCode:       "#000000",
+							Undercurl:     true,
+							Underdouble:   true,
+							Underdotted:   true,
+							Underdashed:   true,
+							Strikethrough: true,
+							Reverse:       true,
+						}},
 					},
 				},
 			},
@@ -574,6 +607,14 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		}
 		if len(scheme.Data.Dark) != 1 {
 			t.Fatalf("Data.Dark len = %d, want 1", len(scheme.Data.Dark))
+		}
+		lightGroup := scheme.Data.Light[0]
+		if !lightGroup.Bold || !lightGroup.Italic || !lightGroup.Underline {
+			t.Fatalf("light highlight attributes were not saved: %+v", lightGroup)
+		}
+		darkGroup := scheme.Data.Dark[0]
+		if !darkGroup.Undercurl || !darkGroup.Underdouble || !darkGroup.Underdotted || !darkGroup.Underdashed || !darkGroup.Strikethrough || !darkGroup.Reverse {
+			t.Fatalf("dark highlight attributes were not saved: %+v", darkGroup)
 		}
 	})
 
