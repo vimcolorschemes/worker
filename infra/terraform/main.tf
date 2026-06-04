@@ -115,7 +115,7 @@ resource "aws_cloudwatch_event_rule" "generate" {
 resource "aws_cloudwatch_event_rule" "publish" {
   name                = "publish"
   description         = "Runs the vimcolorschemes publish job"
-  schedule_expression = "cron(30 14 * * ? *)"
+  schedule_expression = "cron(30 15 * * ? *)"
   state               = "ENABLED"
   tags                = local.tags
 }

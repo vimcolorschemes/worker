@@ -11,7 +11,7 @@ The worker runs in AWS as one-off ECS Fargate tasks triggered by EventBridge cro
 - `import`: `cron(0 13 * * ? *)`
 - `update`: `cron(30 13 * * ? *)`
 - `generate`: `cron(0 14 * * ? *)`
-- `publish`: `cron(30 14 * * ? *)`
+- `publish`: `cron(30 15 * * ? *)`
 
 All schedules are in UTC.
 
