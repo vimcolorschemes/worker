@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 )
+
+const transientLibSQLRetryAttempts = 3
 
 func isTransientLibSQLError(err error) bool {
 	errMsg := strings.ToLower(err.Error())
@@ -25,55 +28,113 @@ func isTransientLibSQLError(err error) bool {
 }
 
 func execWithTransientRetry(query string, args ...any) (sql.Result, error) {
-	result, err := db.Exec(query, args...)
-	if err == nil {
-		return result, nil
+	var lastErr error
+	for attempt := 0; attempt <= transientLibSQLRetryAttempts; attempt++ {
+		result, err := db.Exec(query, args...)
+		if err == nil {
+			return result, nil
+		}
+
+		if !isTransientLibSQLError(err) {
+			return nil, err
+		}
+
+		lastErr = err
+		if attempt == transientLibSQLRetryAttempts {
+			break
+		}
+
+		log.Printf("DB exec failed with transient libsql error, retrying: %s", err)
+		if pingErr := db.Ping(); pingErr != nil {
+			return nil, fmt.Errorf("ping before exec retry: %w", pingErr)
+		}
+		time.Sleep(transientLibSQLRetryBackoff(attempt))
 	}
 
-	if !isTransientLibSQLError(err) {
-		return nil, err
+	return nil, lastErr
+}
+
+func runWithTransientRetry(operation string, run func() error) error {
+	var lastErr error
+	for attempt := 0; attempt <= transientLibSQLRetryAttempts; attempt++ {
+		err := run()
+		if err == nil {
+			return nil
+		}
+
+		if !isTransientLibSQLError(err) {
+			return err
+		}
+
+		lastErr = err
+		if attempt == transientLibSQLRetryAttempts {
+			break
+		}
+
+		log.Printf("DB %s failed with transient libsql error, retrying: %s", operation, err)
+		if pingErr := db.Ping(); pingErr != nil {
+			return fmt.Errorf("ping before %s retry: %w", operation, pingErr)
+		}
+		time.Sleep(transientLibSQLRetryBackoff(attempt))
 	}
 
-	log.Printf("DB exec failed with transient libsql error, retrying once: %s", err)
-	if pingErr := db.Ping(); pingErr != nil {
-		return nil, fmt.Errorf("ping before exec retry: %w", pingErr)
-	}
-
-	return db.Exec(query, args...)
+	return lastErr
 }
 
 func queryWithTransientRetry(query string, args ...any) (*sql.Rows, error) {
-	rows, err := db.Query(query, args...)
-	if err == nil {
-		return rows, nil
+	var lastErr error
+	for attempt := 0; attempt <= transientLibSQLRetryAttempts; attempt++ {
+		rows, err := db.Query(query, args...)
+		if err == nil {
+			return rows, nil
+		}
+
+		if !isTransientLibSQLError(err) {
+			return nil, err
+		}
+
+		lastErr = err
+		if attempt == transientLibSQLRetryAttempts {
+			break
+		}
+
+		log.Printf("DB query failed with transient libsql error, retrying: %s", err)
+		if pingErr := db.Ping(); pingErr != nil {
+			return nil, fmt.Errorf("ping before query retry: %w", pingErr)
+		}
+		time.Sleep(transientLibSQLRetryBackoff(attempt))
 	}
 
-	if !isTransientLibSQLError(err) {
-		return nil, err
-	}
-
-	log.Printf("DB query failed with transient libsql error, retrying once: %s", err)
-	if pingErr := db.Ping(); pingErr != nil {
-		return nil, fmt.Errorf("ping before query retry: %w", pingErr)
-	}
-
-	return db.Query(query, args...)
+	return nil, lastErr
 }
 
 func beginWithTransientRetry() (*sql.Tx, error) {
-	tx, err := db.Begin()
-	if err == nil {
-		return tx, nil
+	var lastErr error
+	for attempt := 0; attempt <= transientLibSQLRetryAttempts; attempt++ {
+		tx, err := db.Begin()
+		if err == nil {
+			return tx, nil
+		}
+
+		if !isTransientLibSQLError(err) {
+			return nil, err
+		}
+
+		lastErr = err
+		if attempt == transientLibSQLRetryAttempts {
+			break
+		}
+
+		log.Printf("DB begin failed with transient libsql error, retrying: %s", err)
+		if pingErr := db.Ping(); pingErr != nil {
+			return nil, fmt.Errorf("ping before begin retry: %w", pingErr)
+		}
+		time.Sleep(transientLibSQLRetryBackoff(attempt))
 	}
 
-	if !isTransientLibSQLError(err) {
-		return nil, err
-	}
+	return nil, lastErr
+}
 
-	log.Printf("DB begin failed with transient libsql error, retrying once: %s", err)
-	if pingErr := db.Ping(); pingErr != nil {
-		return nil, fmt.Errorf("ping before begin retry: %w", pingErr)
-	}
-
-	return db.Begin()
+func transientLibSQLRetryBackoff(attempt int) time.Duration {
+	return time.Duration(attempt+1) * 250 * time.Millisecond
 }

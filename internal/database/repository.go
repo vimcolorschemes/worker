@@ -75,7 +75,7 @@ func GetRepository(repoKey string) (repository.Repository, error) {
 // colorschemes, colorscheme_groups, and repository_job_events are declared
 // ON DELETE CASCADE, so SQLite removes the related rows for us.
 func DeleteRepository(id int64) error {
-	_, err := db.Exec("DELETE FROM repositories WHERE id = ?", id)
+	_, err := execWithTransientRetry("DELETE FROM repositories WHERE id = ?", id)
 	return err
 }
 
@@ -86,13 +86,13 @@ func GetRepositoriesToGenerate() ([]repository.Repository, error) {
 
 // SetRepositoryDisabled updates the manual/system scheduler override flag.
 func SetRepositoryDisabled(id int64, disabled bool) error {
-	_, err := db.Exec("UPDATE repositories SET is_disabled = ? WHERE id = ?", disabled, id)
+	_, err := execWithTransientRetry("UPDATE repositories SET is_disabled = ? WHERE id = ?", disabled, id)
 	return err
 }
 
 // UpsertRepositoryFromImport inserts or updates a repository from import data.
 func UpsertRepositoryFromImport(data ImportData) {
-	_, err := db.Exec(`INSERT INTO repositories (id, owner_name, owner_avatar_url, name, description, github_url, github_created_at, pushed_at)
+	_, err := execWithTransientRetry(`INSERT INTO repositories (id, owner_name, owner_avatar_url, name, description, github_url, github_created_at, pushed_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			owner_name = excluded.owner_name,
@@ -121,7 +121,7 @@ func UpdateRepositoryFromUpdate(id int64, data UpdateData) {
 		panic(err)
 	}
 
-	_, err = db.Exec(`UPDATE repositories SET pushed_at = ?, stargazers_count = ?, stargazers_count_history = ?, week_stargazers_count = ?, is_eligible = ?, is_disabled = ?, updated_at = ? WHERE id = ?`,
+	_, err = execWithTransientRetry(`UPDATE repositories SET pushed_at = ?, stargazers_count = ?, stargazers_count_history = ?, week_stargazers_count = ?, is_eligible = ?, is_disabled = ?, updated_at = ? WHERE id = ?`,
 		data.PushedAt, data.StargazersCount, string(historyJSON), data.WeekStargazersCount, data.IsEligible, data.IsDisabled, data.UpdatedAt, id)
 	if err != nil {
 		log.Printf("Error updating repository: %s", err)
@@ -242,6 +242,16 @@ func CreateRepositoryGenerateErrorEvent(repositoryID int64, errorMessage string)
 }
 
 func createRepositoryJobEvent(exec repositoryJobEventExecutor, repositoryID int64, job string, status string, errorMessage string, createdAt time.Time) error {
+	if execDB, ok := exec.(*sql.DB); ok && execDB == db {
+		return runWithTransientRetry("repository job event", func() error {
+			return createRepositoryJobEventOnce(execDB, repositoryID, job, status, errorMessage, createdAt)
+		})
+	}
+
+	return createRepositoryJobEventOnce(exec, repositoryID, job, status, errorMessage, createdAt)
+}
+
+func createRepositoryJobEventOnce(exec repositoryJobEventExecutor, repositoryID int64, job string, status string, errorMessage string, createdAt time.Time) error {
 	trimmedErrorMessage := errorMessage
 	if len(trimmedErrorMessage) > maxJobEventErrorMessageLength {
 		trimmedErrorMessage = trimmedErrorMessage[:maxJobEventErrorMessageLength]
