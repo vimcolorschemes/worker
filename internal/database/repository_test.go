@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -129,6 +130,76 @@ func TestUpsertRepositoryFromImport(t *testing.T) {
 		newMatches := countSearchMatches(t, "night")
 		if newMatches != 1 {
 			t.Fatalf("newMatches = %d, want 1", newMatches)
+		}
+	})
+
+	t.Run("bulk upserts repositories and preserves import event history", func(t *testing.T) {
+		setupTestDB(t)
+		now := time.Now().UTC().Truncate(time.Second)
+		UpsertRepositoriesFromImport([]ImportData{
+			{ID: 1, OwnerName: "owner1", Name: "repo1", Description: "old", PushedAt: now},
+			{ID: 2, OwnerName: "owner2", Name: "repo2", PushedAt: now},
+		})
+		UpsertRepositoriesFromImport([]ImportData{
+			{ID: 1, OwnerName: "owner1", Name: "renamed", Description: "new", PushedAt: now},
+			{ID: 2, OwnerName: "owner2", Name: "repo2", PushedAt: now},
+		})
+
+		var name, description string
+		err := db.QueryRow(`SELECT name, description FROM repositories WHERE id = 1`).Scan(&name, &description)
+		if err != nil {
+			t.Fatalf("query repository: %v", err)
+		}
+		if name != "renamed" {
+			t.Fatalf("name = %q, want %q", name, "renamed")
+		}
+		if description != "new" {
+			t.Fatalf("description = %q, want %q", description, "new")
+		}
+
+		var eventCount int
+		err = db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE job = 'import' AND status = 'success'`).Scan(&eventCount)
+		if err != nil {
+			t.Fatalf("query event count: %v", err)
+		}
+		if eventCount != 4 {
+			t.Fatalf("eventCount = %d, want 4", eventCount)
+		}
+	})
+
+	t.Run("bulk upserts more than one batch", func(t *testing.T) {
+		setupTestDB(t)
+		now := time.Now().UTC().Truncate(time.Second)
+		count := repositoryWriteBatchSize + 1
+		data := make([]ImportData, 0, count)
+		for index := 0; index < count; index++ {
+			id := int64(index + 1)
+			data = append(data, ImportData{
+				ID:        id,
+				OwnerName: "owner",
+				Name:      fmt.Sprintf("repo%d", id),
+				PushedAt:  now,
+			})
+		}
+
+		UpsertRepositoriesFromImport(data)
+
+		var repositoryCount int
+		err := db.QueryRow(`SELECT COUNT(*) FROM repositories`).Scan(&repositoryCount)
+		if err != nil {
+			t.Fatalf("query repository count: %v", err)
+		}
+		if repositoryCount != count {
+			t.Fatalf("repositoryCount = %d, want %d", repositoryCount, count)
+		}
+
+		var eventCount int
+		err = db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE job = 'import' AND status = 'success'`).Scan(&eventCount)
+		if err != nil {
+			t.Fatalf("query event count: %v", err)
+		}
+		if eventCount != count {
+			t.Fatalf("eventCount = %d, want %d", eventCount, count)
 		}
 	})
 }
@@ -557,6 +628,80 @@ func TestUpdateRepositoryFromUpdate(t *testing.T) {
 			t.Fatalf("eventCount = %d, want 1", eventCount)
 		}
 	})
+
+	t.Run("bulk updates repositories and preserves update event history", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo1")
+		insertTestRepo(t, 2, "owner", "repo2")
+
+		UpdateRepositoriesFromUpdate([]RepositoryUpdateData{
+			{ID: 1, Data: UpdateData{StargazersCount: 10, WeekStargazersCount: 1, IsEligible: true}},
+			{ID: 2, Data: UpdateData{StargazersCount: 20, WeekStargazersCount: 2, IsDisabled: true}},
+		})
+		UpdateRepositoriesFromUpdate([]RepositoryUpdateData{
+			{ID: 1, Data: UpdateData{StargazersCount: 30, WeekStargazersCount: 3}},
+			{ID: 2, Data: UpdateData{StargazersCount: 40, WeekStargazersCount: 4}},
+		})
+
+		var stars1, week1, stars2, week2 int
+		err := db.QueryRow(`SELECT stargazers_count, week_stargazers_count FROM repositories WHERE id = 1`).Scan(&stars1, &week1)
+		if err != nil {
+			t.Fatalf("query repo1: %v", err)
+		}
+		err = db.QueryRow(`SELECT stargazers_count, week_stargazers_count FROM repositories WHERE id = 2`).Scan(&stars2, &week2)
+		if err != nil {
+			t.Fatalf("query repo2: %v", err)
+		}
+		if stars1 != 30 || week1 != 3 {
+			t.Fatalf("repo1 counts = %d/%d, want 30/3", stars1, week1)
+		}
+		if stars2 != 40 || week2 != 4 {
+			t.Fatalf("repo2 counts = %d/%d, want 40/4", stars2, week2)
+		}
+
+		var eventCount int
+		err = db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE job = 'update' AND status = 'success'`).Scan(&eventCount)
+		if err != nil {
+			t.Fatalf("query event count: %v", err)
+		}
+		if eventCount != 4 {
+			t.Fatalf("eventCount = %d, want 4", eventCount)
+		}
+	})
+
+	t.Run("bulk updates more than one batch", func(t *testing.T) {
+		setupTestDB(t)
+		count := repositoryWriteBatchSize + 1
+		updates := make([]RepositoryUpdateData, 0, count)
+		for index := 0; index < count; index++ {
+			id := int64(index + 1)
+			insertTestRepo(t, id, "owner", fmt.Sprintf("repo%d", id))
+			updates = append(updates, RepositoryUpdateData{
+				ID:   id,
+				Data: UpdateData{StargazersCount: index + 1},
+			})
+		}
+
+		UpdateRepositoriesFromUpdate(updates)
+
+		var updatedCount int
+		err := db.QueryRow(`SELECT COUNT(*) FROM repositories WHERE stargazers_count > 0`).Scan(&updatedCount)
+		if err != nil {
+			t.Fatalf("query updated repository count: %v", err)
+		}
+		if updatedCount != count {
+			t.Fatalf("updatedCount = %d, want %d", updatedCount, count)
+		}
+
+		var eventCount int
+		err = db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE job = 'update' AND status = 'success'`).Scan(&eventCount)
+		if err != nil {
+			t.Fatalf("query event count: %v", err)
+		}
+		if eventCount != count {
+			t.Fatalf("eventCount = %d, want %d", eventCount, count)
+		}
+	})
 }
 
 func TestUpdateRepositoryFromGenerate(t *testing.T) {
@@ -657,7 +802,7 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		}
 	})
 
-	t.Run("keeps only latest success event per repo and job", func(t *testing.T) {
+	t.Run("preserves generate success event history", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
 
@@ -669,8 +814,8 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query row: %v", err)
 		}
-		if eventCount != 1 {
-			t.Fatalf("eventCount = %d, want 1", eventCount)
+		if eventCount != 2 {
+			t.Fatalf("eventCount = %d, want 2", eventCount)
 		}
 	})
 
@@ -697,7 +842,7 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		}
 	})
 
-	t.Run("keeps only latest event per status", func(t *testing.T) {
+	t.Run("preserves generate event history per status", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
 
@@ -715,8 +860,8 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query row: %v", err)
 		}
-		if errorCount != 1 {
-			t.Fatalf("errorCount = %d, want 1", errorCount)
+		if errorCount != 2 {
+			t.Fatalf("errorCount = %d, want 2", errorCount)
 		}
 
 		var successCount int
@@ -724,8 +869,8 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query row: %v", err)
 		}
-		if successCount != 1 {
-			t.Fatalf("successCount = %d, want 1", successCount)
+		if successCount != 2 {
+			t.Fatalf("successCount = %d, want 2", successCount)
 		}
 	})
 }

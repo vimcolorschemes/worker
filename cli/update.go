@@ -14,6 +14,9 @@ import (
 var getGithubRepository = github.GetRepository
 var isGithub404 = github.Is404
 
+// Flush updates periodically so long runs keep making durable progress.
+const repositoryUpdateFlushSize = 100
+
 // Update the imported repositories with all kinds of useful information
 func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	var repositories []repoHelper.Repository
@@ -35,6 +38,7 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	repositoryErrorCount := 0
 	repositoryDeletedNames := []string{}
 	repositoryDisabledCount := 0
+	pendingUpdates := []database.RepositoryUpdateData{}
 
 	for index, repository := range repositories {
 		fmt.Println()
@@ -55,8 +59,14 @@ func Update(_force bool, _debug bool, repoKey string) map[string]interface{} {
 
 		data := getUpdateData(updatedRepository)
 
-		database.UpdateRepositoryFromUpdate(repository.ID, data)
+		pendingUpdates = append(pendingUpdates, database.RepositoryUpdateData{ID: repository.ID, Data: data})
+		if len(pendingUpdates) >= repositoryUpdateFlushSize {
+			database.UpdateRepositoriesFromUpdate(pendingUpdates)
+			pendingUpdates = pendingUpdates[:0]
+		}
 	}
+
+	database.UpdateRepositoriesFromUpdate(pendingUpdates)
 
 	return map[string]interface{}{
 		"repositoryCount":         len(repositories),

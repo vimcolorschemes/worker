@@ -48,7 +48,14 @@ const (
 	jobStatusError   = "error"
 
 	maxJobEventErrorMessageLength = 2048
+	repositoryWriteBatchSize      = 100
 )
+
+// RepositoryUpdateData pairs a repository id with the fields set during update.
+type RepositoryUpdateData struct {
+	ID   int64
+	Data UpdateData
+}
 
 // GetRepositories gets all repositories stored in the database.
 func GetRepositories() ([]repository.Repository, error) {
@@ -92,46 +99,193 @@ func SetRepositoryDisabled(id int64, disabled bool) error {
 
 // UpsertRepositoryFromImport inserts or updates a repository from import data.
 func UpsertRepositoryFromImport(data ImportData) {
-	_, err := execWithTransientRetry(`INSERT INTO repositories (id, owner_name, owner_avatar_url, name, description, github_url, github_created_at, pushed_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET
-			owner_name = excluded.owner_name,
-			owner_avatar_url = excluded.owner_avatar_url,
-			name = excluded.name,
-			description = excluded.description,
-			github_url = excluded.github_url,
-			github_created_at = excluded.github_created_at,
-			pushed_at = excluded.pushed_at`,
-		data.ID, data.OwnerName, data.OwnerAvatarURL, data.Name, data.Description, data.GithubURL, data.GithubCreatedAt, data.PushedAt)
-	if err != nil {
-		log.Printf("Error upserting repository: %s", err)
-		panic(err)
-	}
+	UpsertRepositoriesFromImport([]ImportData{data})
+}
 
-	if err := createRepositoryJobEvent(db, data.ID, jobImport, jobStatusSuccess, "", time.Now().UTC()); err != nil {
-		log.Printf("Error creating repository job event: %s", err)
-		panic(err)
+// UpsertRepositoriesFromImport inserts or updates repositories from import data in batches.
+func UpsertRepositoriesFromImport(data []ImportData) {
+	for start := 0; start < len(data); start += repositoryWriteBatchSize {
+		end := min(start+repositoryWriteBatchSize, len(data))
+		if err := upsertRepositoriesFromImportBatch(data[start:end]); err != nil {
+			log.Printf("Error upserting repositories: %s", err)
+			panic(err)
+		}
 	}
 }
 
 // UpdateRepositoryFromUpdate updates a repository with update job data.
 func UpdateRepositoryFromUpdate(id int64, data UpdateData) {
-	historyJSON, err := json.Marshal(data.StargazersCountHistory)
-	if err != nil {
-		panic(err)
+	UpdateRepositoriesFromUpdate([]RepositoryUpdateData{{ID: id, Data: data}})
+}
+
+// UpdateRepositoriesFromUpdate updates repositories with update job data in batches.
+func UpdateRepositoriesFromUpdate(updates []RepositoryUpdateData) {
+	for start := 0; start < len(updates); start += repositoryWriteBatchSize {
+		end := min(start+repositoryWriteBatchSize, len(updates))
+		if err := updateRepositoriesFromUpdateBatch(updates[start:end]); err != nil {
+			log.Printf("Error updating repositories: %s", err)
+			panic(err)
+		}
+	}
+}
+
+func upsertRepositoriesFromImportBatch(data []ImportData) error {
+	if len(data) == 0 {
+		return nil
 	}
 
-	_, err = execWithTransientRetry(`UPDATE repositories SET pushed_at = ?, stargazers_count = ?, stargazers_count_history = ?, week_stargazers_count = ?, is_eligible = ?, is_disabled = ?, updated_at = ? WHERE id = ?`,
-		data.PushedAt, data.StargazersCount, string(historyJSON), data.WeekStargazersCount, data.IsEligible, data.IsDisabled, data.UpdatedAt, id)
-	if err != nil {
-		log.Printf("Error updating repository: %s", err)
-		panic(err)
+	return runWithTransientRetry("import repository batch", func() error {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = tx.Rollback()
+		}()
+
+		values := buildImportRepositoryBatchValues(data)
+
+		_, err = tx.Exec(`INSERT INTO repositories (id, owner_name, owner_avatar_url, name, description, github_url, github_created_at, pushed_at)
+			VALUES `+values.rowPlaceholders+`
+			ON CONFLICT(id) DO UPDATE SET
+				owner_name = excluded.owner_name,
+				owner_avatar_url = excluded.owner_avatar_url,
+				name = excluded.name,
+				description = excluded.description,
+				github_url = excluded.github_url,
+				github_created_at = excluded.github_created_at,
+				pushed_at = excluded.pushed_at`,
+			values.args...)
+		if err != nil {
+			return err
+		}
+
+		if err := createRepositoryJobEvents(tx, values.repositoryIDs, jobImport, jobStatusSuccess, "", time.Now().UTC()); err != nil {
+			return err
+		}
+
+		return tx.Commit()
+	})
+}
+
+func updateRepositoriesFromUpdateBatch(updates []RepositoryUpdateData) error {
+	if len(updates) == 0 {
+		return nil
 	}
 
-	if err := createRepositoryJobEvent(db, id, jobUpdate, jobStatusSuccess, "", time.Now().UTC()); err != nil {
-		log.Printf("Error creating repository job event: %s", err)
-		panic(err)
+	return runWithTransientRetry("update repository batch", func() error {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = tx.Rollback()
+		}()
+
+		values, err := buildUpdateRepositoryBatchValues(updates)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Exec(`WITH updates(id, pushed_at, stargazers_count, stargazers_count_history, week_stargazers_count, is_eligible, is_disabled, updated_at) AS (
+				VALUES `+values.rowPlaceholders+`
+			)
+			UPDATE repositories SET
+				pushed_at = (SELECT pushed_at FROM updates WHERE updates.id = repositories.id),
+				stargazers_count = (SELECT stargazers_count FROM updates WHERE updates.id = repositories.id),
+				stargazers_count_history = (SELECT stargazers_count_history FROM updates WHERE updates.id = repositories.id),
+				week_stargazers_count = (SELECT week_stargazers_count FROM updates WHERE updates.id = repositories.id),
+				is_eligible = (SELECT is_eligible FROM updates WHERE updates.id = repositories.id),
+				is_disabled = (SELECT is_disabled FROM updates WHERE updates.id = repositories.id),
+				updated_at = (SELECT updated_at FROM updates WHERE updates.id = repositories.id)
+			WHERE id IN (SELECT id FROM updates)`,
+			values.args...)
+		if err != nil {
+			return err
+		}
+
+		if err := createRepositoryJobEvents(tx, values.repositoryIDs, jobUpdate, jobStatusSuccess, "", time.Now().UTC()); err != nil {
+			return err
+		}
+
+		return tx.Commit()
+	})
+}
+
+type repositoryBatchValues struct {
+	rowPlaceholders string
+	args            []any
+	repositoryIDs   []int64
+}
+
+func buildImportRepositoryBatchValues(data []ImportData) repositoryBatchValues {
+	values := repositoryBatchValues{
+		rowPlaceholders: rowPlaceholders(len(data), 8),
+		args:            make([]any, 0, len(data)*8),
+		repositoryIDs:   make([]int64, 0, len(data)),
 	}
+
+	for _, item := range data {
+		values.args = append(values.args,
+			item.ID,
+			item.OwnerName,
+			item.OwnerAvatarURL,
+			item.Name,
+			item.Description,
+			item.GithubURL,
+			item.GithubCreatedAt,
+			item.PushedAt,
+		)
+		values.repositoryIDs = append(values.repositoryIDs, item.ID)
+	}
+
+	return values
+}
+
+func buildUpdateRepositoryBatchValues(updates []RepositoryUpdateData) (repositoryBatchValues, error) {
+	values := repositoryBatchValues{
+		rowPlaceholders: rowPlaceholders(len(updates), 8),
+		args:            make([]any, 0, len(updates)*8),
+		repositoryIDs:   make([]int64, 0, len(updates)),
+	}
+
+	for _, update := range updates {
+		historyJSON, err := json.Marshal(update.Data.StargazersCountHistory)
+		if err != nil {
+			return repositoryBatchValues{}, err
+		}
+
+		values.args = append(values.args,
+			update.ID,
+			update.Data.PushedAt,
+			update.Data.StargazersCount,
+			string(historyJSON),
+			update.Data.WeekStargazersCount,
+			update.Data.IsEligible,
+			update.Data.IsDisabled,
+			update.Data.UpdatedAt,
+		)
+		values.repositoryIDs = append(values.repositoryIDs, update.ID)
+	}
+
+	return values, nil
+}
+
+func rowPlaceholders(rowCount int, columnCount int) string {
+	row := "(" + placeholders(columnCount) + ")"
+	rows := make([]string, rowCount)
+	for index := range rows {
+		rows[index] = row
+	}
+	return strings.Join(rows, ", ")
+}
+
+func placeholders(count int) string {
+	items := make([]string, count)
+	for index := range items {
+		items[index] = "?"
+	}
+	return strings.Join(items, ", ")
 }
 
 // UpdateRepositoryFromGenerate updates a repository with generate job data.
@@ -251,6 +405,59 @@ func createRepositoryJobEvent(exec repositoryJobEventExecutor, repositoryID int6
 	return createRepositoryJobEventOnce(exec, repositoryID, job, status, errorMessage, createdAt)
 }
 
+func createRepositoryJobEvents(exec repositoryJobEventExecutor, repositoryIDs []int64, job string, status string, errorMessage string, createdAt time.Time) error {
+	if execDB, ok := exec.(*sql.DB); ok && execDB == db {
+		return runWithTransientRetry("repository job events", func() error {
+			return createRepositoryJobEventsOnce(execDB, repositoryIDs, job, status, errorMessage, createdAt)
+		})
+	}
+
+	return createRepositoryJobEventsOnce(exec, repositoryIDs, job, status, errorMessage, createdAt)
+}
+
+func createRepositoryJobEventsOnce(exec repositoryJobEventExecutor, repositoryIDs []int64, job string, status string, errorMessage string, createdAt time.Time) error {
+	if len(repositoryIDs) == 0 {
+		return nil
+	}
+
+	if len(repositoryIDs) == 1 {
+		return createRepositoryJobEventOnce(exec, repositoryIDs[0], job, status, errorMessage, createdAt)
+	}
+
+	trimmedErrorMessage := errorMessage
+	if len(trimmedErrorMessage) > maxJobEventErrorMessageLength {
+		trimmedErrorMessage = trimmedErrorMessage[:maxJobEventErrorMessageLength]
+	}
+
+	idArgs := make([]any, 0, len(repositoryIDs))
+	for _, repositoryID := range repositoryIDs {
+		idArgs = append(idArgs, repositoryID)
+	}
+	idPlaceholders := placeholders(len(repositoryIDs))
+
+	if job == jobGenerate {
+		args := append([]any{createdAt}, idArgs...)
+		_, err := exec.Exec(
+			"UPDATE repositories SET last_generate_event_at = ? WHERE id IN ("+idPlaceholders+")",
+			args...,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	insertArgs := make([]any, 0, len(repositoryIDs)*5)
+	for _, repositoryID := range repositoryIDs {
+		insertArgs = append(insertArgs, repositoryID, job, status, trimmedErrorMessage, createdAt)
+	}
+
+	_, err := exec.Exec(
+		"INSERT INTO repository_job_events (repository_id, job, status, error_message, created_at) VALUES "+rowPlaceholders(len(repositoryIDs), 5),
+		insertArgs...,
+	)
+	return err
+}
+
 func createRepositoryJobEventOnce(exec repositoryJobEventExecutor, repositoryID int64, job string, status string, errorMessage string, createdAt time.Time) error {
 	trimmedErrorMessage := errorMessage
 	if len(trimmedErrorMessage) > maxJobEventErrorMessageLength {
@@ -269,16 +476,6 @@ func createRepositoryJobEventOnce(exec repositoryJobEventExecutor, repositoryID 
 	}
 
 	_, err := exec.Exec(
-		"DELETE FROM repository_job_events WHERE repository_id = ? AND job = ? AND status = ?",
-		repositoryID,
-		job,
-		status,
-	)
-	if err != nil {
-		return err
-	}
-
-	_, err = exec.Exec(
 		"INSERT INTO repository_job_events (repository_id, job, status, error_message, created_at) VALUES (?, ?, ?, ?, ?)",
 		repositoryID,
 		job,

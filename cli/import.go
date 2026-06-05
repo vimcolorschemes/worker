@@ -58,11 +58,12 @@ func Import(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	}
 
 	log.Print("Upserting ", len(repositories), " repositories")
+	data := make([]database.ImportData, 0, len(repositories))
 	for _, repository := range repositories {
 		log.Print("Upserting ", *repository.Name)
-		data := getImportData(repository)
-		database.UpsertRepositoryFromImport(data)
+		data = append(data, getImportData(repository))
 	}
+	database.UpsertRepositoriesFromImport(data)
 
 	return map[string]interface{}{"repositoryCount": len(repositories)}
 }
