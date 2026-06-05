@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-const transientLibSQLRetryAttempts = 3
+const transientLibSQLRetryAttempts = 8
 
 func isTransientLibSQLError(err error) bool {
 	errMsg := strings.ToLower(err.Error())
@@ -18,6 +18,8 @@ func isTransientLibSQLError(err error) bool {
 		"stream not found: generation mismatch",
 		"generation mismatch",
 		"stream not found",
+		"sqlite_busy",
+		"database is locked",
 	} {
 		if strings.Contains(errMsg, marker) {
 			return true
@@ -136,5 +138,9 @@ func beginWithTransientRetry() (*sql.Tx, error) {
 }
 
 func transientLibSQLRetryBackoff(attempt int) time.Duration {
-	return time.Duration(attempt+1) * 250 * time.Millisecond
+	backoff := time.Duration(attempt+1) * 2 * time.Second
+	if backoff > 15*time.Second {
+		return 15 * time.Second
+	}
+	return backoff
 }

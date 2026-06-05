@@ -19,6 +19,11 @@ func TestIsTransientLibSQLError(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "sqlite busy is transient",
+			err:  testError(`Error { message: "SQLite error: database is locked", code: "SQLITE_BUSY" }`),
+			want: true,
+		},
+		{
 			name: "constraint failure is not transient",
 			err:  testError("UNIQUE constraint failed"),
 			want: false,

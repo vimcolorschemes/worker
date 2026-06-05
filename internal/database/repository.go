@@ -48,7 +48,7 @@ const (
 	jobStatusError   = "error"
 
 	maxJobEventErrorMessageLength = 2048
-	repositoryWriteBatchSize      = 100
+	repositoryWriteBatchSize      = 25
 )
 
 // RepositoryUpdateData pairs a repository id with the fields set during update.
