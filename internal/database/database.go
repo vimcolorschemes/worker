@@ -46,6 +46,10 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	if strings.HasPrefix(databaseURL, "libsql://") {
+		db.SetMaxOpenConns(1)
+		db.SetMaxIdleConns(1)
+	}
 
 	err = db.Ping()
 	if err != nil {

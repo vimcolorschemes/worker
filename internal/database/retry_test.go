@@ -1,6 +1,10 @@
 package database
 
-import "testing"
+import (
+	"context"
+	"fmt"
+	"testing"
+)
 
 func TestIsTransientLibSQLError(t *testing.T) {
 	tests := []struct {
@@ -21,6 +25,16 @@ func TestIsTransientLibSQLError(t *testing.T) {
 		{
 			name: "sqlite busy is transient",
 			err:  testError(`Error { message: "SQLite error: database is locked", code: "SQLITE_BUSY" }`),
+			want: true,
+		},
+		{
+			name: "operation timeout is transient",
+			err:  fmt.Errorf("exec timed out: %w", context.DeadlineExceeded),
+			want: true,
+		},
+		{
+			name: "hrana unexpected multiple responses is transient",
+			err:  testError("error code = 2: Error executing statement: Hrana: `unexpected response: `Unexpected multiple responses from server"),
 			want: true,
 		},
 		{

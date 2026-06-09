@@ -57,10 +57,10 @@ func Import(_force bool, _debug bool, repoKey string) map[string]interface{} {
 		repositories = github.SearchRepositories(queries, repositoryCountLimit, repositoryCountLimitPerPage)
 	}
 
-	log.Print("Upserting ", len(repositories), " repositories")
+	log.Print("Preparing import data for ", len(repositories), " repositories")
 	data := make([]database.ImportData, 0, len(repositories))
 	for _, repository := range repositories {
-		log.Print("Upserting ", *repository.Name)
+		log.Print("Preparing ", *repository.Name)
 		data = append(data, getImportData(repository))
 	}
 	database.UpsertRepositoriesFromImport(data)

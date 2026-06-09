@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -95,6 +96,54 @@ func TestUpsertRepositoryFromImport(t *testing.T) {
 		}
 	})
 
+	t.Run("skips unchanged repository update on conflict", func(t *testing.T) {
+		setupTestDB(t)
+		now := time.Now().UTC().Truncate(time.Second)
+		_, err := db.Exec(`CREATE TABLE repository_update_audit (repository_id INTEGER NOT NULL)`)
+		if err != nil {
+			t.Fatalf("create audit table: %v", err)
+		}
+		_, err = db.Exec(`CREATE TRIGGER repository_update_audit_trigger AFTER UPDATE ON repositories BEGIN
+			INSERT INTO repository_update_audit(repository_id) VALUES (new.id);
+		END`)
+		if err != nil {
+			t.Fatalf("create audit trigger: %v", err)
+		}
+
+		data := ImportData{
+			ID:              1,
+			OwnerName:       "owner",
+			OwnerAvatarURL:  "https://avatar",
+			Name:            "repo",
+			Description:     "old",
+			GithubURL:       "https://github.com/owner/repo",
+			GithubCreatedAt: now,
+			PushedAt:        now,
+		}
+		UpsertRepositoryFromImport(data)
+		UpsertRepositoryFromImport(data)
+
+		var updateCount int
+		err = db.QueryRow(`SELECT COUNT(*) FROM repository_update_audit`).Scan(&updateCount)
+		if err != nil {
+			t.Fatalf("query audit count: %v", err)
+		}
+		if updateCount != 0 {
+			t.Fatalf("updateCount = %d, want 0", updateCount)
+		}
+
+		data.Description = "new"
+		UpsertRepositoryFromImport(data)
+
+		err = db.QueryRow(`SELECT COUNT(*) FROM repository_update_audit`).Scan(&updateCount)
+		if err != nil {
+			t.Fatalf("query audit count after change: %v", err)
+		}
+		if updateCount != 1 {
+			t.Fatalf("updateCount after change = %d, want 1", updateCount)
+		}
+	})
+
 	t.Run("creates an import job event", func(t *testing.T) {
 		setupTestDB(t)
 		now := time.Now().UTC().Truncate(time.Second)
@@ -133,7 +182,7 @@ func TestUpsertRepositoryFromImport(t *testing.T) {
 		}
 	})
 
-	t.Run("bulk upserts repositories and preserves import event history", func(t *testing.T) {
+	t.Run("upserts repositories and preserves import event history", func(t *testing.T) {
 		setupTestDB(t)
 		now := time.Now().UTC().Truncate(time.Second)
 		UpsertRepositoriesFromImport([]ImportData{
@@ -167,7 +216,7 @@ func TestUpsertRepositoryFromImport(t *testing.T) {
 		}
 	})
 
-	t.Run("bulk upserts more than one batch", func(t *testing.T) {
+	t.Run("upserts multiple repositories", func(t *testing.T) {
 		setupTestDB(t)
 		now := time.Now().UTC().Truncate(time.Second)
 		count := repositoryWriteBatchSize + 1
@@ -364,6 +413,40 @@ func TestGetRepositories(t *testing.T) {
 		}
 		if repos[0].ID != 1 {
 			t.Fatalf("ID = %d, want 1", repos[0].ID)
+		}
+	})
+}
+
+func TestCreateRepositoryJobEventsContext(t *testing.T) {
+	t.Run("does not duplicate events for the same logical retry", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+		createdAt := time.Now().UTC().Truncate(time.Second)
+
+		for attempt := 0; attempt < 2; attempt++ {
+			ctx := context.Background()
+			tx, err := db.BeginTx(ctx, nil)
+			if err != nil {
+				t.Fatalf("begin tx attempt %d: %v", attempt, err)
+			}
+
+			err = createRepositoryJobEventsContext(ctx, tx, []int64{1, 1}, jobImport, jobStatusSuccess, "", createdAt)
+			if err != nil {
+				_ = tx.Rollback()
+				t.Fatalf("create events attempt %d: %v", attempt, err)
+			}
+			if err := tx.Commit(); err != nil {
+				t.Fatalf("commit attempt %d: %v", attempt, err)
+			}
+		}
+
+		var eventCount int
+		err := db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE repository_id = 1 AND job = 'import'`).Scan(&eventCount)
+		if err != nil {
+			t.Fatalf("query event count: %v", err)
+		}
+		if eventCount != 1 {
+			t.Fatalf("eventCount = %d, want 1", eventCount)
 		}
 	})
 }
@@ -629,7 +712,7 @@ func TestUpdateRepositoryFromUpdate(t *testing.T) {
 		}
 	})
 
-	t.Run("bulk updates repositories and preserves update event history", func(t *testing.T) {
+	t.Run("updates repositories and preserves update event history", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo1")
 		insertTestRepo(t, 2, "owner", "repo2")
@@ -669,7 +752,7 @@ func TestUpdateRepositoryFromUpdate(t *testing.T) {
 		}
 	})
 
-	t.Run("bulk updates more than one batch", func(t *testing.T) {
+	t.Run("updates multiple repositories", func(t *testing.T) {
 		setupTestDB(t)
 		count := repositoryWriteBatchSize + 1
 		updates := make([]RepositoryUpdateData, 0, count)

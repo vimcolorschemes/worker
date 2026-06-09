@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -49,6 +50,7 @@ const (
 
 	maxJobEventErrorMessageLength = 2048
 	repositoryWriteBatchSize      = 25
+	repositoryWriteLogInterval    = 100
 )
 
 // RepositoryUpdateData pairs a repository id with the fields set during update.
@@ -102,15 +104,24 @@ func UpsertRepositoryFromImport(data ImportData) {
 	UpsertRepositoriesFromImport([]ImportData{data})
 }
 
-// UpsertRepositoriesFromImport inserts or updates repositories from import data in batches.
+// UpsertRepositoriesFromImport inserts or updates repositories from import data.
 func UpsertRepositoriesFromImport(data []ImportData) {
+	if len(data) == 0 {
+		return
+	}
+
+	startedAt := time.Now()
+	eventCreatedAt := startedAt.UTC()
+	log.Printf("Writing %d imported repositories to database", len(data))
 	for start := 0; start < len(data); start += repositoryWriteBatchSize {
 		end := min(start+repositoryWriteBatchSize, len(data))
-		if err := upsertRepositoriesFromImportBatch(data[start:end]); err != nil {
+		if err := upsertRepositoriesFromImportAdaptive(data[start:end], eventCreatedAt); err != nil {
 			log.Printf("Error upserting repositories: %s", err)
 			panic(err)
 		}
+		logRepositoryWriteProgress("imported repositories", end, len(data))
 	}
+	log.Printf("Finished writing %d imported repositories in %s", len(data), time.Since(startedAt).Round(time.Millisecond))
 }
 
 // UpdateRepositoryFromUpdate updates a repository with update job data.
@@ -118,34 +129,71 @@ func UpdateRepositoryFromUpdate(id int64, data UpdateData) {
 	UpdateRepositoriesFromUpdate([]RepositoryUpdateData{{ID: id, Data: data}})
 }
 
-// UpdateRepositoriesFromUpdate updates repositories with update job data in batches.
+// UpdateRepositoriesFromUpdate updates repositories with update job data.
 func UpdateRepositoriesFromUpdate(updates []RepositoryUpdateData) {
+	if len(updates) == 0 {
+		return
+	}
+
+	startedAt := time.Now()
+	eventCreatedAt := startedAt.UTC()
+	log.Printf("Writing %d repository updates to database", len(updates))
 	for start := 0; start < len(updates); start += repositoryWriteBatchSize {
 		end := min(start+repositoryWriteBatchSize, len(updates))
-		if err := updateRepositoriesFromUpdateBatch(updates[start:end]); err != nil {
+		if err := updateRepositoriesFromUpdateAdaptive(updates[start:end], eventCreatedAt); err != nil {
 			log.Printf("Error updating repositories: %s", err)
 			panic(err)
 		}
+		logRepositoryWriteProgress("repository updates", end, len(updates))
+	}
+	log.Printf("Finished writing %d repository updates in %s", len(updates), time.Since(startedAt).Round(time.Millisecond))
+}
+
+func logRepositoryWriteProgress(label string, completed int, total int) {
+	if total == 0 {
+		return
+	}
+	if completed == total || completed%repositoryWriteLogInterval == 0 {
+		log.Printf("Wrote %d/%d %s", completed, total, label)
 	}
 }
 
-func upsertRepositoriesFromImportBatch(data []ImportData) error {
+func upsertRepositoryFromImportOnce(data ImportData, eventCreatedAt time.Time) error {
+	return upsertRepositoriesFromImportBatch([]ImportData{data}, eventCreatedAt)
+}
+
+func upsertRepositoriesFromImportAdaptive(data []ImportData, eventCreatedAt time.Time) error {
 	if len(data) == 0 {
 		return nil
 	}
 
-	return runWithTransientRetry("import repository batch", func() error {
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-		defer func() {
-			_ = tx.Rollback()
-		}()
+	err := upsertRepositoriesFromImportBatch(data, eventCreatedAt)
+	if err == nil {
+		return nil
+	}
 
-		values := buildImportRepositoryBatchValues(data)
+	if len(data) == 1 {
+		log.Printf("Error upserting repository batch, falling back to single write: %s", err)
+		return upsertRepositoryFromImportOnce(data[0], eventCreatedAt)
+	}
 
-		_, err = tx.Exec(`INSERT INTO repositories (id, owner_name, owner_avatar_url, name, description, github_url, github_created_at, pushed_at)
+	midpoint := len(data) / 2
+	log.Printf("Error upserting repository batch of %d, retrying as %d and %d: %s", len(data), midpoint, len(data)-midpoint, err)
+	if err := upsertRepositoriesFromImportAdaptive(data[:midpoint], eventCreatedAt); err != nil {
+		return err
+	}
+	return upsertRepositoriesFromImportAdaptive(data[midpoint:], eventCreatedAt)
+}
+
+func upsertRepositoriesFromImportBatch(data []ImportData, eventCreatedAt time.Time) error {
+	if len(data) == 0 {
+		return nil
+	}
+
+	values := buildImportRepositoryBatchValues(data)
+
+	return runRepositoryWriteTransaction(func(ctx context.Context, tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO repositories (id, owner_name, owner_avatar_url, name, description, github_url, github_created_at, pushed_at)
 			VALUES `+values.rowPlaceholders+`
 			ON CONFLICT(id) DO UPDATE SET
 				owner_name = excluded.owner_name,
@@ -154,40 +202,63 @@ func upsertRepositoriesFromImportBatch(data []ImportData) error {
 				description = excluded.description,
 				github_url = excluded.github_url,
 				github_created_at = excluded.github_created_at,
-				pushed_at = excluded.pushed_at`,
+				pushed_at = excluded.pushed_at
+			WHERE
+				repositories.owner_name IS NOT excluded.owner_name OR
+				repositories.owner_avatar_url IS NOT excluded.owner_avatar_url OR
+				repositories.name IS NOT excluded.name OR
+				repositories.description IS NOT excluded.description OR
+				repositories.github_url IS NOT excluded.github_url OR
+				repositories.github_created_at IS NOT excluded.github_created_at OR
+				repositories.pushed_at IS NOT excluded.pushed_at`,
 			values.args...)
 		if err != nil {
 			return err
 		}
 
-		if err := createRepositoryJobEvents(tx, values.repositoryIDs, jobImport, jobStatusSuccess, "", time.Now().UTC()); err != nil {
-			return err
-		}
-
-		return tx.Commit()
+		return createRepositoryJobEventsContext(ctx, tx, values.repositoryIDs, jobImport, jobStatusSuccess, "", eventCreatedAt)
 	})
 }
 
-func updateRepositoriesFromUpdateBatch(updates []RepositoryUpdateData) error {
+func updateRepositoryFromUpdateOnce(update RepositoryUpdateData, eventCreatedAt time.Time) error {
+	return updateRepositoriesFromUpdateBatch([]RepositoryUpdateData{update}, eventCreatedAt)
+}
+
+func updateRepositoriesFromUpdateAdaptive(updates []RepositoryUpdateData, eventCreatedAt time.Time) error {
 	if len(updates) == 0 {
 		return nil
 	}
 
-	return runWithTransientRetry("update repository batch", func() error {
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-		defer func() {
-			_ = tx.Rollback()
-		}()
+	err := updateRepositoriesFromUpdateBatch(updates, eventCreatedAt)
+	if err == nil {
+		return nil
+	}
 
-		values, err := buildUpdateRepositoryBatchValues(updates)
-		if err != nil {
-			return err
-		}
+	if len(updates) == 1 {
+		log.Printf("Error updating repository batch, falling back to single write: %s", err)
+		return updateRepositoryFromUpdateOnce(updates[0], eventCreatedAt)
+	}
 
-		_, err = tx.Exec(`WITH updates(id, pushed_at, stargazers_count, stargazers_count_history, week_stargazers_count, is_eligible, is_disabled, updated_at) AS (
+	midpoint := len(updates) / 2
+	log.Printf("Error updating repository batch of %d, retrying as %d and %d: %s", len(updates), midpoint, len(updates)-midpoint, err)
+	if err := updateRepositoriesFromUpdateAdaptive(updates[:midpoint], eventCreatedAt); err != nil {
+		return err
+	}
+	return updateRepositoriesFromUpdateAdaptive(updates[midpoint:], eventCreatedAt)
+}
+
+func updateRepositoriesFromUpdateBatch(updates []RepositoryUpdateData, eventCreatedAt time.Time) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	values, err := buildUpdateRepositoryBatchValues(updates)
+	if err != nil {
+		return err
+	}
+
+	return runRepositoryWriteTransaction(func(ctx context.Context, tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `WITH updates(id, pushed_at, stargazers_count, stargazers_count_history, week_stargazers_count, is_eligible, is_disabled, updated_at) AS (
 				VALUES `+values.rowPlaceholders+`
 			)
 			UPDATE repositories SET
@@ -204,11 +275,36 @@ func updateRepositoriesFromUpdateBatch(updates []RepositoryUpdateData) error {
 			return err
 		}
 
-		if err := createRepositoryJobEvents(tx, values.repositoryIDs, jobUpdate, jobStatusSuccess, "", time.Now().UTC()); err != nil {
+		return createRepositoryJobEventsContext(ctx, tx, values.repositoryIDs, jobUpdate, jobStatusSuccess, "", eventCreatedAt)
+	})
+}
+
+func runRepositoryWriteTransaction(run func(context.Context, *sql.Tx) error) error {
+	return runWithTransientRetry("repository write transaction", func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
+		defer cancel()
+
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
 			return err
 		}
 
-		return tx.Commit()
+		committed := false
+		defer func() {
+			if !committed {
+				_ = tx.Rollback()
+			}
+		}()
+
+		if err := run(ctx, tx); err != nil {
+			return err
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+
+		committed = true
+		return nil
 	})
 }
 
@@ -390,6 +486,10 @@ type repositoryJobEventExecutor interface {
 	Exec(query string, args ...any) (sql.Result, error)
 }
 
+type repositoryJobEventContextExecutor interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
 // CreateRepositoryGenerateErrorEvent stores a failed generate attempt for a repository.
 func CreateRepositoryGenerateErrorEvent(repositoryID int64, errorMessage string) error {
 	return createRepositoryJobEvent(db, repositoryID, jobGenerate, jobStatusError, errorMessage, time.Now().UTC())
@@ -397,12 +497,16 @@ func CreateRepositoryGenerateErrorEvent(repositoryID int64, errorMessage string)
 
 func createRepositoryJobEvent(exec repositoryJobEventExecutor, repositoryID int64, job string, status string, errorMessage string, createdAt time.Time) error {
 	if execDB, ok := exec.(*sql.DB); ok && execDB == db {
-		return runWithTransientRetry("repository job event", func() error {
-			return createRepositoryJobEventOnce(execDB, repositoryID, job, status, errorMessage, createdAt)
-		})
+		return createRepositoryJobEventWithRetry(repositoryID, job, status, errorMessage, createdAt)
 	}
 
 	return createRepositoryJobEventOnce(exec, repositoryID, job, status, errorMessage, createdAt)
+}
+
+func createRepositoryJobEventWithRetry(repositoryID int64, job string, status string, errorMessage string, createdAt time.Time) error {
+	return runRepositoryWriteTransaction(func(ctx context.Context, tx *sql.Tx) error {
+		return createRepositoryJobEventsContext(ctx, tx, []int64{repositoryID}, job, status, errorMessage, createdAt)
+	})
 }
 
 func createRepositoryJobEvents(exec repositoryJobEventExecutor, repositoryIDs []int64, job string, status string, errorMessage string, createdAt time.Time) error {
@@ -415,13 +519,50 @@ func createRepositoryJobEvents(exec repositoryJobEventExecutor, repositoryIDs []
 	return createRepositoryJobEventsOnce(exec, repositoryIDs, job, status, errorMessage, createdAt)
 }
 
-func createRepositoryJobEventsOnce(exec repositoryJobEventExecutor, repositoryIDs []int64, job string, status string, errorMessage string, createdAt time.Time) error {
+func createRepositoryJobEventsContext(ctx context.Context, exec repositoryJobEventContextExecutor, repositoryIDs []int64, job string, status string, errorMessage string, createdAt time.Time) error {
 	if len(repositoryIDs) == 0 {
 		return nil
 	}
 
-	if len(repositoryIDs) == 1 {
-		return createRepositoryJobEventOnce(exec, repositoryIDs[0], job, status, errorMessage, createdAt)
+	trimmedErrorMessage := errorMessage
+	if len(trimmedErrorMessage) > maxJobEventErrorMessageLength {
+		trimmedErrorMessage = trimmedErrorMessage[:maxJobEventErrorMessageLength]
+	}
+
+	idArgs := make([]any, 0, len(repositoryIDs))
+	for _, repositoryID := range repositoryIDs {
+		idArgs = append(idArgs, repositoryID)
+	}
+	idPlaceholders := placeholders(len(repositoryIDs))
+
+	if job == jobGenerate {
+		args := append([]any{createdAt}, idArgs...)
+		_, err := exec.ExecContext(
+			ctx,
+			"UPDATE repositories SET last_generate_event_at = ? WHERE id IN ("+idPlaceholders+")",
+			args...,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	insertArgs := make([]any, 0, len(repositoryIDs)*5)
+	for _, repositoryID := range repositoryIDs {
+		insertArgs = append(insertArgs, repositoryID, job, status, trimmedErrorMessage, createdAt)
+	}
+
+	_, err := exec.ExecContext(
+		ctx,
+		repositoryJobEventInsertQuery(len(repositoryIDs)),
+		insertArgs...,
+	)
+	return err
+}
+
+func createRepositoryJobEventsOnce(exec repositoryJobEventExecutor, repositoryIDs []int64, job string, status string, errorMessage string, createdAt time.Time) error {
+	if len(repositoryIDs) == 0 {
+		return nil
 	}
 
 	trimmedErrorMessage := errorMessage
@@ -451,10 +592,7 @@ func createRepositoryJobEventsOnce(exec repositoryJobEventExecutor, repositoryID
 		insertArgs = append(insertArgs, repositoryID, job, status, trimmedErrorMessage, createdAt)
 	}
 
-	_, err := exec.Exec(
-		"INSERT INTO repository_job_events (repository_id, job, status, error_message, created_at) VALUES "+rowPlaceholders(len(repositoryIDs), 5),
-		insertArgs...,
-	)
+	_, err := exec.Exec(repositoryJobEventInsertQuery(len(repositoryIDs)), insertArgs...)
 	return err
 }
 
@@ -475,13 +613,24 @@ func createRepositoryJobEventOnce(exec repositoryJobEventExecutor, repositoryID 
 		}
 	}
 
-	_, err := exec.Exec(
-		"INSERT INTO repository_job_events (repository_id, job, status, error_message, created_at) VALUES (?, ?, ?, ?, ?)",
-		repositoryID,
-		job,
-		status,
-		trimmedErrorMessage,
-		createdAt,
-	)
+	_, err := exec.Exec(repositoryJobEventInsertQuery(1), repositoryID, job, status, trimmedErrorMessage, createdAt)
 	return err
+}
+
+func repositoryJobEventInsertQuery(rowCount int) string {
+	return `WITH event_values(repository_id, job, status, error_message, created_at) AS (
+			VALUES ` + rowPlaceholders(rowCount, 5) + `
+		)
+		INSERT INTO repository_job_events (repository_id, job, status, error_message, created_at)
+		SELECT DISTINCT repository_id, job, status, error_message, created_at
+		FROM event_values
+		WHERE NOT EXISTS (
+			SELECT 1
+			FROM repository_job_events existing
+			WHERE existing.repository_id = event_values.repository_id
+			  AND existing.job = event_values.job
+			  AND existing.status = event_values.status
+			  AND existing.error_message IS event_values.error_message
+			  AND existing.created_at = event_values.created_at
+		)`
 }
