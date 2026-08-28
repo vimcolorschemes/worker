@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"os"
 	"reflect"
 	"strings"
@@ -246,4 +247,62 @@ func TestMergeColorData(t *testing.T) {
 			t.Fatalf("mergeColorData() overwrote an earlier batch, got: %v", target["nord"])
 		}
 	})
+}
+
+func TestClassifyGenerateResult(t *testing.T) {
+	tests := []struct {
+		name              string
+		colorschemeCount  int
+		shipsColorschemes bool
+		checkError        error
+		want              generateOutcome
+		wantChecked       bool
+	}{
+		{
+			name:             "writes without checking when colorschemes were generated",
+			colorschemeCount: 3,
+			want:             generateOutcomeWrite,
+		},
+		{
+			name:              "errors on zero colorschemes when the repository ships colors files",
+			shipsColorschemes: true,
+			want:              generateOutcomeError,
+			wantChecked:       true,
+		},
+		{
+			name:        "reports empty on zero colorschemes when the repository ships none",
+			want:        generateOutcomeEmpty,
+			wantChecked: true,
+		},
+		{
+			name:        "errors when the colors check itself fails",
+			checkError:  errors.New("boom"),
+			want:        generateOutcomeError,
+			wantChecked: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			original := hasColorschemeFiles
+			t.Cleanup(func() { hasColorschemeFiles = original })
+
+			checked := false
+			hasColorschemeFiles = func(ownerName string, name string) (bool, error) {
+				checked = true
+				if ownerName != "owner" || name != "repo" {
+					t.Fatalf("hasColorschemeFiles(%q, %q), want (\"owner\", \"repo\")", ownerName, name)
+				}
+				return tt.shipsColorschemes, tt.checkError
+			}
+
+			got := classifyGenerateResult("owner", "repo", tt.colorschemeCount)
+			if got != tt.want {
+				t.Fatalf("classifyGenerateResult() = %v, want %v", got, tt.want)
+			}
+			if checked != tt.wantChecked {
+				t.Fatalf("colors check called = %v, want %v", checked, tt.wantChecked)
+			}
+		})
+	}
 }

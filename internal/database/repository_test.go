@@ -530,11 +530,12 @@ func TestGetRepositoriesToGenerate(t *testing.T) {
 		}
 	}
 
-	insertGenerateEvent := func(t *testing.T, id int64, createdAt time.Time) {
+	insertGenerateEventWithStatus := func(t *testing.T, id int64, createdAt time.Time, status string) {
 		t.Helper()
 		_, err := db.Exec(
-			`INSERT INTO repository_job_events (repository_id, job, created_at) VALUES (?, 'generate', ?)`,
+			`INSERT INTO repository_job_events (repository_id, job, status, created_at) VALUES (?, 'generate', ?, ?)`,
 			id,
+			status,
 			createdAt,
 		)
 		if err != nil {
@@ -544,6 +545,18 @@ func TestGetRepositoriesToGenerate(t *testing.T) {
 		_, err = db.Exec(`UPDATE repositories SET last_generate_event_at = ? WHERE id = ?`, createdAt, id)
 		if err != nil {
 			t.Fatalf("update repo last_generate_event_at: %v", err)
+		}
+	}
+
+	insertGenerateEvent := func(t *testing.T, id int64, createdAt time.Time) {
+		t.Helper()
+		insertGenerateEventWithStatus(t, id, createdAt, jobStatusSuccess)
+	}
+
+	insertGenerateErrors := func(t *testing.T, id int64, createdAt time.Time, count int) {
+		t.Helper()
+		for index := range count {
+			insertGenerateEventWithStatus(t, id, createdAt.Add(time.Duration(index)*time.Minute), jobStatusError)
 		}
 	}
 
@@ -622,6 +635,91 @@ func TestGetRepositoriesToGenerate(t *testing.T) {
 		}
 		if len(repos) != 1 {
 			t.Fatalf("len(repos) = %d, want 1", len(repos))
+		}
+	})
+
+	t.Run("retries repos whose generate failed, up to the retry cap", func(t *testing.T) {
+		for _, errorCount := range []int{1, maxGenerateRetries, maxGenerateRetries + 1} {
+			t.Run(fmt.Sprintf("%d errors", errorCount), func(t *testing.T) {
+				setupTestDB(t)
+				insertRepoForGenerate(t, 1, 1, base)
+				insertGenerateEvent(t, 1, base.Add(time.Hour))
+				insertGenerateErrors(t, 1, base.Add(2*time.Hour), errorCount)
+
+				repos, err := GetRepositoriesToGenerate()
+				if err != nil {
+					t.Fatalf("GetRepositoriesToGenerate returned error: %v", err)
+				}
+
+				want := 1
+				if errorCount > maxGenerateRetries {
+					want = 0
+				}
+				if len(repos) != want {
+					t.Fatalf("len(repos) = %d, want %d", len(repos), want)
+				}
+			})
+		}
+	})
+
+	t.Run("excludes repos with no prior success once the retry cap is reached", func(t *testing.T) {
+		setupTestDB(t)
+		insertRepoForGenerate(t, 1, 1, base)
+		insertGenerateErrors(t, 1, base.Add(time.Hour), maxGenerateRetries+1)
+
+		repos, err := GetRepositoriesToGenerate()
+		if err != nil {
+			t.Fatalf("GetRepositoriesToGenerate returned error: %v", err)
+		}
+		if len(repos) != 0 {
+			t.Fatalf("len(repos) = %d, want 0", len(repos))
+		}
+	})
+
+	t.Run("a later success resets the retry count", func(t *testing.T) {
+		setupTestDB(t)
+		insertRepoForGenerate(t, 1, 1, base)
+		insertGenerateErrors(t, 1, base.Add(time.Hour), maxGenerateRetries+1)
+		insertGenerateEvent(t, 1, base.Add(5*time.Hour))
+
+		repos, err := GetRepositoriesToGenerate()
+		if err != nil {
+			t.Fatalf("GetRepositoriesToGenerate returned error: %v", err)
+		}
+		if len(repos) != 0 {
+			t.Fatalf("len(repos) = %d, want 0", len(repos))
+		}
+	})
+
+	t.Run("includes repos pushed to after exhausting the retry cap", func(t *testing.T) {
+		setupTestDB(t)
+		insertRepoForGenerate(t, 1, 1, base.Add(10*time.Hour))
+		insertGenerateErrors(t, 1, base.Add(time.Hour), maxGenerateRetries+1)
+
+		repos, err := GetRepositoriesToGenerate()
+		if err != nil {
+			t.Fatalf("GetRepositoriesToGenerate returned error: %v", err)
+		}
+		if len(repos) != 1 {
+			t.Fatalf("len(repos) = %d, want 1", len(repos))
+		}
+	})
+
+	t.Run("excludes disabled repos with failed generates", func(t *testing.T) {
+		setupTestDB(t)
+		insertRepoForGenerate(t, 1, 1, base)
+		insertGenerateErrors(t, 1, base.Add(time.Hour), 1)
+
+		if err := SetRepositoryDisabled(1, true); err != nil {
+			t.Fatalf("SetRepositoryDisabled: %v", err)
+		}
+
+		repos, err := GetRepositoriesToGenerate()
+		if err != nil {
+			t.Fatalf("GetRepositoriesToGenerate returned error: %v", err)
+		}
+		if len(repos) != 0 {
+			t.Fatalf("len(repos) = %d, want 0", len(repos))
 		}
 	})
 }

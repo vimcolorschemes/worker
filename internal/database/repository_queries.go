@@ -38,7 +38,23 @@ const (
 		FROM repositories
 		WHERE is_disabled = 0
 		  AND is_eligible = 1
-		  AND (last_generate_event_at IS NULL OR pushed_at > last_generate_event_at)
+		  AND (
+		    last_generate_event_at IS NULL
+		    OR pushed_at > last_generate_event_at
+		    OR (
+		      SELECT COUNT(*)
+		      FROM repository_job_events failures
+		      WHERE failures.repository_id = repositories.id
+		        AND failures.job = '` + jobGenerate + `'
+		        AND failures.id > COALESCE((
+		          SELECT MAX(successes.id)
+		          FROM repository_job_events successes
+		          WHERE successes.repository_id = repositories.id
+		            AND successes.job = '` + jobGenerate + `'
+		            AND successes.status = '` + jobStatusSuccess + `'
+		        ), 0)
+		    ) BETWEEN 1 AND ?
+		  )
 	`
 )
 
