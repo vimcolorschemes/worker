@@ -182,6 +182,8 @@ func writeJobSection(b *strings.Builder, job string, report database.JobReport, 
 
 	keyLabels := map[string]string{
 		"repositoryCount":        "Repositories",
+		"repositoryCheckedCount": "Checked",
+		"repositoryDroppedCount": "Dropped",
 		"repositoryErrorCount":   "Errors",
 		"repositoryDeletedCount": "Pruned",
 		"responseStatusCode":     "Status code",
@@ -189,7 +191,7 @@ func writeJobSection(b *strings.Builder, job string, report database.JobReport, 
 		"notificationStatus":     "Notification",
 	}
 
-	for _, key := range []string{"repositoryCount", "repositoryErrorCount", "repositoryDeletedCount", "responseStatusCode", "webhookTriggered", "notificationStatus"} {
+	for _, key := range []string{"repositoryCount", "repositoryCheckedCount", "repositoryDroppedCount", "repositoryErrorCount", "repositoryDeletedCount", "responseStatusCode", "webhookTriggered", "notificationStatus"} {
 		value, ok := report.Data[key]
 		if !ok {
 			continue
@@ -216,12 +218,8 @@ func writeJobSection(b *strings.Builder, job string, report database.JobReport, 
 
 	writeSummaryRows(b, rows)
 
-	if names, ok := report.Data["repositoryDeletedNames"].([]interface{}); ok && len(names) > 0 {
-		b.WriteString("\n  Pruned repositories:\n")
-		for _, name := range names {
-			b.WriteString(fmt.Sprintf("    - %v (https://github.com/%v)\n", name, name))
-		}
-	}
+	writeRepositoryNames(b, report.Data["repositoryDeletedNames"], "Pruned repositories")
+	writeRepositoryNames(b, report.Data["repositoryDroppedNames"], "Dropped repositories")
 
 	var errorSamples []string
 	if includeGenerateEvents {
@@ -337,6 +335,27 @@ func formatInt(n int64) string {
 	}
 	parts = append([]string{raw}, parts...)
 	return sign + strings.Join(parts, ",")
+}
+
+func writeRepositoryNames(b *strings.Builder, value interface{}, title string) {
+	var names []interface{}
+	switch typed := value.(type) {
+	case []interface{}:
+		names = typed
+	case []string:
+		for _, name := range typed {
+			names = append(names, name)
+		}
+	}
+
+	if len(names) == 0 {
+		return
+	}
+
+	b.WriteString(fmt.Sprintf("\n  %s:\n", title))
+	for _, name := range names {
+		b.WriteString(fmt.Sprintf("    - %v (https://github.com/%v)\n", name, name))
+	}
 }
 
 func formatStringMap(values map[string]string) string {
