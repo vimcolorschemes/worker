@@ -183,13 +183,14 @@ func writeJobSection(b *strings.Builder, job string, report database.JobReport, 
 	keyLabels := map[string]string{
 		"repositoryCount":        "Repositories",
 		"repositoryErrorCount":   "Errors",
+		"repositoryEmptyCount":   "Empty",
 		"repositoryDeletedCount": "Pruned",
 		"responseStatusCode":     "Status code",
 		"webhookTriggered":       "Webhook",
 		"notificationStatus":     "Notification",
 	}
 
-	for _, key := range []string{"repositoryCount", "repositoryErrorCount", "repositoryDeletedCount", "responseStatusCode", "webhookTriggered", "notificationStatus"} {
+	for _, key := range []string{"repositoryCount", "repositoryErrorCount", "repositoryEmptyCount", "repositoryDeletedCount", "responseStatusCode", "webhookTriggered", "notificationStatus"} {
 		value, ok := report.Data[key]
 		if !ok {
 			continue
@@ -294,7 +295,7 @@ func formatSummaryValue(key string, value interface{}) string {
 		return fmt.Sprintf("%t", v)
 	}
 
-	useThousands := key == "repositoryCount" || key == "repositoryErrorCount" || key == "repositoryDeletedCount"
+	useThousands := key == "repositoryCount" || key == "repositoryErrorCount" || key == "repositoryEmptyCount" || key == "repositoryDeletedCount"
 
 	switch v := value.(type) {
 	case float64:

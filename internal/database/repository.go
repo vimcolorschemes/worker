@@ -48,6 +48,9 @@ const (
 	jobStatusSuccess = "success"
 	jobStatusError   = "error"
 
+	// A push resets the count through the pushed_at watermark.
+	maxGenerateRetries = 3
+
 	maxJobEventErrorMessageLength = 2048
 	repositoryWriteBatchSize      = 25
 	repositoryWriteLogInterval    = 100
@@ -90,7 +93,7 @@ func DeleteRepository(id int64) error {
 
 // GetRepositoriesToGenerate gets all repositories that are due for a preview generate.
 func GetRepositoriesToGenerate() ([]repository.Repository, error) {
-	return queryRepositoriesBasic(queryRepositoriesToGenerate)
+	return queryRepositoriesBasic(queryRepositoriesToGenerate, maxGenerateRetries)
 }
 
 // SetRepositoryDisabled updates the manual/system scheduler override flag.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/vimcolorschemes/worker/internal/database"
 	file "github.com/vimcolorschemes/worker/internal/file"
+	"github.com/vimcolorschemes/worker/internal/github"
 	repoHelper "github.com/vimcolorschemes/worker/internal/repository"
 )
 
@@ -20,6 +22,18 @@ const previewGenerationTimeout = 30 * time.Second
 
 // extractor.nvim refuses to extract more than 100 colorschemes at once.
 const colorschemeBatchSize = 50
+
+type generateOutcome int
+
+const (
+	generateOutcomeWrite generateOutcome = iota
+	generateOutcomeEmpty
+	generateOutcomeError
+)
+
+const emptyGenerateErrorMessage = "generate produced 0 colorschemes for a repository that ships colors/ files"
+
+var hasColorschemeFiles = github.HasColorschemeFiles
 
 var tmpDirectoryPath string
 var packDirectoryPath string
@@ -65,6 +79,7 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 
 	log.Printf("Generating previews for %d repositories", len(repositories))
 	repositoryErrorCount := 0
+	repositoryEmptyCount := 0
 	repositoryErrorSamples := []string{}
 
 	for index, repository := range repositories {
@@ -122,6 +137,20 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 				})
 		}
 
+		switch classifyGenerateResult(repository.Owner.Name, repository.Name, len(colorschemes)) {
+		case generateOutcomeError:
+			emptyError := errors.New(emptyGenerateErrorMessage)
+			log.Printf("Error generating colorschemes: %s", emptyError)
+			repositoryErrorCount++
+			repositoryErrorSamples = appendRepositoryErrorSample(repositoryErrorSamples, repository, emptyError)
+			if eventErr := database.CreateRepositoryGenerateErrorEvent(repository.ID, emptyError.Error()); eventErr != nil {
+				log.Printf("Error creating generate failure event: %s", eventErr)
+			}
+			continue
+		case generateOutcomeEmpty:
+			repositoryEmptyCount++
+		}
+
 		repository.Colorschemes = colorschemes
 		updateRepositoryAfterGenerate(repository)
 	}
@@ -131,8 +160,29 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 	return map[string]interface{}{
 		"repositoryCount":        len(repositories),
 		"repositoryErrorCount":   repositoryErrorCount,
+		"repositoryEmptyCount":   repositoryEmptyCount,
 		"repositoryErrorSamples": repositoryErrorSamples,
 	}
+}
+
+// A zero yield is ambiguous: nothing to find, or a generate that failed silently.
+// An inconclusive check resolves to an error, keeping the repository retryable.
+func classifyGenerateResult(ownerName string, name string, colorschemeCount int) generateOutcome {
+	if colorschemeCount > 0 {
+		return generateOutcomeWrite
+	}
+
+	shipsColorschemes, err := hasColorschemeFiles(ownerName, name)
+	if err != nil {
+		log.Printf("Error checking colors/ files for %s/%s: %s", ownerName, name, err)
+		return generateOutcomeError
+	}
+
+	if shipsColorschemes {
+		return generateOutcomeError
+	}
+
+	return generateOutcomeEmpty
 }
 
 func updateRepositoryAfterGenerate(repository repoHelper.Repository) {
