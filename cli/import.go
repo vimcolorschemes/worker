@@ -26,6 +26,15 @@ var queries = []string{
 	"neovim colorscheme",
 	"neovim colour scheme",
 	"neovim colourscheme",
+	"topic:vim-colorscheme",
+	"topic:neovim-colorscheme",
+	"topic:vim-theme",
+	"topic:neovim-theme",
+	"topic:nvim-theme",
+	"topic:vim-colorschemes",
+	"topic:neovim-colorschemes",
+	"topic:nvim-colorscheme",
+	"topic:nvim-colorschemes",
 }
 
 func init() {
@@ -40,7 +49,7 @@ func init() {
 
 // Import potential colorscheme repositories from Github
 func Import(_force bool, _debug bool, repoKey string) map[string]interface{} {
-	log.Printf("Repository limit: %d", repositoryCountLimit)
+	log.Printf("Repository limit per query: %d", repositoryCountLimit)
 
 	var repositories []*gogithub.Repository
 	if repoKey != "" {
