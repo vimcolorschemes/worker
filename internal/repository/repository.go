@@ -1,7 +1,10 @@
 package repository
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
+	"math"
 	"sort"
 	"time"
 
@@ -67,6 +70,57 @@ type ColorschemeGroup struct {
 	Underdashed   bool   `json:"underdashed,omitempty"`
 	Strikethrough bool   `json:"strikethrough,omitempty"`
 	Reverse       bool   `json:"reverse,omitempty"`
+}
+
+// hexCode arrives as a decimal RGB integer, not a string, when a cterm
+// colorscheme has a group that only defines gui colors.
+func (group *ColorschemeGroup) UnmarshalJSON(data []byte) error {
+	type alias ColorschemeGroup
+
+	var raw struct {
+		alias
+		HexCode json.RawMessage `json:"hexCode"`
+	}
+
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	hexCode, err := decodeHexCode(raw.HexCode)
+	if err != nil {
+		return err
+	}
+
+	*group = ColorschemeGroup(raw.alias)
+	group.HexCode = hexCode
+
+	return nil
+}
+
+func decodeHexCode(raw json.RawMessage) (string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", nil
+	}
+
+	if raw[0] == '"' {
+		var hexCode string
+		if err := json.Unmarshal(raw, &hexCode); err != nil {
+			return "", err
+		}
+
+		return hexCode, nil
+	}
+
+	var decimal float64
+	if err := json.Unmarshal(raw, &decimal); err != nil {
+		return "", fmt.Errorf("invalid hexCode %s", raw)
+	}
+
+	if decimal != math.Trunc(decimal) || decimal < 0 || decimal > 0xFFFFFF {
+		return "", fmt.Errorf("hexCode %s is not a 24-bit color value", raw)
+	}
+
+	return fmt.Sprintf("#%06X", int(decimal)), nil
 }
 
 // BackgroundValue sets up an enum containing possible background values

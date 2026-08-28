@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
+	"sort"
 	"time"
 
 	"github.com/vimcolorschemes/worker/internal/database"
@@ -16,12 +18,17 @@ import (
 
 const previewGenerationTimeout = 30 * time.Second
 
+// extractor.nvim refuses to extract more than 100 colorschemes at once.
+const colorschemeBatchSize = 50
+
 var tmpDirectoryPath string
 var packDirectoryPath string
 var vimrcPath string
 var vimFilesPath string
 var colorDataFilePath string
 var defaultColorschemeFilePath string
+var colorschemeListFilePath string
+var colorschemeBatchFilePath string
 var defaultColorschemes map[string]bool
 var debugMode bool
 
@@ -147,6 +154,8 @@ func initRuntimeFiles() {
 	vimrcPath = fmt.Sprintf("%s/init.lua", tmpDirectoryPath)
 	colorDataFilePath = fmt.Sprintf("%s/data.json", tmpDirectoryPath)
 	defaultColorschemeFilePath = fmt.Sprintf("%s/default_colorschemes.json", tmpDirectoryPath)
+	colorschemeListFilePath = fmt.Sprintf("%s/repository_colorschemes.json", tmpDirectoryPath)
+	colorschemeBatchFilePath = fmt.Sprintf("%s/colorscheme_batch.json", tmpDirectoryPath)
 
 	if _, err := os.Stat(tmpDirectoryPath); !os.IsNotExist(err) {
 		// .tmp directory exists, remove it
@@ -189,9 +198,7 @@ func setupRuntime() {
 	runtimepath := fmt.Sprintf("vim.opt.runtimepath:append(\"%s\")\n", tmpDirectoryPath)
 	packpath := fmt.Sprintf("vim.opt.packpath:append(\"%s\")\n", tmpDirectoryPath)
 
-	colorDataPath := fmt.Sprintf("vim.env.COLOR_DATA_PATH=\"%s\"\n", colorDataFilePath)
-
-	vimrcContent := fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n", baseVimrcContent, myVimrc, runtimepath, packpath, colorDataPath)
+	vimrcContent := fmt.Sprintf("%s\n%s\n%s\n%s\n", baseVimrcContent, myVimrc, runtimepath, packpath)
 
 	err = file.AppendToFile(vimrcContent, vimrcPath)
 	if err != nil {
@@ -211,33 +218,11 @@ func setupRuntime() {
 	captureDefaultColorschemes()
 }
 
-// captureDefaultColorschemes runs nvim to get the list of built-in colorschemes
-// and populates the defaultColorschemes map.
+// captureDefaultColorschemes records the colorschemes present before any repository is installed.
 func captureDefaultColorschemes() {
 	log.Print("Capturing default colorschemes")
 
-	ctx, cancel := context.WithTimeout(context.Background(), previewGenerationTimeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "nvim", "-u", vimrcPath, "--headless",
-		"-c", fmt.Sprintf("lua require('extractor').colorschemes({ output_path = '%s' })", defaultColorschemeFilePath),
-		"-c", "qa!")
-
-	log.Printf("Running %s (timeout: %s)", cmd, previewGenerationTimeout)
-	cmd.Stdout = os.Stdout
-
-	err := cmd.Run()
-	if err != nil {
-		log.Panic(wrapCommandError(ctx, "capturing default colorschemes", err))
-	}
-
-	content, err := file.GetLocalFileContent(defaultColorschemeFilePath)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	var names []string
-	err = json.Unmarshal([]byte(content), &names)
+	names, err := captureColorschemeNames(defaultColorschemeFilePath)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -248,6 +233,48 @@ func captureDefaultColorschemes() {
 	}
 
 	log.Printf("Captured %d default colorschemes", len(defaultColorschemes))
+}
+
+// captureColorschemeNames lists every colorscheme currently on the runtime path.
+func captureColorschemeNames(outputPath string) ([]string, error) {
+	if err := removeIfExists(outputPath); err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), previewGenerationTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "nvim", "-u", vimrcPath, "--headless",
+		"-c", captureColorschemeNamesCommand(outputPath))
+
+	log.Printf("Running %s (timeout: %s)", cmd, previewGenerationTimeout)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return nil, wrapCommandError(ctx, "listing colorschemes", err)
+	}
+
+	content, err := file.GetLocalFileContent(outputPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var names []string
+	err = json.Unmarshal([]byte(content), &names)
+	if err != nil {
+		return nil, err
+	}
+
+	return names, nil
+}
+
+func captureColorschemeNamesCommand(outputPath string) string {
+	return fmt.Sprintf(
+		"lua local ok, err = pcall(require('extractor').colorschemes, { output_path = '%s' }) if not ok then io.stderr:write(tostring(err)) vim.cmd('cquit 1') else vim.cmd('qa!') end",
+		outputPath,
+	)
 }
 
 // Installs a plugin/colorscheme on the runtime configuration from a Github URL
@@ -281,8 +308,101 @@ func deletePlugin(key string) error {
 
 // Gathers the colorscheme data from vimcolorschemes/extractor.nvim
 func getColorschemeColorData() (map[string]repoHelper.ColorschemeData, error) {
-	err := executePreviewGenerator()
+	names, err := captureColorschemeNames(colorschemeListFilePath)
 	if err != nil {
+		return nil, err
+	}
+
+	targets := repositoryColorschemes(names, defaultColorschemes)
+	if len(targets) == 0 {
+		log.Print("No colorscheme to extract")
+		return map[string]repoHelper.ColorschemeData{}, nil
+	}
+
+	batches := chunkColorschemes(targets, colorschemeBatchSize)
+	log.Printf("Extracting %d colorschemes in %d batches", len(targets), len(batches))
+
+	data := map[string]repoHelper.ColorschemeData{}
+
+	for index, batch := range batches {
+		log.Printf("Extracting batch %d/%d (%d colorschemes)", index+1, len(batches), len(batch))
+
+		batchData, err := extractColorData(batch)
+		if err != nil {
+			return nil, err
+		}
+
+		mergeColorData(data, batchData)
+	}
+
+	return data, nil
+}
+
+func repositoryColorschemes(names []string, defaults map[string]bool) []string {
+	seen := make(map[string]bool, len(names))
+	targets := []string{}
+
+	for _, name := range names {
+		if name == "" || defaults[name] || isDefaultColorscheme(name) || seen[name] {
+			continue
+		}
+
+		seen[name] = true
+		targets = append(targets, name)
+	}
+
+	// Stable order keeps batches identical from one run to the next.
+	sort.Strings(targets)
+
+	return targets
+}
+
+func chunkColorschemes(names []string, size int) [][]string {
+	if size < 1 {
+		size = 1
+	}
+
+	batches := [][]string{}
+
+	for start := 0; start < len(names); start += size {
+		end := start + size
+		if end > len(names) {
+			end = len(names)
+		}
+
+		batches = append(batches, names[start:end])
+	}
+
+	return batches
+}
+
+func mergeColorData(target map[string]repoHelper.ColorschemeData, source map[string]repoHelper.ColorschemeData) {
+	for name, data := range source {
+		if _, exists := target[name]; exists {
+			continue
+		}
+
+		target[name] = data
+	}
+}
+
+func extractColorData(colorschemes []string) (map[string]repoHelper.ColorschemeData, error) {
+	// extractor.nvim may write nothing, in which case a file left by an earlier
+	// batch would be read instead.
+	if err := removeIfExists(colorDataFilePath); err != nil {
+		return nil, err
+	}
+
+	batch, err := json.Marshal(colorschemes)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := os.WriteFile(colorschemeBatchFilePath, batch, os.FileMode(0600)); err != nil {
+		return nil, err
+	}
+
+	if err := executePreviewGenerator(); err != nil {
 		log.Printf("Error executing nvim: %s", err)
 		return nil, err
 	}
@@ -293,17 +413,49 @@ func getColorschemeColorData() (map[string]repoHelper.ColorschemeData, error) {
 		return nil, err
 	}
 
-	var data map[string]repoHelper.ColorschemeData
-	err = json.Unmarshal([]byte(colorSchemeOutput), &data)
+	data, err := parseColorData([]byte(colorSchemeOutput))
 	if err != nil {
 		return nil, err
 	}
 
 	if !debugMode {
-		err = os.Remove(colorDataFilePath)
-		if err != nil {
+		if err := removeIfExists(colorDataFilePath); err != nil {
 			return nil, err
 		}
+	}
+
+	return data, nil
+}
+
+// vim.fn.json_encode writes an empty table as "[]", so an extraction that
+// skipped every colorscheme comes back as an array rather than an object.
+func parseColorData(content []byte) (map[string]repoHelper.ColorschemeData, error) {
+	trimmed := bytes.TrimSpace(content)
+
+	if len(trimmed) == 0 {
+		return map[string]repoHelper.ColorschemeData{}, nil
+	}
+
+	if trimmed[0] == '[' {
+		var items []json.RawMessage
+		if err := json.Unmarshal(trimmed, &items); err != nil {
+			return nil, err
+		}
+
+		if len(items) > 0 {
+			return nil, fmt.Errorf("expected colorscheme data, got an array of %d items", len(items))
+		}
+
+		return map[string]repoHelper.ColorschemeData{}, nil
+	}
+
+	var data map[string]repoHelper.ColorschemeData
+	if err := json.Unmarshal(trimmed, &data); err != nil {
+		return nil, err
+	}
+
+	if data == nil {
+		data = map[string]repoHelper.ColorschemeData{}
 	}
 
 	return data, nil
@@ -314,10 +466,14 @@ func executePreviewGenerator() error {
 	args := []string{"-u", vimrcPath}
 
 	if !debugMode {
-		args = append(args, "--headless", "-c", ":qa!")
+		args = append(args, "--headless")
 	}
 
-	args = append(args, "./vim/code_sample.vim")
+	args = append(args, "./vim/code_sample.vim", "-c", extractCommand())
+
+	if !debugMode {
+		args = append(args, "-c", "qa!")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), previewGenerationTimeout)
 	defer cancel()
@@ -328,6 +484,7 @@ func executePreviewGenerator() error {
 
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	err := cmd.Run()
 	if err != nil {
@@ -335,6 +492,16 @@ func executePreviewGenerator() error {
 	}
 
 	return nil
+}
+
+// The batch is read from a file since a colorscheme name may contain quotes.
+// nvim exits 0 even when a -c command throws, hence the explicit cquit.
+func extractCommand() string {
+	return fmt.Sprintf(
+		"lua local ok, err = pcall(require('extractor').extract, { colorschemes = vim.json.decode(table.concat(vim.fn.readfile('%s'), '')), output_path = '%s' }) if not ok then io.stderr:write(tostring(err)) vim.cmd('cquit 1') end",
+		colorschemeBatchFilePath,
+		colorDataFilePath,
+	)
 }
 
 // Deletes the temporary directory used for runtime config
@@ -353,6 +520,15 @@ func getGenerateData(repository repoHelper.Repository) database.GenerateData {
 	return database.GenerateData{
 		Colorschemes: repository.Colorschemes,
 	}
+}
+
+func removeIfExists(path string) error {
+	err := os.Remove(path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
 }
 
 // wrapCommandError returns an error message that distinguishes timeout from other failures.
