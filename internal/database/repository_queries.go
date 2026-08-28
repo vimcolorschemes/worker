@@ -33,6 +33,8 @@ const (
 		WHERE is_disabled = 0
 	`
 
+	queryRepositoryIDs = `SELECT id FROM repositories`
+
 	queryRepositoriesToGenerate = `
 		SELECT ` + repositorySelectColumns + `
 		FROM repositories
