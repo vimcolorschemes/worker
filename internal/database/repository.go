@@ -509,16 +509,6 @@ func createRepositoryJobEventWithRetry(repositoryID int64, job string, status st
 	})
 }
 
-func createRepositoryJobEvents(exec repositoryJobEventExecutor, repositoryIDs []int64, job string, status string, errorMessage string, createdAt time.Time) error {
-	if execDB, ok := exec.(*sql.DB); ok && execDB == db {
-		return runWithTransientRetry("repository job events", func() error {
-			return createRepositoryJobEventsOnce(execDB, repositoryIDs, job, status, errorMessage, createdAt)
-		})
-	}
-
-	return createRepositoryJobEventsOnce(exec, repositoryIDs, job, status, errorMessage, createdAt)
-}
-
 func createRepositoryJobEventsContext(ctx context.Context, exec repositoryJobEventContextExecutor, repositoryIDs []int64, job string, status string, errorMessage string, createdAt time.Time) error {
 	if len(repositoryIDs) == 0 {
 		return nil
@@ -557,42 +547,6 @@ func createRepositoryJobEventsContext(ctx context.Context, exec repositoryJobEve
 		repositoryJobEventInsertQuery(len(repositoryIDs)),
 		insertArgs...,
 	)
-	return err
-}
-
-func createRepositoryJobEventsOnce(exec repositoryJobEventExecutor, repositoryIDs []int64, job string, status string, errorMessage string, createdAt time.Time) error {
-	if len(repositoryIDs) == 0 {
-		return nil
-	}
-
-	trimmedErrorMessage := errorMessage
-	if len(trimmedErrorMessage) > maxJobEventErrorMessageLength {
-		trimmedErrorMessage = trimmedErrorMessage[:maxJobEventErrorMessageLength]
-	}
-
-	idArgs := make([]any, 0, len(repositoryIDs))
-	for _, repositoryID := range repositoryIDs {
-		idArgs = append(idArgs, repositoryID)
-	}
-	idPlaceholders := placeholders(len(repositoryIDs))
-
-	if job == jobGenerate {
-		args := append([]any{createdAt}, idArgs...)
-		_, err := exec.Exec(
-			"UPDATE repositories SET last_generate_event_at = ? WHERE id IN ("+idPlaceholders+")",
-			args...,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
-	insertArgs := make([]any, 0, len(repositoryIDs)*5)
-	for _, repositoryID := range repositoryIDs {
-		insertArgs = append(insertArgs, repositoryID, job, status, trimmedErrorMessage, createdAt)
-	}
-
-	_, err := exec.Exec(repositoryJobEventInsertQuery(len(repositoryIDs)), insertArgs...)
 	return err
 }
 
