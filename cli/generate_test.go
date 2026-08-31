@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -147,17 +146,6 @@ func TestParseColorData(t *testing.T) {
 		}
 	})
 
-	t.Run("should read an empty array as no colorscheme", func(t *testing.T) {
-		got, err := parseColorData([]byte("[]\n"))
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
-
-		if len(got) != 0 {
-			t.Fatalf("parseColorData() = %v, want an empty map", got)
-		}
-	})
-
 	t.Run("should read empty content as no colorscheme", func(t *testing.T) {
 		got, err := parseColorData([]byte("  "))
 		if err != nil {
@@ -166,12 +154,6 @@ func TestParseColorData(t *testing.T) {
 
 		if len(got) != 0 {
 			t.Fatalf("parseColorData() = %v, want an empty map", got)
-		}
-	})
-
-	t.Run("should reject a non-empty array", func(t *testing.T) {
-		if _, err := parseColorData([]byte(`["nord"]`)); err == nil {
-			t.Fatal("Expected an error, got none")
 		}
 	})
 
@@ -194,24 +176,6 @@ func TestCaptureColorschemeNamesCommand(t *testing.T) {
 		if !strings.Contains(command, fragment) {
 			t.Errorf("captureColorschemeNamesCommand() missing %q in %q", fragment, command)
 		}
-	}
-}
-
-func TestRemoveIfExists(t *testing.T) {
-	path := t.TempDir() + "/colorschemes.json"
-	if err := os.WriteFile(path, []byte("stale"), 0600); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := removeIfExists(path); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Errorf("removeIfExists() left %q behind, stat error: %v", path, err)
-	}
-
-	if err := removeIfExists(path); err != nil {
-		t.Fatalf("removeIfExists() returned an error for a missing file: %v", err)
 	}
 }
 

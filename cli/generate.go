@@ -18,7 +18,7 @@ import (
 
 const previewGenerationTimeout = 30 * time.Second
 
-// extractor.nvim refuses to extract more than 100 colorschemes at once.
+// Bounds each nvim run under previewGenerationTimeout.
 const colorschemeBatchSize = 50
 
 var tmpDirectoryPath string
@@ -237,10 +237,6 @@ func captureDefaultColorschemes() {
 
 // captureColorschemeNames lists every colorscheme currently on the runtime path.
 func captureColorschemeNames(outputPath string) ([]string, error) {
-	if err := removeIfExists(outputPath); err != nil {
-		return nil, err
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), previewGenerationTimeout)
 	defer cancel()
 
@@ -387,12 +383,6 @@ func mergeColorData(target map[string]repoHelper.ColorschemeData, source map[str
 }
 
 func extractColorData(colorschemes []string) (map[string]repoHelper.ColorschemeData, error) {
-	// extractor.nvim may write nothing, in which case a file left by an earlier
-	// batch would be read instead.
-	if err := removeIfExists(colorDataFilePath); err != nil {
-		return nil, err
-	}
-
 	batch, err := json.Marshal(colorschemes)
 	if err != nil {
 		return nil, err
@@ -419,7 +409,8 @@ func extractColorData(colorschemes []string) (map[string]repoHelper.ColorschemeD
 	}
 
 	if !debugMode {
-		if err := removeIfExists(colorDataFilePath); err != nil {
+		err = os.Remove(colorDataFilePath)
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -427,25 +418,11 @@ func extractColorData(colorschemes []string) (map[string]repoHelper.ColorschemeD
 	return data, nil
 }
 
-// vim.fn.json_encode writes an empty table as "[]", so an extraction that
-// skipped every colorscheme comes back as an array rather than an object.
 func parseColorData(content []byte) (map[string]repoHelper.ColorschemeData, error) {
 	trimmed := bytes.TrimSpace(content)
 
+	// A run killed by its timeout can leave an empty file behind.
 	if len(trimmed) == 0 {
-		return map[string]repoHelper.ColorschemeData{}, nil
-	}
-
-	if trimmed[0] == '[' {
-		var items []json.RawMessage
-		if err := json.Unmarshal(trimmed, &items); err != nil {
-			return nil, err
-		}
-
-		if len(items) > 0 {
-			return nil, fmt.Errorf("expected colorscheme data, got an array of %d items", len(items))
-		}
-
 		return map[string]repoHelper.ColorschemeData{}, nil
 	}
 
@@ -520,15 +497,6 @@ func getGenerateData(repository repoHelper.Repository) database.GenerateData {
 	return database.GenerateData{
 		Colorschemes: repository.Colorschemes,
 	}
-}
-
-func removeIfExists(path string) error {
-	err := os.Remove(path)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	return nil
 }
 
 // wrapCommandError returns an error message that distinguishes timeout from other failures.

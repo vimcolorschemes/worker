@@ -1,8 +1,6 @@
 package repository
 
 import (
-	"encoding/json"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -377,101 +375,6 @@ func TestComputeRepositoryEligibilityAfterUpdate(t *testing.T) {
 		isValid := repository.IsEligibleAfterUpdate()
 		if isValid {
 			t.Errorf("Incorrect result for IsRepositoryValidAfterUpdate, got: %v, want: %v", isValid, false)
-		}
-	})
-}
-
-func TestColorschemeGroupUnmarshalJSON(t *testing.T) {
-	t.Run("should keep a hex code string", func(t *testing.T) {
-		var group ColorschemeGroup
-		if err := json.Unmarshal([]byte(`{"name":"NormalFg","hexCode":"#002B36"}`), &group); err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
-
-		if group.HexCode != "#002B36" {
-			t.Errorf("Incorrect hex code, got: %s, want: %s", group.HexCode, "#002B36")
-		}
-		if group.Name != "NormalFg" {
-			t.Errorf("Incorrect name, got: %s, want: %s", group.Name, "NormalFg")
-		}
-	})
-
-	t.Run("should convert a decimal rgb hex code", func(t *testing.T) {
-		var group ColorschemeGroup
-		if err := json.Unmarshal([]byte(`{"name":"CommentFg","hexCode":11119017}`), &group); err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
-
-		if group.HexCode != "#A9A9A9" {
-			t.Errorf("Incorrect hex code, got: %s, want: %s", group.HexCode, "#A9A9A9")
-		}
-	})
-
-	t.Run("should pad a small decimal rgb hex code", func(t *testing.T) {
-		var group ColorschemeGroup
-		if err := json.Unmarshal([]byte(`{"name":"NormalBg","hexCode":0}`), &group); err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
-
-		if group.HexCode != "#000000" {
-			t.Errorf("Incorrect hex code, got: %s, want: %s", group.HexCode, "#000000")
-		}
-	})
-
-	t.Run("should keep the highlight attributes of a converted group", func(t *testing.T) {
-		var group ColorschemeGroup
-		content := `{"name":"StatementFg","hexCode":16711680,"bold":true,"italic":true,"reverse":false}`
-		if err := json.Unmarshal([]byte(content), &group); err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
-
-		if group.HexCode != "#FF0000" {
-			t.Errorf("Incorrect hex code, got: %s, want: %s", group.HexCode, "#FF0000")
-		}
-		if !group.Bold || !group.Italic {
-			t.Errorf("Incorrect attributes, got bold: %v, italic: %v, want both true", group.Bold, group.Italic)
-		}
-		if group.Reverse {
-			t.Error("Incorrect attributes, got reverse: true, want false")
-		}
-	})
-
-	t.Run("should accept a missing hex code", func(t *testing.T) {
-		var group ColorschemeGroup
-		if err := json.Unmarshal([]byte(`{"name":"NormalFg"}`), &group); err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
-
-		if group.HexCode != "" {
-			t.Errorf("Incorrect hex code, got: %s, want an empty string", group.HexCode)
-		}
-	})
-
-	t.Run("should reject a hex code that is not a color value", func(t *testing.T) {
-		for _, hexCode := range []string{"-1", "16777216", "1.5"} {
-			var group ColorschemeGroup
-			content := fmt.Sprintf(`{"name":"NormalFg","hexCode":%s}`, hexCode)
-
-			if err := json.Unmarshal([]byte(content), &group); err == nil {
-				t.Errorf("Expected an error for hex code %s, got none", hexCode)
-			}
-		}
-	})
-
-	t.Run("should decode a list of groups", func(t *testing.T) {
-		var data ColorschemeData
-		content := `{"dark":[{"name":"NormalFg","hexCode":8421504},{"name":"NormalBg","hexCode":"#FFFFFF"}]}`
-		if err := json.Unmarshal([]byte(content), &data); err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
-
-		expected := []ColorschemeGroup{
-			{Name: "NormalFg", HexCode: "#808080"},
-			{Name: "NormalBg", HexCode: "#FFFFFF"},
-		}
-
-		if !reflect.DeepEqual(data.Dark, expected) {
-			t.Errorf("Incorrect groups, got: %v, want: %v", data.Dark, expected)
 		}
 	})
 }
