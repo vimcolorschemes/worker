@@ -146,14 +146,9 @@ func TestParseColorData(t *testing.T) {
 		}
 	})
 
-	t.Run("should read empty content as no colorscheme", func(t *testing.T) {
-		got, err := parseColorData([]byte("  "))
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
-
-		if len(got) != 0 {
-			t.Fatalf("parseColorData() = %v, want an empty map", got)
+	t.Run("should reject empty content", func(t *testing.T) {
+		if _, err := parseColorData([]byte("  ")); err == nil {
+			t.Fatal("Expected an error, got none")
 		}
 	})
 

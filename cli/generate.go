@@ -100,11 +100,6 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 		var colorschemes []repoHelper.Colorscheme
 
 		for name := range data {
-			// Skip built-in colorschemes
-			if defaultColorschemes[name] || isDefaultColorscheme(name) {
-				continue
-			}
-
 			var backgrounds []repoHelper.BackgroundValue
 			if data[name].Light != nil {
 				backgrounds = append(backgrounds, repoHelper.LightBackground)
@@ -419,12 +414,8 @@ func extractColorData(colorschemes []string) (map[string]repoHelper.ColorschemeD
 }
 
 func parseColorData(content []byte) (map[string]repoHelper.ColorschemeData, error) {
+	// Empty content means a broken extractor run; failing here beats wiping stored colorschemes.
 	trimmed := bytes.TrimSpace(content)
-
-	// A run killed by its timeout can leave an empty file behind.
-	if len(trimmed) == 0 {
-		return map[string]repoHelper.ColorschemeData{}, nil
-	}
 
 	var data map[string]repoHelper.ColorschemeData
 	if err := json.Unmarshal(trimmed, &data); err != nil {
