@@ -9,10 +9,3 @@ vim.cmd("colorscheme default")
 
 -- Necessary custom settings for some colorschemes
 vim.cmd("let g:solarized_termcolors=256")
-
-vim.api.nvim_create_autocmd("BufReadPost", {
-  pattern = "code_sample.vim",
-  callback = function()
-    pcall(require("extractor").extract, { output_path = vim.env.COLOR_DATA_PATH })
-  end,
-})
