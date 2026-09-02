@@ -2,11 +2,8 @@ package github
 
 import (
 	"context"
-	"errors"
 	"log"
-	"os"
 	"regexp"
-	"strings"
 
 	gogithub "github.com/google/go-github/v68/github"
 )
@@ -17,10 +14,6 @@ var colorschemeFilePattern = regexp.MustCompile(`^colors/.*\.(vim|lua)$`)
 // colors/. A truncated tree resolves to true: discarding a real colorscheme costs
 // more than a wasted generate attempt.
 func HasColorschemeFiles(ownerName string, name string) (bool, error) {
-	if strings.HasSuffix(os.Args[0], ".test") {
-		return false, errors.New("running in test mode")
-	}
-
 	tree, response, err := client.Git.GetTree(context.Background(), ownerName, name, "HEAD", true)
 
 	if _, ok := err.(*gogithub.RateLimitError); ok {
