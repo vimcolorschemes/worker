@@ -26,6 +26,21 @@ func TestCountColorschemeFiles(t *testing.T) {
 			want:  2,
 		},
 		{
+			name:  "counts case-differed files, which load on case-insensitive systems",
+			paths: []string{"Colors/One.vim", "colors/two.VIM", "COLORS/three.lua"},
+			want:  3,
+		},
+		{
+			name:  "counts the after/colors override path",
+			paths: []string{"after/colors/late.vim"},
+			want:  1,
+		},
+		{
+			name:  "ignores nested and non-root after/colors files",
+			paths: []string{"after/colors/nested/one.vim", "lua/after/colors/one.lua"},
+			want:  0,
+		},
+		{
 			name:  "ignores nested colorscheme files, which vim never loads",
 			paths: []string{"colors/light/one.vim", "colors/dark/two.lua"},
 			want:  0,

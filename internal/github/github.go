@@ -23,7 +23,7 @@ var client *gogithub.Client
 
 const searchResultCountHardLimit = 1000
 
-var colorschemeFilePattern = regexp.MustCompile(`^colors/[^/]+\.(vim|lua)$`)
+var colorschemeFilePattern = regexp.MustCompile(`(?i)^(after/)?colors/[^/]+\.(vim|lua)$`)
 
 // ErrTreeTruncated is returned when Github truncated the tree response before
 // any colorscheme file showed up, so the count cannot be trusted.
@@ -93,7 +93,8 @@ func isEmptyRepository(err error) bool {
 }
 
 // CountColorschemeFiles reports how many colors/*.{vim,lua} files a repository
-// ships, by matching its recursive HEAD tree.
+// ships, by matching its recursive HEAD tree. The after/colors/ override path
+// is counted too, since vim loads it from the runtimepath as well.
 func CountColorschemeFiles(ownerName string, name string) (int, error) {
 	if strings.HasSuffix(os.Args[0], ".test") {
 		return 0, errors.New("running in test mode")

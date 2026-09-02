@@ -116,7 +116,7 @@ func filterColorschemeRepositories(repositories []*gogithub.Repository) ([]*gogi
 		}
 
 		if count == 0 {
-			log.Printf("Dropping %s/%s, no colors/*.{vim,lua} file", ownerName, name)
+			log.Printf("Dropping %s/%s, no root colors/ or after/colors/ *.{vim,lua} file", ownerName, name)
 			droppedNames = append(droppedNames, fmt.Sprintf("%s/%s", ownerName, name))
 			continue
 		}
