@@ -97,27 +97,7 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 			continue
 		}
 
-		var colorschemes []repoHelper.Colorscheme
-
-		for name := range data {
-			var backgrounds []repoHelper.BackgroundValue
-			if data[name].Light != nil {
-				backgrounds = append(backgrounds, repoHelper.LightBackground)
-			}
-			if data[name].Dark != nil {
-				backgrounds = append(backgrounds, repoHelper.DarkBackground)
-			}
-
-			colorschemes = append(
-				colorschemes,
-				repoHelper.Colorscheme{
-					Name:        name,
-					Data:        data[name],
-					Backgrounds: backgrounds,
-				})
-		}
-
-		repository.Colorschemes = colorschemes
+		repository.Colorschemes = buildRepositoryColorschemes(data, repository.Name)
 		updateRepositoryAfterGenerate(repository)
 	}
 
