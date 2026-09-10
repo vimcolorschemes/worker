@@ -10,7 +10,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/pressly/goose/v3 v3.22.1
 	github.com/tursodatabase/go-libsql v0.0.0-20251219133454-43644db490ff
-	golang.org/x/oauth2 v0.27.0
+	golang.org/x/oauth2 v0.37.0
 )
 
 require (
