@@ -3,7 +3,7 @@ module github.com/vimcolorschemes/worker
 go 1.26.1
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.46.0
+	github.com/aws/aws-sdk-go-v2 v1.47.1
 	github.com/aws/aws-sdk-go-v2/config v1.33.3
 	github.com/aws/aws-sdk-go-v2/service/sns v1.39.15
 	github.com/google/go-github/v68 v68.0.0
