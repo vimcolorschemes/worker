@@ -64,6 +64,32 @@ func GetRepositories() ([]repository.Repository, error) {
 	return queryRepositoriesBasic(queryAllRepositories)
 }
 
+// GetRepositoryIDs gets the ids of every stored repository, disabled ones included.
+func GetRepositoryIDs() (map[int64]bool, error) {
+	rows, err := queryWithTransientRetry(queryRepositoryIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	ids := map[int64]bool{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids[id] = true
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ids, nil
+}
+
 // GetRepository gets the repository matching the repository key.
 func GetRepository(repoKey string) (repository.Repository, error) {
 	matches := strings.Split(repoKey, "/")

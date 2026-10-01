@@ -957,3 +957,40 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		}
 	})
 }
+
+func TestGetRepositoryIDs(t *testing.T) {
+	t.Run("returns no ids on an empty database", func(t *testing.T) {
+		setupTestDB(t)
+
+		ids, err := GetRepositoryIDs()
+		if err != nil {
+			t.Fatalf("GetRepositoryIDs returned error: %v", err)
+		}
+		if len(ids) != 0 {
+			t.Fatalf("len(ids) = %d, want 0", len(ids))
+		}
+	})
+
+	t.Run("returns every id including disabled repositories", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "enabled")
+		insertTestRepo(t, 2, "owner", "disabled")
+		if err := SetRepositoryDisabled(2, true); err != nil {
+			t.Fatalf("SetRepositoryDisabled returned error: %v", err)
+		}
+
+		ids, err := GetRepositoryIDs()
+		if err != nil {
+			t.Fatalf("GetRepositoryIDs returned error: %v", err)
+		}
+		if len(ids) != 2 {
+			t.Fatalf("len(ids) = %d, want 2", len(ids))
+		}
+		if !ids[1] {
+			t.Fatal("ids[1] = false, want true")
+		}
+		if !ids[2] {
+			t.Fatal("ids[2] = false, want true")
+		}
+	})
+}
