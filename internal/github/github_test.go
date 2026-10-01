@@ -9,7 +9,7 @@ import (
 func tree(truncated bool, paths ...string) *gogithub.Tree {
 	entries := make([]*gogithub.TreeEntry, 0, len(paths))
 	for _, path := range paths {
-		entries = append(entries, &gogithub.TreeEntry{Path: gogithub.Ptr(path)})
+		entries = append(entries, &gogithub.TreeEntry{Path: gogithub.Ptr(path), Type: gogithub.Ptr("blob")})
 	}
 	return &gogithub.Tree{Entries: entries, Truncated: gogithub.Ptr(truncated)}
 }
@@ -26,9 +26,9 @@ func TestCountColorschemeFiles(t *testing.T) {
 			want:  2,
 		},
 		{
-			name:  "counts case-differed files, which load on case-insensitive systems",
+			name:  "ignores case-differed files, which the linux worker cannot load",
 			paths: []string{"Colors/One.vim", "colors/two.VIM", "COLORS/three.lua"},
-			want:  3,
+			want:  0,
 		},
 		{
 			name:  "counts the after/colors override path",
@@ -84,5 +84,17 @@ func TestCountColorschemeFiles(t *testing.T) {
 				t.Fatalf("countColorschemeFiles() = %d, want %d", got, test.want)
 			}
 		})
+	}
+}
+
+func TestCountColorschemeFilesIgnoresNonBlobEntries(t *testing.T) {
+	entries := []*gogithub.TreeEntry{
+		{Path: gogithub.Ptr("colors/one.vim"), Type: gogithub.Ptr("blob")},
+		{Path: gogithub.Ptr("colors/dir.vim"), Type: gogithub.Ptr("tree")},
+		{Path: gogithub.Ptr("colors/submodule.vim"), Type: gogithub.Ptr("commit")},
+	}
+
+	if got := countColorschemeFiles(&gogithub.Tree{Entries: entries}); got != 1 {
+		t.Fatalf("countColorschemeFiles() = %d, want 1", got)
 	}
 }

@@ -103,7 +103,10 @@ func TestBuildDailyJobSummary(t *testing.T) {
 			ElapsedTime: 12.5,
 			Status:      "success",
 			Data: map[string]interface{}{
-				"repositoryCount": float64(2934),
+				"repositoryCount":        float64(2934),
+				"repositoryCheckedCount": float64(40),
+				"repositoryDroppedCount": float64(2),
+				"repositoryDroppedNames": []string{"owner4/dotfiles", "owner5/tutorial"},
 			},
 		},
 		"update": {
@@ -149,6 +152,11 @@ func TestBuildDailyJobSummary(t *testing.T) {
 		"https://vimcolorschemes.com",
 		"Import · success",
 		"Repositories:  2,934",
+		"Checked:       40",
+		"Dropped:       2",
+		"Dropped repositories:",
+		"- owner4/dotfiles (https://github.com/owner4/dotfiles)",
+		"- owner5/tutorial (https://github.com/owner5/tutorial)",
 		"Duration:      12.5s",
 		"Update · success",
 		"Errors:        2",

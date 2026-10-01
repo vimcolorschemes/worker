@@ -23,7 +23,7 @@ var client *gogithub.Client
 
 const searchResultCountHardLimit = 1000
 
-var colorschemeFilePattern = regexp.MustCompile(`(?i)^(after/)?colors/[^/]+\.(vim|lua)$`)
+var colorschemeFilePattern = regexp.MustCompile(`^(after/)?colors/[^/]+\.(vim|lua)$`)
 
 // ErrTreeTruncated is returned when Github truncated the tree response before
 // any colorscheme file showed up, so the count cannot be trusted.
@@ -129,6 +129,9 @@ func CountColorschemeFiles(ownerName string, name string) (int, error) {
 func countColorschemeFiles(tree *gogithub.Tree) int {
 	count := 0
 	for _, entry := range tree.Entries {
+		if entry.GetType() != "blob" {
+			continue
+		}
 		if colorschemeFilePattern.MatchString(entry.GetPath()) {
 			count++
 		}
