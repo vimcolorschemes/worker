@@ -165,7 +165,7 @@ func buildDailyJobSummary(day time.Time, reports map[string]database.JobReport, 
 func writeJobSection(b *strings.Builder, job string, report database.JobReport, includeGenerateEvents bool, generateEventCounts map[string]int, generateErrorMessages []string) {
 	b.WriteString(summaryDivider)
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("%s · %s\n", titleCase(job), sectionStatus(report)))
+	fmt.Fprintf(b, "%s · %s\n", titleCase(job), sectionStatus(report))
 	b.WriteString(summaryDivider)
 	b.WriteString("\n")
 
@@ -233,7 +233,7 @@ func writeJobSection(b *strings.Builder, job string, report database.JobReport, 
 	if len(errorSamples) > 0 {
 		b.WriteString("\n  Recent errors:\n")
 		for _, message := range errorSamples {
-			b.WriteString(fmt.Sprintf("    - %s\n", message))
+			fmt.Fprintf(b, "    - %s\n", message)
 		}
 	}
 }
@@ -246,7 +246,7 @@ func writeSummaryRows(b *strings.Builder, rows [][2]string) {
 		}
 	}
 	for _, row := range rows {
-		b.WriteString(fmt.Sprintf("  %-*s  %s\n", width+1, row[0]+":", row[1]))
+		fmt.Fprintf(b, "  %-*s  %s\n", width+1, row[0]+":", row[1])
 	}
 }
 
@@ -352,9 +352,9 @@ func writeRepositoryNames(b *strings.Builder, value interface{}, title string) {
 		return
 	}
 
-	b.WriteString(fmt.Sprintf("\n  %s:\n", title))
+	fmt.Fprintf(b, "\n  %s:\n", title)
 	for _, name := range names {
-		b.WriteString(fmt.Sprintf("    - %v (https://github.com/%v)\n", name, name))
+		fmt.Fprintf(b, "    - %v (https://github.com/%v)\n", name, name)
 	}
 }
 
