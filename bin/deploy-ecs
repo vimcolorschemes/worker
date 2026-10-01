@@ -16,6 +16,7 @@ Required environment variables:
   EVENTBRIDGE_RULES
   JOB_NOTIFICATIONS_TOPIC_ARN
   PUBLISH_WEBHOOK_URL
+  DISPATCH_TOKEN_SECRET_ARN
 EOF
 }
 
@@ -65,6 +66,7 @@ require_var ECS_CONTAINER_NAME
 require_var EVENTBRIDGE_RULES
 require_var JOB_NOTIFICATIONS_TOPIC_ARN
 require_var PUBLISH_WEBHOOK_URL
+require_var DISPATCH_TOKEN_SECRET_ARN
 
 image_uri="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
 immutable_image="${image_uri}@${digest}"
@@ -85,7 +87,8 @@ aws ecs describe-task-definition \
 jq --arg image "$immutable_image" \
   --arg name "$ECS_CONTAINER_NAME" \
   --arg jobNotificationsTopicArn "$JOB_NOTIFICATIONS_TOPIC_ARN" \
-  --arg publishWebhookURL "$PUBLISH_WEBHOOK_URL" '
+  --arg publishWebhookURL "$PUBLISH_WEBHOOK_URL" \
+  --arg githubDispatchTokenSecretArn "$DISPATCH_TOKEN_SECRET_ARN" '
   {
     family,
     taskRoleArn,
@@ -115,7 +118,10 @@ jq --arg image "$immutable_image" \
               {name: "PUBLISH_WEBHOOK_URL", value: $publishWebhookURL}
             ])
         | .secrets = ((.secrets // [])
-          | map(select(.name != "JOB_NOTIFICATIONS_TOPIC_ARN" and .name != "PUBLISH_WEBHOOK_URL")))
+          | map(select(.name != "JOB_NOTIFICATIONS_TOPIC_ARN" and .name != "PUBLISH_WEBHOOK_URL" and .name != "GITHUB_DISPATCH_TOKEN"))
+          + [
+              {name: "GITHUB_DISPATCH_TOKEN", valueFrom: $githubDispatchTokenSecretArn}
+            ])
       else
         .
       end

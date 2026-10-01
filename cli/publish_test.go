@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -59,13 +61,39 @@ func TestTriggerPublishWebhook(t *testing.T) {
 				t.Fatalf("User-Agent = %q, want %q", got, "vimcolorschemes-worker/publish")
 			}
 
+			if got := r.Header.Get("Content-Type"); got != "application/json" {
+				t.Fatalf("Content-Type = %q, want %q", got, "application/json")
+			}
+
+			if got := r.Header.Get("Accept"); got != "application/vnd.github+json" {
+				t.Fatalf("Accept = %q, want %q", got, "application/vnd.github+json")
+			}
+
+			if got := r.Header.Get("Authorization"); got != "Bearer test-dispatch-token" {
+				t.Fatalf("Authorization = %q, want %q", got, "Bearer test-dispatch-token")
+			}
+
+			rawBody, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("read body: %v", err)
+			}
+
+			var payload map[string]string
+			if err := json.Unmarshal(rawBody, &payload); err != nil {
+				t.Fatalf("unmarshal body %q: %v", rawBody, err)
+			}
+
+			if payload["event_type"] != "database-updated" {
+				t.Fatalf("event_type = %q, want %q", payload["event_type"], "database-updated")
+			}
+
 			w.WriteHeader(http.StatusCreated)
 		}))
 		defer server.Close()
 
 		publishHTTPClient = &http.Client{Timeout: time.Second}
 
-		statusCode, err := triggerPublishWebhook(server.URL)
+		statusCode, err := triggerPublishWebhook(server.URL, "test-dispatch-token")
 		if err != nil {
 			t.Fatalf("triggerPublishWebhook returned error: %v", err)
 		}
@@ -83,7 +111,7 @@ func TestTriggerPublishWebhook(t *testing.T) {
 
 		publishHTTPClient = &http.Client{Timeout: time.Second}
 
-		statusCode, err := triggerPublishWebhook(server.URL)
+		statusCode, err := triggerPublishWebhook(server.URL, "test-dispatch-token")
 		if err == nil {
 			t.Fatal("triggerPublishWebhook error = nil, want error")
 		}

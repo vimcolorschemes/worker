@@ -50,6 +50,11 @@ resource "aws_secretsmanager_secret" "database_auth_token" {
   tags = merge(local.tags, { Purpose = "runtime-secret" })
 }
 
+resource "aws_secretsmanager_secret" "github_dispatch_token" {
+  name = "vimcolorschemes/worker/github_dispatch_token"
+  tags = merge(local.tags, { Purpose = "runtime-secret" })
+}
+
 resource "aws_iam_role_policy" "ecs_task_execution_secret_access" {
   name = "VimcolorschemesWorkerRuntimeSecretsRead"
   role = var.ecs_task_execution_role_name
@@ -64,6 +69,7 @@ resource "aws_iam_role_policy" "ecs_task_execution_secret_access" {
           aws_secretsmanager_secret.github_token.arn,
           aws_secretsmanager_secret.database_url.arn,
           aws_secretsmanager_secret.database_auth_token.arn,
+          aws_secretsmanager_secret.github_dispatch_token.arn,
         ]
       }
     ]
