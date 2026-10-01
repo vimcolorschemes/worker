@@ -35,6 +35,7 @@ Deployment behavior:
 - Registers a new ECS task definition revision in the `run-job` family
 - Pins the ECS container image to the pushed image digest (`@sha256:...`)
 - Ensures the ECS container sets `JOB_NOTIFICATIONS_TOPIC_ARN` and `PUBLISH_WEBHOOK_URL` as plain ECS environment
+- Ensures the ECS container sets `GITHUB_DISPATCH_TOKEN` as an ECS secret from `DISPATCH_TOKEN_SECRET_ARN`
 - Updates EventBridge rules (`import`, `update`, `generate`, `publish`) to the new revision
 
 Required GitHub Actions repo variables:
@@ -44,6 +45,7 @@ Required GitHub Actions repo variables:
 - `AWS_ROLE_TO_ASSUME`
 - `JOB_NOTIFICATIONS_TOPIC_ARN`
 - `PUBLISH_WEBHOOK_URL`
+- `DISPATCH_TOKEN_SECRET_ARN`
 
 The assumed role must trust GitHub OIDC (`token.actions.githubusercontent.com`) and allow:
 
@@ -59,6 +61,7 @@ The ECS task definition should inject these environment variables from AWS Secre
 - `GITHUB_TOKEN` from `vimcolorschemes/worker/github_token`
 - `DATABASE_URL` from `vimcolorschemes/worker/database_url`
 - `DATABASE_AUTH_TOKEN` from `vimcolorschemes/worker/database_auth_token`
+- `GITHUB_DISPATCH_TOKEN` from `vimcolorschemes/worker/github_dispatch_token`
 
 The ECS task definition should set this non-secret variable as plain container environment:
 

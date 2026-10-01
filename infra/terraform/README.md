@@ -45,6 +45,7 @@ This module is configured to let CI keep owning deploy-time task definition revi
   - `vimcolorschemes/worker/github_token`
   - `vimcolorschemes/worker/database_url`
   - `vimcolorschemes/worker/database_auth_token`
+  - `vimcolorschemes/worker/github_dispatch_token`
 - ECS task definitions should map these as container `secrets`.
 - `alert_email_addresses` controls SNS email subscriptions for job notifications.
 - `JOB_NOTIFICATIONS_TOPIC_ARN` and `PUBLISH_WEBHOOK_URL` are treated as non-secret and should be set as plain container `environment` during deploy.

@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -47,7 +49,12 @@ func Publish(_force bool, _debug bool, _repoKey string) map[string]interface{} {
 		log.Panic("PUBLISH_WEBHOOK_URL not found in env")
 	}
 
-	responseStatusCode, err := triggerPublishWebhook(webhookURL)
+	dispatchToken, ok := os.LookupEnv("GITHUB_DISPATCH_TOKEN")
+	if !ok || dispatchToken == "" {
+		log.Panic("GITHUB_DISPATCH_TOKEN not found in env")
+	}
+
+	responseStatusCode, err := triggerPublishWebhook(webhookURL, dispatchToken)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -86,24 +93,32 @@ func validatePublishPrerequisites(statuses map[string]string) error {
 	return fmt.Errorf("publish requires successful reports today for import, update, and generate; got %s", strings.Join(incompleteJobs, ", "))
 }
 
-func triggerPublishWebhook(webhookURL string) (int, error) {
-	req, err := http.NewRequest(http.MethodPost, webhookURL, nil)
+func triggerPublishWebhook(webhookURL string, dispatchToken string) (int, error) {
+	body, err := json.Marshal(map[string]string{"event_type": "database-updated"})
 	if err != nil {
-		return 0, fmt.Errorf("build vercel webhook request: %w", err)
+		return 0, fmt.Errorf("build github dispatch request body: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, webhookURL, bytes.NewReader(body))
+	if err != nil {
+		return 0, fmt.Errorf("build github dispatch request: %w", err)
 	}
 
 	req.Header.Set("User-Agent", "vimcolorschemes-worker/publish")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", "Bearer "+dispatchToken)
 
 	response, err := publishHTTPClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("call vercel webhook: %w", err)
+		return 0, fmt.Errorf("call github dispatch: %w", err)
 	}
 	defer func() {
 		_ = response.Body.Close()
 	}()
 
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return response.StatusCode, fmt.Errorf("vercel webhook returned status %d", response.StatusCode)
+		return response.StatusCode, fmt.Errorf("github dispatch returned status %d", response.StatusCode)
 	}
 
 	return response.StatusCode, nil
