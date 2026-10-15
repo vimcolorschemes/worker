@@ -848,6 +848,94 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		}
 	})
 
+	t.Run("batches groups spanning multiple batches", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		groupCount := generateGroupBatchSize + 10
+		light := make([]repository.ColorschemeGroup, 0, groupCount)
+		dark := make([]repository.ColorschemeGroup, 0, groupCount)
+		for index := 0; index < groupCount; index++ {
+			light = append(light, repository.ColorschemeGroup{
+				Name:    fmt.Sprintf("light-%d", index),
+				HexCode: "#ffffff",
+				Bold:    index%2 == 0,
+			})
+			dark = append(dark, repository.ColorschemeGroup{
+				Name:    fmt.Sprintf("dark-%d", index),
+				HexCode: "#000000",
+				Italic:  index%2 == 1,
+			})
+		}
+
+		if err := UpdateRepositoryFromGenerate(1, GenerateData{
+			Colorschemes: []repository.Colorscheme{
+				{Name: "scheme1", Data: repository.ColorschemeData{Light: light}},
+				{Name: "scheme2", Data: repository.ColorschemeData{Dark: dark}},
+			},
+		}); err != nil {
+			t.Fatalf("UpdateRepositoryFromGenerate: %v", err)
+		}
+
+		repo, err := GetRepository("owner/repo")
+		if err != nil {
+			t.Fatalf("GetRepository: %v", err)
+		}
+		if len(repo.Colorschemes) != 2 {
+			t.Fatalf("Colorschemes len = %d, want 2", len(repo.Colorschemes))
+		}
+		byName := map[string]repository.Colorscheme{}
+		for _, scheme := range repo.Colorschemes {
+			byName[scheme.Name] = scheme
+		}
+		if len(byName["scheme1"].Data.Light) != groupCount {
+			t.Fatalf("scheme1 light len = %d, want %d", len(byName["scheme1"].Data.Light), groupCount)
+		}
+		if len(byName["scheme1"].Data.Dark) != 0 {
+			t.Fatalf("scheme1 dark len = %d, want 0", len(byName["scheme1"].Data.Dark))
+		}
+		if len(byName["scheme2"].Data.Dark) != groupCount {
+			t.Fatalf("scheme2 dark len = %d, want %d", len(byName["scheme2"].Data.Dark), groupCount)
+		}
+		if len(byName["scheme2"].Data.Light) != 0 {
+			t.Fatalf("scheme2 light len = %d, want 0", len(byName["scheme2"].Data.Light))
+		}
+		if byName["scheme1"].Data.Light[0].Name != "light-0" {
+			t.Fatalf("scheme1 light[0] = %q, want %q", byName["scheme1"].Data.Light[0].Name, "light-0")
+		}
+		if !byName["scheme1"].Data.Light[0].Bold {
+			t.Fatal("scheme1 light[0].Bold = false, want true")
+		}
+		if byName["scheme1"].Data.Light[55].Name != "light-55" {
+			t.Fatalf("scheme1 light[55] = %q, want %q", byName["scheme1"].Data.Light[55].Name, "light-55")
+		}
+		if byName["scheme1"].Data.Light[55].Bold {
+			t.Fatal("scheme1 light[55].Bold = true, want false")
+		}
+		if byName["scheme2"].Data.Dark[59].Name != "dark-59" {
+			t.Fatalf("scheme2 dark[59] = %q, want %q", byName["scheme2"].Data.Dark[59].Name, "dark-59")
+		}
+		if !byName["scheme2"].Data.Dark[59].Italic {
+			t.Fatal("scheme2 dark[59].Italic = false, want true")
+		}
+
+		var lightCount, darkCount int
+		err = db.QueryRow(`SELECT COUNT(*) FROM colorscheme_groups WHERE background = 'light'`).Scan(&lightCount)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		err = db.QueryRow(`SELECT COUNT(*) FROM colorscheme_groups WHERE background = 'dark'`).Scan(&darkCount)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if lightCount != groupCount {
+			t.Fatalf("light background count = %d, want %d", lightCount, groupCount)
+		}
+		if darkCount != groupCount {
+			t.Fatalf("dark background count = %d, want %d", darkCount, groupCount)
+		}
+	})
+
 	t.Run("replaces existing colorschemes", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")

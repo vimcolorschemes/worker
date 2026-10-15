@@ -411,10 +411,24 @@ func placeholders(count int) string {
 	return strings.Join(items, ", ")
 }
 
+// generateGroupBatchSize bounds the rows per colorscheme_groups INSERT.
+// Each statement is a remote Hrana request, so batching cuts request volume
+// (and 429 load-shed risk). 50 rows x 13 columns = 650 variables, safely
+// under SQLite's historic 999-variable limit.
+const generateGroupBatchSize = 50
+
+const generateGroupColumnCount = 13
+
+type generateGroupRow struct {
+	colorschemeID int64
+	background    repository.BackgroundValue
+	group         repository.ColorschemeGroup
+}
+
 // UpdateRepositoryFromGenerate updates a repository with generate job data.
-// The whole transaction retries on transient errors (including Turso 429
-// load-shed). Returns an error so callers can isolate a single repository
-// failure instead of aborting the job.
+// Group writes are batched and the whole transaction retries on transient
+// errors (including Turso 429 load-shed). Returns an error so callers can
+// isolate a single repository failure instead of aborting the job.
 func UpdateRepositoryFromGenerate(id int64, data GenerateData) error {
 	return runRepositoryWriteTransaction(func(ctx context.Context, tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, "DELETE FROM colorschemes WHERE repository_id = ?", id); err != nil {
@@ -434,6 +448,7 @@ func UpdateRepositoryFromGenerate(id int64, data GenerateData) error {
 			return fmt.Errorf("update has_dark/has_light: %w", err)
 		}
 
+		schemeIDs := make([]int64, 0, len(data.Colorschemes))
 		for _, scheme := range data.Colorschemes {
 			result, err := tx.ExecContext(ctx, "INSERT INTO colorschemes (repository_id, name) VALUES (?, ?)", id, scheme.Name)
 			if err != nil {
@@ -443,6 +458,11 @@ func UpdateRepositoryFromGenerate(id int64, data GenerateData) error {
 			if err != nil {
 				return fmt.Errorf("colorscheme last insert id: %w", err)
 			}
+			schemeIDs = append(schemeIDs, schemeID)
+		}
+
+		rows := make([]generateGroupRow, 0)
+		for index, scheme := range data.Colorschemes {
 			for _, bg := range []struct {
 				value  repository.BackgroundValue
 				groups []repository.ColorschemeGroup
@@ -451,44 +471,71 @@ func UpdateRepositoryFromGenerate(id int64, data GenerateData) error {
 				{repository.DarkBackground, scheme.Data.Dark},
 			} {
 				for _, group := range bg.groups {
-					if _, err := tx.ExecContext(ctx, `
-						INSERT INTO colorscheme_groups (
-							colorscheme_id,
-							background,
-							name,
-							hex_code,
-							bold,
-							italic,
-							underline,
-							undercurl,
-							underdouble,
-							underdotted,
-							underdashed,
-							strikethrough,
-							reverse
-						) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-						schemeID,
-						bg.value,
-						group.Name,
-						group.HexCode,
-						group.Bold,
-						group.Italic,
-						group.Underline,
-						group.Undercurl,
-						group.Underdouble,
-						group.Underdotted,
-						group.Underdashed,
-						group.Strikethrough,
-						group.Reverse,
-					); err != nil {
-						return fmt.Errorf("insert colorscheme group: %w", err)
-					}
+					rows = append(rows, generateGroupRow{
+						colorschemeID: schemeIDs[index],
+						background:    bg.value,
+						group:         group,
+					})
 				}
+			}
+		}
+
+		for start := 0; start < len(rows); start += generateGroupBatchSize {
+			end := min(start+generateGroupBatchSize, len(rows))
+			if err := insertGenerateGroupBatch(ctx, tx, rows[start:end]); err != nil {
+				return err
 			}
 		}
 
 		return createRepositoryJobEventsContext(ctx, tx, []int64{id}, jobGenerate, jobStatusSuccess, "", time.Now().UTC())
 	})
+}
+
+func insertGenerateGroupBatch(ctx context.Context, tx *sql.Tx, rows []generateGroupRow) error {
+	if len(rows) == 0 {
+		return nil
+	}
+
+	args := make([]any, 0, len(rows)*generateGroupColumnCount)
+	for _, row := range rows {
+		args = append(args,
+			row.colorschemeID,
+			row.background,
+			row.group.Name,
+			row.group.HexCode,
+			row.group.Bold,
+			row.group.Italic,
+			row.group.Underline,
+			row.group.Undercurl,
+			row.group.Underdouble,
+			row.group.Underdotted,
+			row.group.Underdashed,
+			row.group.Strikethrough,
+			row.group.Reverse,
+		)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+				INSERT INTO colorscheme_groups (
+					colorscheme_id,
+					background,
+					name,
+					hex_code,
+					bold,
+					italic,
+					underline,
+					undercurl,
+					underdouble,
+					underdotted,
+					underdashed,
+					strikethrough,
+					reverse
+				) VALUES `+rowPlaceholders(len(rows), generateGroupColumnCount),
+		args...); err != nil {
+		return fmt.Errorf("insert colorscheme groups: %w", err)
+	}
+
+	return nil
 }
 
 type repositoryJobEventExecutor interface {
