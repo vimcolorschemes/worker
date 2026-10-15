@@ -5,7 +5,7 @@ go 1.26.1
 require (
 	github.com/aws/aws-sdk-go-v2 v1.47.1
 	github.com/aws/aws-sdk-go-v2/config v1.33.3
-	github.com/aws/aws-sdk-go-v2/service/sns v1.47.2
+	github.com/aws/aws-sdk-go-v2/service/sns v1.47.3
 	github.com/google/go-github/v68 v68.0.0
 	github.com/joho/godotenv v1.5.1
 	github.com/pressly/goose/v3 v3.22.1
