@@ -30,6 +30,13 @@ func isTransientLibSQLError(err error) bool {
 		"sqlite_busy",
 		"database is locked",
 		"context deadline exceeded",
+		"too many requests",
+		"status=429",
+		"status 429",
+		"load-shed",
+		"load shed",
+		"rate limit",
+		"throttle",
 	} {
 		if strings.Contains(errMsg, marker) {
 			return true
@@ -115,33 +122,6 @@ func queryWithTransientRetry(query string, args ...any) (*sql.Rows, error) {
 		log.Printf("DB query failed with transient libsql error, retrying: %s", err)
 		if pingErr := pingWithTimeout(); pingErr != nil {
 			return nil, fmt.Errorf("ping before query retry: %w", pingErr)
-		}
-		time.Sleep(transientLibSQLRetryBackoff(attempt))
-	}
-
-	return nil, lastErr
-}
-
-func beginWithTransientRetry() (*sql.Tx, error) {
-	var lastErr error
-	for attempt := 0; attempt <= transientLibSQLRetryAttempts; attempt++ {
-		tx, err := db.Begin()
-		if err == nil {
-			return tx, nil
-		}
-
-		if !isTransientLibSQLError(err) {
-			return nil, err
-		}
-
-		lastErr = err
-		if attempt == transientLibSQLRetryAttempts {
-			break
-		}
-
-		log.Printf("DB begin failed with transient libsql error, retrying: %s", err)
-		if pingErr := pingWithTimeout(); pingErr != nil {
-			return nil, fmt.Errorf("ping before begin retry: %w", pingErr)
 		}
 		time.Sleep(transientLibSQLRetryBackoff(attempt))
 	}
