@@ -875,6 +875,46 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		}
 	})
 
+	t.Run("returns an error and leaves stored colorschemes untouched on failure", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		if err := UpdateRepositoryFromGenerate(1, GenerateData{
+			Colorschemes: []repository.Colorscheme{{Name: "scheme1"}},
+		}); err != nil {
+			t.Fatalf("UpdateRepositoryFromGenerate: %v", err)
+		}
+
+		if _, err := db.Exec(`DROP TABLE colorscheme_groups`); err != nil {
+			t.Fatalf("drop colorscheme_groups: %v", err)
+		}
+		if err := UpdateRepositoryFromGenerate(1, GenerateData{
+			Colorschemes: []repository.Colorscheme{{Name: "scheme2", Data: repository.ColorschemeData{
+				Light: []repository.ColorschemeGroup{{Name: "Normal", HexCode: "#ffffff"}},
+			}}},
+		}); err == nil {
+			t.Fatal("UpdateRepositoryFromGenerate() = nil, want error")
+		}
+
+		var name string
+		err := db.QueryRow(`SELECT name FROM colorschemes WHERE repository_id = 1`).Scan(&name)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if name != "scheme1" {
+			t.Fatalf("Name = %q, want %q", name, "scheme1")
+		}
+
+		var eventCount int
+		err = db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE repository_id = 1 AND job = 'generate' AND status = 'success'`).Scan(&eventCount)
+		if err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if eventCount != 1 {
+			t.Fatalf("eventCount = %d, want 1", eventCount)
+		}
+	})
+
 	t.Run("creates a generate job event", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")

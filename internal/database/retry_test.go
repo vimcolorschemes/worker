@@ -48,6 +48,11 @@ func TestIsTransientLibSQLError(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "constraint failure mentioning 429 is not transient",
+			err:  testError("UNIQUE constraint failed: duplicate key 429"),
+			want: false,
+		},
+		{
 			name: "constraint failure is not transient",
 			err:  testError("UNIQUE constraint failed"),
 			want: false,
