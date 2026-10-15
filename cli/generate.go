@@ -98,7 +98,15 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 		}
 
 		repository.Colorschemes = buildRepositoryColorschemes(data, repository.Name)
-		updateRepositoryAfterGenerate(repository)
+		if err := updateRepositoryAfterGenerate(repository); err != nil {
+			log.Printf("Error writing generate data: %s", err)
+			repositoryErrorCount++
+			repositoryErrorSamples = appendRepositoryErrorSample(repositoryErrorSamples, repository, err)
+			if eventErr := database.CreateRepositoryGenerateErrorEvent(repository.ID, err.Error()); eventErr != nil {
+				log.Printf("Error creating generate failure event: %s", eventErr)
+			}
+			continue
+		}
 	}
 
 	cleanUp()
@@ -110,10 +118,10 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 	}
 }
 
-func updateRepositoryAfterGenerate(repository repoHelper.Repository) {
+func updateRepositoryAfterGenerate(repository repoHelper.Repository) error {
 	log.Printf("Generated %d colorschemes", len(repository.Colorschemes))
 	data := getGenerateData(repository)
-	database.UpdateRepositoryFromGenerate(repository.ID, data)
+	return database.UpdateRepositoryFromGenerate(repository.ID, data)
 }
 
 // Initializes a temporary directory for runtime configuration files

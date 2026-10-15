@@ -38,6 +38,16 @@ func TestIsTransientLibSQLError(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "turso load-shed 429 is transient",
+			err:  testError("error code = 3: Error preparing statement: Hrana: `api error: `status=429 Too Many Requests, body={\"error\":\"load-shed for host vimcolorschemes-reobin.aws-us-east-1.turso.io\"}``"),
+			want: true,
+		},
+		{
+			name: "rate limit is transient",
+			err:  testError("rate limit exceeded, retry later"),
+			want: true,
+		},
+		{
 			name: "constraint failure is not transient",
 			err:  testError("UNIQUE constraint failed"),
 			want: false,

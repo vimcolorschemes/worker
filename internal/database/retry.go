@@ -30,6 +30,12 @@ func isTransientLibSQLError(err error) bool {
 		"sqlite_busy",
 		"database is locked",
 		"context deadline exceeded",
+		"too many requests",
+		"429",
+		"load-shed",
+		"load shed",
+		"rate limit",
+		"throttle",
 	} {
 		if strings.Contains(errMsg, marker) {
 			return true

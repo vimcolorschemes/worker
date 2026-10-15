@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -411,101 +412,83 @@ func placeholders(count int) string {
 }
 
 // UpdateRepositoryFromGenerate updates a repository with generate job data.
-func UpdateRepositoryFromGenerate(id int64, data GenerateData) {
-	tx, err := beginWithTransientRetry()
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
+// The whole transaction retries on transient errors (including Turso 429
+// load-shed). Returns an error so callers can isolate a single repository
+// failure instead of aborting the job.
+func UpdateRepositoryFromGenerate(id int64, data GenerateData) error {
+	return runRepositoryWriteTransaction(func(ctx context.Context, tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM colorschemes WHERE repository_id = ?", id); err != nil {
+			return fmt.Errorf("delete colorschemes: %w", err)
+		}
 
-	_, err = tx.Exec("DELETE FROM colorschemes WHERE repository_id = ?", id)
-	if err != nil {
-		log.Printf("Error deleting colorschemes: %s", err)
-		panic(err)
-	}
+		hasDark, hasLight := 0, 0
+		for _, scheme := range data.Colorschemes {
+			if len(scheme.Data.Dark) > 0 {
+				hasDark = 1
+			}
+			if len(scheme.Data.Light) > 0 {
+				hasLight = 1
+			}
+		}
+		if _, err := tx.ExecContext(ctx, "UPDATE repositories SET has_dark = ?, has_light = ? WHERE id = ?", hasDark, hasLight, id); err != nil {
+			return fmt.Errorf("update has_dark/has_light: %w", err)
+		}
 
-	hasDark, hasLight := 0, 0
-	for _, scheme := range data.Colorschemes {
-		if len(scheme.Data.Dark) > 0 {
-			hasDark = 1
-		}
-		if len(scheme.Data.Light) > 0 {
-			hasLight = 1
-		}
-	}
-	_, err = tx.Exec("UPDATE repositories SET has_dark = ?, has_light = ? WHERE id = ?", hasDark, hasLight, id)
-	if err != nil {
-		log.Printf("Error updating has_dark/has_light: %s", err)
-		panic(err)
-	}
-
-	for _, scheme := range data.Colorschemes {
-		result, err := tx.Exec("INSERT INTO colorschemes (repository_id, name) VALUES (?, ?)", id, scheme.Name)
-		if err != nil {
-			log.Printf("Error inserting colorscheme: %s", err)
-			panic(err)
-		}
-		schemeID, err := result.LastInsertId()
-		if err != nil {
-			panic(err)
-		}
-		for _, bg := range []struct {
-			value  repository.BackgroundValue
-			groups []repository.ColorschemeGroup
-		}{
-			{repository.LightBackground, scheme.Data.Light},
-			{repository.DarkBackground, scheme.Data.Dark},
-		} {
-			for _, group := range bg.groups {
-				_, err = tx.Exec(`
-					INSERT INTO colorscheme_groups (
-						colorscheme_id,
-						background,
-						name,
-						hex_code,
-						bold,
-						italic,
-						underline,
-						undercurl,
-						underdouble,
-						underdotted,
-						underdashed,
-						strikethrough,
-						reverse
-					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-					schemeID,
-					bg.value,
-					group.Name,
-					group.HexCode,
-					group.Bold,
-					group.Italic,
-					group.Underline,
-					group.Undercurl,
-					group.Underdouble,
-					group.Underdotted,
-					group.Underdashed,
-					group.Strikethrough,
-					group.Reverse,
-				)
-				if err != nil {
-					log.Printf("Error inserting colorscheme group: %s", err)
-					panic(err)
+		for _, scheme := range data.Colorschemes {
+			result, err := tx.ExecContext(ctx, "INSERT INTO colorschemes (repository_id, name) VALUES (?, ?)", id, scheme.Name)
+			if err != nil {
+				return fmt.Errorf("insert colorscheme: %w", err)
+			}
+			schemeID, err := result.LastInsertId()
+			if err != nil {
+				return fmt.Errorf("colorscheme last insert id: %w", err)
+			}
+			for _, bg := range []struct {
+				value  repository.BackgroundValue
+				groups []repository.ColorschemeGroup
+			}{
+				{repository.LightBackground, scheme.Data.Light},
+				{repository.DarkBackground, scheme.Data.Dark},
+			} {
+				for _, group := range bg.groups {
+					if _, err := tx.ExecContext(ctx, `
+						INSERT INTO colorscheme_groups (
+							colorscheme_id,
+							background,
+							name,
+							hex_code,
+							bold,
+							italic,
+							underline,
+							undercurl,
+							underdouble,
+							underdotted,
+							underdashed,
+							strikethrough,
+							reverse
+						) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+						schemeID,
+						bg.value,
+						group.Name,
+						group.HexCode,
+						group.Bold,
+						group.Italic,
+						group.Underline,
+						group.Undercurl,
+						group.Underdouble,
+						group.Underdotted,
+						group.Underdashed,
+						group.Strikethrough,
+						group.Reverse,
+					); err != nil {
+						return fmt.Errorf("insert colorscheme group: %w", err)
+					}
 				}
 			}
 		}
-	}
 
-	err = createRepositoryJobEvent(tx, id, jobGenerate, jobStatusSuccess, "", time.Now().UTC())
-	if err != nil {
-		log.Printf("Error creating repository job event: %s", err)
-		panic(err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		panic(err)
-	}
+		return createRepositoryJobEventsContext(ctx, tx, []int64{id}, jobGenerate, jobStatusSuccess, "", time.Now().UTC())
+	})
 }
 
 type repositoryJobEventExecutor interface {
