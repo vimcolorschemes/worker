@@ -848,6 +848,60 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		}
 	})
 
+	t.Run("batches groups spanning multiple batches", func(t *testing.T) {
+		setupTestDB(t)
+		insertTestRepo(t, 1, "owner", "repo")
+
+		groupCount := generateGroupBatchSize + 10
+		light := make([]repository.ColorschemeGroup, 0, groupCount)
+		dark := make([]repository.ColorschemeGroup, 0, groupCount)
+		for index := 0; index < groupCount; index++ {
+			light = append(light, repository.ColorschemeGroup{
+				Name:    fmt.Sprintf("light-%d", index),
+				HexCode: "#ffffff",
+				Bold:    index%2 == 0,
+			})
+			dark = append(dark, repository.ColorschemeGroup{
+				Name:    fmt.Sprintf("dark-%d", index),
+				HexCode: "#000000",
+				Italic:  index%2 == 1,
+			})
+		}
+
+		if err := UpdateRepositoryFromGenerate(1, GenerateData{
+			Colorschemes: []repository.Colorscheme{
+				{Name: "scheme1", Data: repository.ColorschemeData{Light: light}},
+				{Name: "scheme2", Data: repository.ColorschemeData{Dark: dark}},
+			},
+		}); err != nil {
+			t.Fatalf("UpdateRepositoryFromGenerate: %v", err)
+		}
+
+		repo, err := GetRepository("owner/repo")
+		if err != nil {
+			t.Fatalf("GetRepository: %v", err)
+		}
+		if len(repo.Colorschemes) != 2 {
+			t.Fatalf("Colorschemes len = %d, want 2", len(repo.Colorschemes))
+		}
+		byName := map[string]repository.Colorscheme{}
+		for _, scheme := range repo.Colorschemes {
+			byName[scheme.Name] = scheme
+		}
+		if len(byName["scheme1"].Data.Light) != groupCount {
+			t.Fatalf("scheme1 light len = %d, want %d", len(byName["scheme1"].Data.Light), groupCount)
+		}
+		if len(byName["scheme2"].Data.Dark) != groupCount {
+			t.Fatalf("scheme2 dark len = %d, want %d", len(byName["scheme2"].Data.Dark), groupCount)
+		}
+		if byName["scheme1"].Data.Light[0].Name != "light-0" {
+			t.Fatalf("scheme1 light[0] = %q, want %q", byName["scheme1"].Data.Light[0].Name, "light-0")
+		}
+		if !byName["scheme1"].Data.Light[0].Bold {
+			t.Fatal("scheme1 light[0].Bold = false, want true")
+		}
+	})
+
 	t.Run("replaces existing colorschemes", func(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
