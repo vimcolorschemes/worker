@@ -792,7 +792,7 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
 
-		UpdateRepositoryFromGenerate(1, GenerateData{
+		if err := UpdateRepositoryFromGenerate(1, GenerateData{
 			Colorschemes: []repository.Colorscheme{
 				{
 					Name: "myscheme",
@@ -817,7 +817,9 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 					},
 				},
 			},
-		})
+		}); err != nil {
+			t.Fatalf("UpdateRepositoryFromGenerate: %v", err)
+		}
 
 		repo, err := GetRepository("owner/repo")
 		if err != nil {
@@ -850,12 +852,16 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
 
-		UpdateRepositoryFromGenerate(1, GenerateData{
+		if err := UpdateRepositoryFromGenerate(1, GenerateData{
 			Colorschemes: []repository.Colorscheme{{Name: "scheme1"}},
-		})
-		UpdateRepositoryFromGenerate(1, GenerateData{
+		}); err != nil {
+			t.Fatalf("UpdateRepositoryFromGenerate: %v", err)
+		}
+		if err := UpdateRepositoryFromGenerate(1, GenerateData{
 			Colorschemes: []repository.Colorscheme{{Name: "scheme2"}},
-		})
+		}); err != nil {
+			t.Fatalf("UpdateRepositoryFromGenerate: %v", err)
+		}
 
 		repo, err := GetRepository("owner/repo")
 		if err != nil {
@@ -873,7 +879,9 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
 
-		UpdateRepositoryFromGenerate(1, GenerateData{})
+		if err := UpdateRepositoryFromGenerate(1, GenerateData{}); err != nil {
+			t.Fatalf("UpdateRepositoryFromGenerate: %v", err)
+		}
 
 		var eventCount int
 		err := db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE repository_id = 1 AND job = 'generate' AND status = 'success'`).Scan(&eventCount)
@@ -889,8 +897,12 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		setupTestDB(t)
 		insertTestRepo(t, 1, "owner", "repo")
 
-		UpdateRepositoryFromGenerate(1, GenerateData{})
-		UpdateRepositoryFromGenerate(1, GenerateData{})
+		if err := UpdateRepositoryFromGenerate(1, GenerateData{}); err != nil {
+			t.Fatalf("UpdateRepositoryFromGenerate: %v", err)
+		}
+		if err := UpdateRepositoryFromGenerate(1, GenerateData{}); err != nil {
+			t.Fatalf("UpdateRepositoryFromGenerate: %v", err)
+		}
 
 		var eventCount int
 		err := db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE repository_id = 1 AND job = 'generate' AND status = 'success'`).Scan(&eventCount)
@@ -935,8 +947,12 @@ func TestUpdateRepositoryFromGenerate(t *testing.T) {
 		if err := CreateRepositoryGenerateErrorEvent(1, "second"); err != nil {
 			t.Fatalf("CreateRepositoryGenerateErrorEvent: %v", err)
 		}
-		UpdateRepositoryFromGenerate(1, GenerateData{})
-		UpdateRepositoryFromGenerate(1, GenerateData{})
+		if err := UpdateRepositoryFromGenerate(1, GenerateData{}); err != nil {
+			t.Fatalf("UpdateRepositoryFromGenerate: %v", err)
+		}
+		if err := UpdateRepositoryFromGenerate(1, GenerateData{}); err != nil {
+			t.Fatalf("UpdateRepositoryFromGenerate: %v", err)
+		}
 
 		var errorCount int
 		err := db.QueryRow(`SELECT COUNT(*) FROM repository_job_events WHERE repository_id = 1 AND job = 'generate' AND status = 'error'`).Scan(&errorCount)
