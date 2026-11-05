@@ -28,10 +28,7 @@ var publishNotificationNow = func() time.Time {
 	return time.Now().UTC()
 }
 
-const (
-	frontendURL    = "https://vimcolorschemes.com"
-	summaryDivider = "----------------------------------------"
-)
+const frontendURL = "https://vimcolorschemes.com"
 
 // Publish triggers a frontend deployment after the daily jobs succeed.
 func Publish(_force bool, _debug bool, _repoKey string) map[string]interface{} {
@@ -140,59 +137,65 @@ func sendDailyJobSummary(ctx context.Context, publishResult map[string]interface
 		return fmt.Errorf("load generate event messages: %w", err)
 	}
 
-	subject := fmt.Sprintf("vimcolorschemes daily summary %s", day.Format("2006-01-02"))
-	body := buildDailyJobSummary(day, reports, publishResult, generateEventCounts, generateErrorMessages, frontendURL)
+	message := buildDailyJobSummary(day, reports, publishResult, generateEventCounts, generateErrorMessages, frontendURL)
 
-	if err := notify.PublishJobNotification(ctx, subject, body); err != nil {
+	if err := notify.PostMessage(ctx, message); err != nil {
 		return fmt.Errorf("send job summary notification: %w", err)
 	}
 
 	return nil
 }
 
-func buildDailyJobSummary(day time.Time, reports map[string]database.JobReport, publishResult map[string]interface{}, generateEventCounts map[string]int, generateErrorMessages []string, frontendURL string) string {
-	var b strings.Builder
-
-	b.WriteString("vimcolorschemes — Daily Summary\n")
-	b.WriteString(day.Format("2006-01-02"))
-	b.WriteString("\n")
+func buildDailyJobSummary(day time.Time, reports map[string]database.JobReport, publishResult map[string]interface{}, generateEventCounts map[string]int, generateErrorMessages []string, frontendURL string) notify.Message {
+	subtitle := day.Format("Monday, January 2, 2006")
 	if frontendURL != "" {
-		b.WriteString(frontendURL)
-		b.WriteString("\n")
+		subtitle += fmt.Sprintf("  ·  <%s|%s>", frontendURL, strings.TrimPrefix(frontendURL, "https://"))
 	}
 
-	for _, job := range []string{"import", "update", "generate"} {
-		b.WriteString("\n")
-		writeJobSection(&b, job, reports[job], job == "generate", generateEventCounts, generateErrorMessages)
+	blocks := []notify.Block{
+		notify.Header("vimcolorschemes daily summary"),
+		notify.Context(subtitle),
 	}
 
-	b.WriteString("\n")
-	writeJobSection(&b, "publish", database.JobReport{
+	unhealthy := 0
+	for _, job := range publishRequiredJobs {
+		report := reports[job]
+		if sectionStatus(report) != "success" {
+			unhealthy++
+		}
+		blocks = append(blocks, notify.Divider())
+		blocks = append(blocks, jobSectionBlocks(job, report, job == "generate", generateEventCounts, generateErrorMessages)...)
+	}
+
+	blocks = append(blocks, notify.Divider())
+	blocks = append(blocks, jobSectionBlocks("publish", database.JobReport{
 		Job:    "publish",
 		Status: "success",
 		Date:   day,
 		Data:   publishResult,
-	}, false, nil, nil)
+	}, false, nil, nil)...)
 
-	return strings.TrimRight(b.String(), "\n")
-}
-
-func writeJobSection(b *strings.Builder, job string, report database.JobReport, includeGenerateEvents bool, generateEventCounts map[string]int, generateErrorMessages []string) {
-	b.WriteString(summaryDivider)
-	b.WriteString("\n")
-	fmt.Fprintf(b, "%s · %s\n", titleCase(job), sectionStatus(report))
-	b.WriteString(summaryDivider)
-	b.WriteString("\n")
-
-	if report.Job == "" {
-		b.WriteString("  (no report recorded today)\n")
-		return
+	text := fmt.Sprintf("vimcolorschemes daily summary %s: all jobs succeeded", day.Format("2006-01-02"))
+	if unhealthy > 0 {
+		text = fmt.Sprintf("vimcolorschemes daily summary %s: %d of %d jobs need attention", day.Format("2006-01-02"), unhealthy, len(publishRequiredJobs))
 	}
 
-	rows := [][2]string{}
+	return notify.Message{Text: text, Blocks: blocks}
+}
+
+func jobSectionBlocks(job string, report database.JobReport, includeGenerateEvents bool, generateEventCounts map[string]int, generateErrorMessages []string) []notify.Block {
+	status := sectionStatus(report)
+	heading := fmt.Sprintf("%s *%s*", statusEmoji(status), titleCase(job))
+
+	if report.Job == "" {
+		return []notify.Block{notify.Section(heading+"  ·  no report recorded today", nil)}
+	}
+
+	if status != "success" {
+		heading += "  ·  " + status
+	}
 	if job != "publish" {
-		rows = append(rows, [2]string{"Ran at", report.Date.UTC().Format("2006-01-02 15:04:05 UTC")})
-		rows = append(rows, [2]string{"Duration", formatDuration(report.ElapsedTime)})
+		heading += fmt.Sprintf("  ·  %s  ·  ran at %s", formatDuration(report.ElapsedTime), report.Date.UTC().Format("15:04 UTC"))
 	}
 
 	keyLabels := map[string]string{
@@ -206,35 +209,32 @@ func writeJobSection(b *strings.Builder, job string, report database.JobReport, 
 		"notificationStatus":     "Notification",
 	}
 
+	var fields []string
 	for _, key := range []string{"repositoryCount", "repositoryCheckedCount", "repositoryDroppedCount", "repositoryErrorCount", "repositoryDeletedCount", "responseStatusCode", "webhookTriggered", "notificationStatus"} {
 		value, ok := report.Data[key]
 		if !ok {
 			continue
 		}
-		rows = append(rows, [2]string{keyLabels[key], formatSummaryValue(key, value)})
+		fields = append(fields, summaryField(keyLabels[key], formatSummaryValue(key, value)))
+	}
+	if includeGenerateEvents {
+		fields = append(fields, summaryField("Event errors", formatInt(int64(generateEventCounts["error"]))))
 	}
 
-	if statuses, ok := report.Data["jobStatuses"].(map[string]string); ok {
-		rows = append(rows, [2]string{"Job statuses", formatStringMap(statuses)})
-	} else if statuses, ok := report.Data["jobStatuses"].(map[string]interface{}); ok {
-		rows = append(rows, [2]string{"Job statuses", formatInterfaceMap(statuses)})
-	}
+	blocks := []notify.Block{notify.Section(heading, fields)}
 
 	if errValue, ok := report.Data["error"]; ok {
-		rows = append(rows, [2]string{"Error", fmt.Sprintf("%v", errValue)})
+		blocks = append(blocks, notify.Section("*Error*\n"+notify.Escape(fmt.Sprintf("%v", errValue)), nil))
 	}
 	if errValue, ok := report.Data["notificationError"]; ok {
-		rows = append(rows, [2]string{"Notification error", fmt.Sprintf("%v", errValue)})
+		blocks = append(blocks, notify.Section("*Notification error*\n"+notify.Escape(fmt.Sprintf("%v", errValue)), nil))
 	}
-
-	if includeGenerateEvents {
-		rows = append(rows, [2]string{"Event errors", formatInt(int64(generateEventCounts["error"]))})
+	if links := repositoryLinks(report.Data["repositoryDeletedNames"]); links != "" {
+		blocks = append(blocks, notify.Section("*Pruned repositories*\n"+links, nil))
 	}
-
-	writeSummaryRows(b, rows)
-
-	writeRepositoryNames(b, report.Data["repositoryDeletedNames"], "Pruned repositories")
-	writeRepositoryNames(b, report.Data["repositoryDroppedNames"], "Dropped repositories")
+	if links := repositoryLinks(report.Data["repositoryDroppedNames"]); links != "" {
+		blocks = append(blocks, notify.Section("*Dropped repositories*\n"+links, nil))
+	}
 
 	var errorSamples []string
 	if includeGenerateEvents {
@@ -246,22 +246,30 @@ func writeJobSection(b *strings.Builder, job string, report database.JobReport, 
 		}
 	}
 	if len(errorSamples) > 0 {
-		b.WriteString("\n  Recent errors:\n")
-		for _, message := range errorSamples {
-			fmt.Fprintf(b, "    - %s\n", message)
+		lines := make([]string, len(errorSamples))
+		for i, message := range errorSamples {
+			lines[i] = "• " + notify.Escape(message)
 		}
+		blocks = append(blocks, notify.Section("*Recent errors*\n"+strings.Join(lines, "\n"), nil))
 	}
+
+	return blocks
 }
 
-func writeSummaryRows(b *strings.Builder, rows [][2]string) {
-	width := 0
-	for _, row := range rows {
-		if len(row[0]) > width {
-			width = len(row[0])
-		}
-	}
-	for _, row := range rows {
-		fmt.Fprintf(b, "  %-*s  %s\n", width+1, row[0]+":", row[1])
+func summaryField(label string, value string) string {
+	return fmt.Sprintf("*%s*\n%s", label, notify.Escape(value))
+}
+
+func statusEmoji(status string) string {
+	switch status {
+	case "success":
+		return ":white_check_mark:"
+	case "error":
+		return ":x:"
+	case "missing":
+		return ":warning:"
+	default:
+		return ":grey_question:"
 	}
 }
 
@@ -352,57 +360,21 @@ func formatInt(n int64) string {
 	return sign + strings.Join(parts, ",")
 }
 
-func writeRepositoryNames(b *strings.Builder, value interface{}, title string) {
-	var names []interface{}
+func repositoryLinks(value interface{}) string {
+	var names []string
 	switch typed := value.(type) {
 	case []interface{}:
-		names = typed
-	case []string:
 		for _, name := range typed {
-			names = append(names, name)
+			names = append(names, fmt.Sprintf("%v", name))
 		}
+	case []string:
+		names = typed
 	}
 
-	if len(names) == 0 {
-		return
+	links := make([]string, len(names))
+	for i, name := range names {
+		escaped := notify.Escape(name)
+		links[i] = fmt.Sprintf("<https://github.com/%s|%s>", escaped, escaped)
 	}
-
-	fmt.Fprintf(b, "\n  %s:\n", title)
-	for _, name := range names {
-		fmt.Fprintf(b, "    - %v (https://github.com/%v)\n", name, name)
-	}
-}
-
-func formatStringMap(values map[string]string) string {
-	parts := make([]string, 0, len(values))
-	for _, key := range sortedMapKeys(values) {
-		parts = append(parts, fmt.Sprintf("%s=%s", key, values[key]))
-	}
-	return strings.Join(parts, ", ")
-}
-
-func formatInterfaceMap(values map[string]interface{}) string {
-	parts := make([]string, 0, len(values))
-	for _, key := range sortedInterfaceMapKeys(values) {
-		parts = append(parts, fmt.Sprintf("%s=%v", key, values[key]))
-	}
-	return strings.Join(parts, ", ")
-}
-
-func sortedMapKeys(values map[string]string) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-func sortedInterfaceMapKeys(values map[string]interface{}) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
+	return strings.Join(links, "  ·  ")
 }

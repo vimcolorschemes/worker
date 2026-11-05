@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/vimcolorschemes/worker/internal/database"
+	"github.com/vimcolorschemes/worker/internal/notify"
 )
 
 func TestValidatePublishPrerequisites(t *testing.T) {
@@ -172,40 +173,70 @@ func TestBuildDailyJobSummary(t *testing.T) {
 		},
 	}
 
-	body := buildDailyJobSummary(day, reports, publishResult, map[string]int{"error": 1}, []string{"clone failed"}, frontendURL)
+	message := buildDailyJobSummary(day, reports, publishResult, map[string]int{"error": 1}, []string{"clone failed"}, frontendURL)
 
+	if message.Text != "vimcolorschemes daily summary 2026-03-29: all jobs succeeded" {
+		t.Fatalf("Text = %q", message.Text)
+	}
+	if message.Blocks[0]["type"] != "header" {
+		t.Fatalf("first block = %v, want a header", message.Blocks[0])
+	}
+
+	body := strings.Join(blockTexts(message.Blocks), "\n")
 	for _, want := range []string{
-		"vimcolorschemes — Daily Summary",
-		"2026-03-29",
-		"https://vimcolorschemes.com",
-		"Import · success",
-		"Repositories:  2,934",
-		"Checked:       40",
-		"Dropped:       2",
-		"Dropped repositories:",
-		"- owner4/dotfiles (https://github.com/owner4/dotfiles)",
-		"- owner5/tutorial (https://github.com/owner5/tutorial)",
-		"Duration:      12.5s",
-		"Update · success",
-		"Errors:        2",
-		"Pruned:        3",
-		"Pruned repositories:",
-		"- owner1/repo1 (https://github.com/owner1/repo1)",
-		"- owner2/repo2 (https://github.com/owner2/repo2)",
-		"- owner3/repo3 (https://github.com/owner3/repo3)",
-		"Generate · success",
-		"Event errors:  1",
-		"Recent errors:",
-		"- clone failed",
-		"- owner/repo: boom",
-		"Publish · success",
-		"Status code:   201",
-		"Webhook:       triggered",
-		"Notification:  sent",
-		"Job statuses:  generate=success, import=success, update=success",
+		"vimcolorschemes daily summary",
+		"Sunday, March 29, 2026  ·  <https://vimcolorschemes.com|vimcolorschemes.com>",
+		":white_check_mark: *Import*  ·  12.5s  ·  ran at 01:00 UTC",
+		"*Repositories*\n2,934",
+		"*Checked*\n40",
+		"*Dropped*\n2",
+		"*Dropped repositories*\n<https://github.com/owner4/dotfiles|owner4/dotfiles>  ·  <https://github.com/owner5/tutorial|owner5/tutorial>",
+		":white_check_mark: *Update*  ·  18.2s  ·  ran at 02:00 UTC",
+		"*Errors*\n2",
+		"*Pruned*\n3",
+		"*Pruned repositories*\n<https://github.com/owner1/repo1|owner1/repo1>",
+		":white_check_mark: *Generate*",
+		"*Event errors*\n1",
+		"*Recent errors*\n• clone failed\n• owner/repo: boom",
+		":white_check_mark: *Publish*",
+		"*Status code*\n201",
+		"*Webhook*\ntriggered",
+		"*Notification*\nsent",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("summary = %q, want it to contain %q", body, want)
 		}
 	}
+
+	t.Run("flags missing reports", func(t *testing.T) {
+		delete(reports, "update")
+
+		message := buildDailyJobSummary(day, reports, publishResult, nil, nil, frontendURL)
+
+		if message.Text != "vimcolorschemes daily summary 2026-03-29: 1 of 3 jobs need attention" {
+			t.Fatalf("Text = %q", message.Text)
+		}
+		if body := strings.Join(blockTexts(message.Blocks), "\n"); !strings.Contains(body, ":warning: *Update*  ·  no report recorded today") {
+			t.Fatalf("summary = %q, want the missing update report flagged", body)
+		}
+	})
+}
+
+func blockTexts(value interface{}) []string {
+	var texts []string
+	switch typed := value.(type) {
+	case []notify.Block:
+		for _, block := range typed {
+			texts = append(texts, blockTexts(block)...)
+		}
+	case notify.Block:
+		for key, child := range typed {
+			if text, ok := child.(string); ok && key == "text" {
+				texts = append(texts, text)
+				continue
+			}
+			texts = append(texts, blockTexts(child)...)
+		}
+	}
+	return texts
 }

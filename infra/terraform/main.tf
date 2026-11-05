@@ -16,6 +16,7 @@ locals {
   human_deployer_role_name      = "vimcolorschemes-worker-human-deployer-role"
   operator_user_name            = "vimcolorschemes-worker-operator"
   job_failure_alerts_role_name  = "vimcolorschemes-worker-job-failure-alerts-role"
+  job_logs_url                  = "https://${var.aws_region}.console.aws.amazon.com/cloudwatch/home?region=${var.aws_region}#logsV2:log-groups/log-group/${replace(var.cloudwatch_log_group_name, "/", "$252F")}"
 }
 
 resource "aws_ecr_repository" "worker" {
@@ -209,16 +210,31 @@ resource "aws_cloudwatch_event_target" "job_failures_slack" {
   input_transformer {
     input_paths = {
       taskArn       = "$.detail.taskArn"
+      startedBy     = "$.detail.startedBy"
+      exitCode      = "$.detail.containers[0].exitCode"
       stoppedReason = "$.detail.stoppedReason"
-      stopCode      = "$.detail.stopCode"
-      group         = "$.detail.group"
       startedAt     = "$.detail.startedAt"
       stoppedAt     = "$.detail.stoppedAt"
-      region        = "$.region"
     }
 
     input_template = <<EOF
-{"text": ":rotating_light: *vimcolorschemes worker job failed in production*\n```\nFamily: <group>\nTask: <taskArn>\nRegion: <region>\nStarted: <startedAt>\nStopped: <stoppedAt>\nStop code: <stopCode>\nStopped reason: <stoppedReason>\n```"}
+{
+  "text": ":rotating_light: vimcolorschemes worker job failed: <startedBy>",
+  "blocks": [
+    {"type": "header", "text": {"type": "plain_text", "text": ":rotating_light: Worker job failed", "emoji": true}},
+    {"type": "section", "fields": [
+      {"type": "mrkdwn", "text": "*Started by*\n<startedBy>"},
+      {"type": "mrkdwn", "text": "*Exit code*\n<exitCode>"},
+      {"type": "mrkdwn", "text": "*Started*\n<startedAt>"},
+      {"type": "mrkdwn", "text": "*Stopped*\n<stoppedAt>"}
+    ]},
+    {"type": "section",
+      "text": {"type": "mrkdwn", "text": "*Reason*\n<stoppedReason>"},
+      "accessory": {"type": "button", "text": {"type": "plain_text", "text": "View logs"}, "url": "${local.job_logs_url}"}
+    },
+    {"type": "context", "elements": [{"type": "mrkdwn", "text": "<taskArn>"}]}
+  ]
+}
 EOF
   }
 }
