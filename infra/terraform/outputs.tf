@@ -26,6 +26,6 @@ output "event_rule_arns" {
   }
 }
 
-output "job_notifications_topic_arn" {
-  value = length(aws_sns_topic.job_notifications) > 0 ? aws_sns_topic.job_notifications[0].arn : null
+output "slack_webhook_secret_arn" {
+  value = aws_secretsmanager_secret.slack_webhook_url.arn
 }

@@ -1,45 +1,52 @@
 package notify
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"time"
 )
 
-var loadAWSConfig = awsconfig.LoadDefaultConfig
+var httpClient = &http.Client{Timeout: 30 * time.Second}
 
-type snsPublisher interface {
-	Publish(ctx context.Context, params *sns.PublishInput, optFns ...func(*sns.Options)) (*sns.PublishOutput, error)
-}
+// Slack treats these as control characters in message text.
+var slackEscaper = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
 
-var newSNSClient = func(cfg aws.Config) snsPublisher {
-	return sns.NewFromConfig(cfg)
-}
-
-// PublishJobNotification sends a plain-text job notification email through SNS.
+// PublishJobNotification posts a job notification to the Slack incoming webhook.
 func PublishJobNotification(ctx context.Context, subject string, body string) error {
-	topicARN := strings.TrimSpace(os.Getenv("JOB_NOTIFICATIONS_TOPIC_ARN"))
-	if topicARN == "" {
-		return fmt.Errorf("JOB_NOTIFICATIONS_TOPIC_ARN not found in env")
+	webhookURL := strings.TrimSpace(os.Getenv("SLACK_WEBHOOK_URL"))
+	if webhookURL == "" {
+		return fmt.Errorf("SLACK_WEBHOOK_URL not found in env")
 	}
 
-	cfg, err := loadAWSConfig(ctx)
+	text := fmt.Sprintf("*%s*\n```\n%s\n```", slackEscaper.Replace(subject), slackEscaper.Replace(body))
+	payload, err := json.Marshal(map[string]string{"text": text})
 	if err != nil {
-		return fmt.Errorf("load aws config: %w", err)
+		return fmt.Errorf("build slack payload: %w", err)
 	}
 
-	_, err = newSNSClient(cfg).Publish(ctx, &sns.PublishInput{
-		TopicArn: aws.String(topicARN),
-		Subject:  aws.String(subject),
-		Message:  aws.String(body),
-	})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewReader(payload))
 	if err != nil {
-		return fmt.Errorf("publish sns notification: %w", err)
+		return fmt.Errorf("build slack request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("post slack notification: %w", err)
+	}
+	defer func() {
+		_ = response.Body.Close()
+	}()
+
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		responseBody, _ := io.ReadAll(io.LimitReader(response.Body, 512))
+		return fmt.Errorf("slack webhook returned status %d: %s", response.StatusCode, strings.TrimSpace(string(responseBody)))
 	}
 
 	return nil

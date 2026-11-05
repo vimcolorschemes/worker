@@ -108,7 +108,12 @@ variable "bootstrap_task_definition_arn" {
   default = "arn:aws:ecs:us-east-1:123456789012:task-definition/run-job:1"
 }
 
-variable "alert_email_addresses" {
-  type    = list(string)
-  default = []
+variable "slack_webhook_url" {
+  type      = string
+  sensitive = true
+
+  validation {
+    condition     = startswith(var.slack_webhook_url, "https://hooks.slack.com/")
+    error_message = "slack_webhook_url must be a Slack incoming webhook URL."
+  }
 }

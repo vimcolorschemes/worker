@@ -8,7 +8,7 @@ This directory manages static AWS infrastructure for `vimcolorschemes/worker`.
 
 - `bootstrap/`: creates the remote state backend (S3 + DynamoDB lock table)
 - `envs/prod.tfvars.example`: production variable template
-- root module: ECS/EventBridge/ECR/IAM/Secrets metadata resources, including SNS email notifications
+- root module: ECS/EventBridge/ECR/IAM/Secrets metadata resources, including Slack job notifications
 
 ## Bootstrap remote state
 
@@ -46,7 +46,7 @@ This module is configured to let CI keep owning deploy-time task definition revi
   - `vimcolorschemes/worker/database_url`
   - `vimcolorschemes/worker/database_auth_token`
   - `vimcolorschemes/worker/github_dispatch_token`
+  - `vimcolorschemes/worker/slack_webhook_url` (value managed here from `slack_webhook_url`, since the failure alert API destination needs it too)
 - ECS task definitions should map these as container `secrets`.
-- `alert_email_addresses` controls SNS email subscriptions for job notifications.
-- `JOB_NOTIFICATIONS_TOPIC_ARN` and `PUBLISH_WEBHOOK_URL` are treated as non-secret and should be set as plain container `environment` during deploy.
-- After `tofu apply`, confirm the SNS subscription emails before expecting notifications.
+- `slack_webhook_url` is the Slack incoming webhook that receives job notifications. It ends up in Terraform state.
+- `PUBLISH_WEBHOOK_URL` is treated as non-secret and should be set as plain container `environment` during deploy.

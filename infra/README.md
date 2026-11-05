@@ -34,8 +34,9 @@ Deployment behavior:
 - Pushes two ECR tags: `${GITHUB_SHA}` and `latest`
 - Registers a new ECS task definition revision in the `run-job` family
 - Pins the ECS container image to the pushed image digest (`@sha256:...`)
-- Ensures the ECS container sets `JOB_NOTIFICATIONS_TOPIC_ARN` and `PUBLISH_WEBHOOK_URL` as plain ECS environment
+- Ensures the ECS container sets `PUBLISH_WEBHOOK_URL` as plain ECS environment
 - Ensures the ECS container sets `GITHUB_DISPATCH_TOKEN` as an ECS secret from `DISPATCH_TOKEN_SECRET_ARN`
+- Ensures the ECS container sets `SLACK_WEBHOOK_URL` as an ECS secret from `SLACK_WEBHOOK_SECRET_ARN`
 - Updates EventBridge rules (`import`, `update`, `generate`, `publish`) to the new revision
 
 Required GitHub Actions repo variables:
@@ -43,9 +44,9 @@ Required GitHub Actions repo variables:
 - `AWS_REGION`
 - `AWS_REGISTRY_ID`
 - `AWS_ROLE_TO_ASSUME`
-- `JOB_NOTIFICATIONS_TOPIC_ARN`
 - `PUBLISH_WEBHOOK_URL`
 - `DISPATCH_TOKEN_SECRET_ARN`
+- `SLACK_WEBHOOK_SECRET_ARN` (the `slack_webhook_secret_arn` Terraform output)
 
 The assumed role must trust GitHub OIDC (`token.actions.githubusercontent.com`) and allow:
 
@@ -62,21 +63,20 @@ The ECS task definition should inject these environment variables from AWS Secre
 - `DATABASE_URL` from `vimcolorschemes/worker/database_url`
 - `DATABASE_AUTH_TOKEN` from `vimcolorschemes/worker/database_auth_token`
 - `GITHUB_DISPATCH_TOKEN` from `vimcolorschemes/worker/github_dispatch_token`
+- `SLACK_WEBHOOK_URL` from `vimcolorschemes/worker/slack_webhook_url`
 
 The ECS task definition should set this non-secret variable as plain container environment:
 
-- `JOB_NOTIFICATIONS_TOPIC_ARN`
 - `PUBLISH_WEBHOOK_URL`
 
 `DATABASE_URL` is required by the worker and should point to a `libsql://...` endpoint in production.
-For production deploys, keep the true secrets in ECS task `secrets`; `JOB_NOTIFICATIONS_TOPIC_ARN` and `PUBLISH_WEBHOOK_URL` can stay in plain `environment`.
+For production deploys, keep the true secrets in ECS task `secrets`; `PUBLISH_WEBHOOK_URL` can stay in plain `environment`.
 
 ## Notifications
 
-- An SNS topic is used for worker notifications.
-- EventBridge publishes immediate emails when an ECS job exits non-zero.
-- The `publish` job sends a daily summary email with the latest `import`, `update`, `generate`, and `publish` results.
-- Confirm every SNS email subscription after `tofu apply`, otherwise no mail is delivered.
+- Worker notifications are posted to a Slack incoming webhook.
+- EventBridge posts to Slack through an API destination when an ECS job exits non-zero.
+- The `publish` job posts a daily summary with the latest `import`, `update`, `generate`, and `publish` results.
 
 ## Terraform
 

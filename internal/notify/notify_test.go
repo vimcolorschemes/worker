@@ -2,87 +2,59 @@ package notify
 
 import (
 	"context"
-	"errors"
-	"os"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/sns"
 )
 
-type stubSNSClient struct {
-	publish func(ctx context.Context, params *sns.PublishInput, optFns ...func(*sns.Options)) (*sns.PublishOutput, error)
-}
-
-func (s stubSNSClient) Publish(ctx context.Context, params *sns.PublishInput, optFns ...func(*sns.Options)) (*sns.PublishOutput, error) {
-	return s.publish(ctx, params, optFns...)
-}
-
 func TestPublishJobNotification(t *testing.T) {
-	originalLoadAWSConfig := loadAWSConfig
-	originalNewSNSClient := newSNSClient
-	t.Cleanup(func() {
-		loadAWSConfig = originalLoadAWSConfig
-		newSNSClient = originalNewSNSClient
-		_ = os.Unsetenv("JOB_NOTIFICATIONS_TOPIC_ARN")
-	})
+	t.Run("posts subject and body to the slack webhook", func(t *testing.T) {
+		var gotText string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				t.Fatalf("Method = %q, want POST", r.Method)
+			}
+			if got := r.Header.Get("Content-Type"); got != "application/json" {
+				t.Fatalf("Content-Type = %q, want application/json", got)
+			}
+			var payload map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode payload: %v", err)
+			}
+			gotText = payload["text"]
+			_, _ = w.Write([]byte("ok"))
+		}))
+		t.Cleanup(server.Close)
+		t.Setenv("SLACK_WEBHOOK_URL", server.URL)
 
-	t.Run("publishes subject and message to sns", func(t *testing.T) {
-		if err := os.Setenv("JOB_NOTIFICATIONS_TOPIC_ARN", "arn:aws:sns:us-east-1:123456789012:topic"); err != nil {
-			t.Fatalf("Setenv: %v", err)
-		}
-
-		loadAWSConfig = func(ctx context.Context, optFns ...func(*awsconfig.LoadOptions) error) (aws.Config, error) {
-			return aws.Config{}, nil
-		}
-
-		newSNSClient = func(cfg aws.Config) snsPublisher {
-			return stubSNSClient{publish: func(ctx context.Context, params *sns.PublishInput, optFns ...func(*sns.Options)) (*sns.PublishOutput, error) {
-				if got := aws.ToString(params.TopicArn); got != "arn:aws:sns:us-east-1:123456789012:topic" {
-					t.Fatalf("TopicArn = %q, want topic arn", got)
-				}
-				if got := aws.ToString(params.Subject); got != "Daily Summary" {
-					t.Fatalf("Subject = %q, want %q", got, "Daily Summary")
-				}
-				if got := aws.ToString(params.Message); got != "hello" {
-					t.Fatalf("Message = %q, want %q", got, "hello")
-				}
-				return &sns.PublishOutput{}, nil
-			}}
-		}
-
-		if err := PublishJobNotification(context.Background(), "Daily Summary", "hello"); err != nil {
+		if err := PublishJobNotification(context.Background(), "Daily Summary", "a < b & c > d"); err != nil {
 			t.Fatalf("PublishJobNotification returned error: %v", err)
 		}
+
+		want := "*Daily Summary*\n```\na &lt; b &amp; c &gt; d\n```"
+		if gotText != want {
+			t.Fatalf("text = %q, want %q", gotText, want)
+		}
 	})
 
-	t.Run("returns error when topic arn is missing", func(t *testing.T) {
-		_ = os.Unsetenv("JOB_NOTIFICATIONS_TOPIC_ARN")
+	t.Run("returns error when webhook url is missing", func(t *testing.T) {
+		t.Setenv("SLACK_WEBHOOK_URL", "")
 
-		err := PublishJobNotification(context.Background(), "Daily Summary", "hello")
-		if err == nil {
+		if err := PublishJobNotification(context.Background(), "Daily Summary", "hello"); err == nil {
 			t.Fatal("PublishJobNotification error = nil, want error")
 		}
 	})
 
-	t.Run("returns publish error", func(t *testing.T) {
-		if err := os.Setenv("JOB_NOTIFICATIONS_TOPIC_ARN", "arn:aws:sns:us-east-1:123456789012:topic"); err != nil {
-			t.Fatalf("Setenv: %v", err)
-		}
+	t.Run("returns error on non-2xx response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte("invalid_token"))
+		}))
+		t.Cleanup(server.Close)
+		t.Setenv("SLACK_WEBHOOK_URL", server.URL)
 
-		loadAWSConfig = func(ctx context.Context, optFns ...func(*awsconfig.LoadOptions) error) (aws.Config, error) {
-			return aws.Config{}, nil
-		}
-
-		newSNSClient = func(cfg aws.Config) snsPublisher {
-			return stubSNSClient{publish: func(ctx context.Context, params *sns.PublishInput, optFns ...func(*sns.Options)) (*sns.PublishOutput, error) {
-				return nil, errors.New("boom")
-			}}
-		}
-
-		err := PublishJobNotification(context.Background(), "Daily Summary", "hello")
-		if err == nil {
+		if err := PublishJobNotification(context.Background(), "Daily Summary", "hello"); err == nil {
 			t.Fatal("PublishJobNotification error = nil, want error")
 		}
 	})

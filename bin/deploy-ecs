@@ -14,9 +14,9 @@ Required environment variables:
   ECS_TASK_FAMILY
   ECS_CONTAINER_NAME
   EVENTBRIDGE_RULES
-  JOB_NOTIFICATIONS_TOPIC_ARN
   PUBLISH_WEBHOOK_URL
   DISPATCH_TOKEN_SECRET_ARN
+  SLACK_WEBHOOK_SECRET_ARN
 EOF
 }
 
@@ -64,9 +64,9 @@ require_var ECR_REPOSITORY
 require_var ECS_TASK_FAMILY
 require_var ECS_CONTAINER_NAME
 require_var EVENTBRIDGE_RULES
-require_var JOB_NOTIFICATIONS_TOPIC_ARN
 require_var PUBLISH_WEBHOOK_URL
 require_var DISPATCH_TOKEN_SECRET_ARN
+require_var SLACK_WEBHOOK_SECRET_ARN
 
 image_uri="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
 immutable_image="${image_uri}@${digest}"
@@ -86,9 +86,9 @@ aws ecs describe-task-definition \
 
 jq --arg image "$immutable_image" \
   --arg name "$ECS_CONTAINER_NAME" \
-  --arg jobNotificationsTopicArn "$JOB_NOTIFICATIONS_TOPIC_ARN" \
   --arg publishWebhookURL "$PUBLISH_WEBHOOK_URL" \
-  --arg githubDispatchTokenSecretArn "$DISPATCH_TOKEN_SECRET_ARN" '
+  --arg githubDispatchTokenSecretArn "$DISPATCH_TOKEN_SECRET_ARN" \
+  --arg slackWebhookSecretArn "$SLACK_WEBHOOK_SECRET_ARN" '
   {
     family,
     taskRoleArn,
@@ -114,13 +114,13 @@ jq --arg image "$immutable_image" \
         | .environment = ((.environment // [])
           | map(select(.name != "JOB_NOTIFICATIONS_TOPIC_ARN" and .name != "PUBLISH_WEBHOOK_URL"))
           + [
-              {name: "JOB_NOTIFICATIONS_TOPIC_ARN", value: $jobNotificationsTopicArn},
               {name: "PUBLISH_WEBHOOK_URL", value: $publishWebhookURL}
             ])
         | .secrets = ((.secrets // [])
-          | map(select(.name != "JOB_NOTIFICATIONS_TOPIC_ARN" and .name != "PUBLISH_WEBHOOK_URL" and .name != "GITHUB_DISPATCH_TOKEN"))
+          | map(select(.name != "JOB_NOTIFICATIONS_TOPIC_ARN" and .name != "PUBLISH_WEBHOOK_URL" and .name != "GITHUB_DISPATCH_TOKEN" and .name != "SLACK_WEBHOOK_URL"))
           + [
-              {name: "GITHUB_DISPATCH_TOKEN", valueFrom: $githubDispatchTokenSecretArn}
+              {name: "GITHUB_DISPATCH_TOKEN", valueFrom: $githubDispatchTokenSecretArn},
+              {name: "SLACK_WEBHOOK_URL", valueFrom: $slackWebhookSecretArn}
             ])
       else
         .

@@ -15,7 +15,7 @@ locals {
   github_deploy_policy_schedule = "vimcolorschemes-worker-deploy-ecs-events-policy"
   human_deployer_role_name      = "vimcolorschemes-worker-human-deployer-role"
   operator_user_name            = "vimcolorschemes-worker-operator"
-  alerts_topic_name             = "vimcolorschemes-worker-job-notifications"
+  job_failure_alerts_role_name  = "vimcolorschemes-worker-job-failure-alerts-role"
 }
 
 resource "aws_ecr_repository" "worker" {
@@ -55,6 +55,17 @@ resource "aws_secretsmanager_secret" "github_dispatch_token" {
   tags = merge(local.tags, { Purpose = "runtime-secret" })
 }
 
+resource "aws_secretsmanager_secret" "slack_webhook_url" {
+  name = "vimcolorschemes/worker/slack_webhook_url"
+  tags = merge(local.tags, { Purpose = "runtime-secret" })
+}
+
+# Managed here, unlike the other secrets, because the failure alert API destination needs the same URL.
+resource "aws_secretsmanager_secret_version" "slack_webhook_url" {
+  secret_id     = aws_secretsmanager_secret.slack_webhook_url.id
+  secret_string = var.slack_webhook_url
+}
+
 resource "aws_iam_role_policy" "ecs_task_execution_secret_access" {
   name = "VimcolorschemesWorkerRuntimeSecretsRead"
   role = var.ecs_task_execution_role_name
@@ -70,25 +81,8 @@ resource "aws_iam_role_policy" "ecs_task_execution_secret_access" {
           aws_secretsmanager_secret.database_url.arn,
           aws_secretsmanager_secret.database_auth_token.arn,
           aws_secretsmanager_secret.github_dispatch_token.arn,
+          aws_secretsmanager_secret.slack_webhook_url.arn,
         ]
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy" "ecs_task_execution_notifications" {
-  count = length(var.alert_email_addresses) > 0 ? 1 : 0
-
-  name = "VimcolorschemesWorkerNotificationsPublish"
-  role = var.ecs_task_execution_role_name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = ["sns:Publish"]
-        Resource = [aws_sns_topic.job_notifications[0].arn]
       }
     ]
   })
@@ -126,50 +120,7 @@ resource "aws_cloudwatch_event_rule" "publish" {
   tags                = local.tags
 }
 
-resource "aws_sns_topic" "job_notifications" {
-  count = length(var.alert_email_addresses) > 0 ? 1 : 0
-
-  name = local.alerts_topic_name
-  tags = merge(local.tags, { Purpose = "alerts" })
-}
-
-resource "aws_sns_topic_policy" "job_notifications" {
-  count = length(var.alert_email_addresses) > 0 ? 1 : 0
-
-  arn = aws_sns_topic.job_notifications[0].arn
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowEventBridgePublish"
-        Effect = "Allow"
-        Principal = {
-          Service = "events.amazonaws.com"
-        }
-        Action   = "sns:Publish"
-        Resource = aws_sns_topic.job_notifications[0].arn
-        Condition = {
-          ArnEquals = {
-            "aws:SourceArn" = aws_cloudwatch_event_rule.job_failures[0].arn
-          }
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_sns_topic_subscription" "job_notifications_email" {
-  count = length(var.alert_email_addresses)
-
-  topic_arn = aws_sns_topic.job_notifications[0].arn
-  protocol  = "email"
-  endpoint  = var.alert_email_addresses[count.index]
-}
-
 resource "aws_cloudwatch_event_rule" "job_failures" {
-  count = length(var.alert_email_addresses) > 0 ? 1 : 0
-
   name        = "run-job-failures"
   description = "Alerts when a vimcolorschemes worker ECS task exits with a non-zero status"
   event_pattern = jsonencode({
@@ -193,12 +144,67 @@ resource "aws_cloudwatch_event_rule" "job_failures" {
   tags = merge(local.tags, { Purpose = "alerts" })
 }
 
-resource "aws_cloudwatch_event_target" "job_failures_sns" {
-  count = length(var.alert_email_addresses) > 0 ? 1 : 0
+# Slack ignores this header; EventBridge connections require some authorization.
+resource "aws_cloudwatch_event_connection" "slack" {
+  name               = "vimcolorschemes-worker-slack"
+  authorization_type = "API_KEY"
 
-  rule      = aws_cloudwatch_event_rule.job_failures[0].name
-  target_id = "job-failure-email"
-  arn       = aws_sns_topic.job_notifications[0].arn
+  auth_parameters {
+    api_key {
+      key   = "X-Unused-Auth"
+      value = "unused"
+    }
+  }
+}
+
+resource "aws_cloudwatch_event_api_destination" "slack" {
+  name                             = "vimcolorschemes-worker-slack"
+  connection_arn                   = aws_cloudwatch_event_connection.slack.arn
+  invocation_endpoint              = var.slack_webhook_url
+  http_method                      = "POST"
+  invocation_rate_limit_per_second = 1
+}
+
+data "aws_iam_policy_document" "job_failure_alerts_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "job_failure_alerts" {
+  name               = local.job_failure_alerts_role_name
+  description        = "Lets EventBridge post vimcolorschemes worker job failures to Slack"
+  assume_role_policy = data.aws_iam_policy_document.job_failure_alerts_assume_role.json
+  tags               = merge(local.tags, { Purpose = "alerts" })
+}
+
+resource "aws_iam_role_policy" "job_failure_alerts" {
+  name = "VimcolorschemesWorkerSlackAlertsInvoke"
+  role = aws_iam_role.job_failure_alerts.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["events:InvokeApiDestination"]
+        Resource = [aws_cloudwatch_event_api_destination.slack.arn]
+      }
+    ]
+  })
+}
+
+resource "aws_cloudwatch_event_target" "job_failures_slack" {
+  rule      = aws_cloudwatch_event_rule.job_failures.name
+  target_id = "job-failure-slack"
+  arn       = aws_cloudwatch_event_api_destination.slack.arn
+  role_arn  = aws_iam_role.job_failure_alerts.arn
 
   input_transformer {
     input_paths = {
@@ -212,7 +218,7 @@ resource "aws_cloudwatch_event_target" "job_failures_sns" {
     }
 
     input_template = <<EOF
-"vimcolorschemes worker job failed in production\n\nFamily: <group>\nTask: <taskArn>\nRegion: <region>\nStarted: <startedAt>\nStopped: <stoppedAt>\nStop code: <stopCode>\nStopped reason: <stoppedReason>"
+{"text": ":rotating_light: *vimcolorschemes worker job failed in production*\n```\nFamily: <group>\nTask: <taskArn>\nRegion: <region>\nStarted: <startedAt>\nStopped: <stoppedAt>\nStop code: <stopCode>\nStopped reason: <stoppedReason>\n```"}
 EOF
   }
 }

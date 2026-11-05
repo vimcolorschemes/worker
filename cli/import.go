@@ -19,7 +19,7 @@ var repositoryCountLimitPerPage int
 var countColorschemeFiles = github.CountColorschemeFiles
 var getRepositoryIDs = database.GetRepositoryIDs
 
-// Keep the job report small enough to travel in an SNS notification.
+// Keep the job report small enough to travel in a Slack notification.
 const repositoryDroppedNameSampleSize = 5
 
 var queries = []string{
