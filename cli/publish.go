@@ -121,23 +121,16 @@ func triggerPublishWebhook(webhookURL string, dispatchToken string) (int, error)
 	return response.StatusCode, nil
 }
 
+// Slack lists are all or nothing: a longer list is counted and left to the reports row and the worker logs.
+const summaryListLimit = 10
+
 func sendDailyJobSummary(ctx context.Context, publishResult map[string]interface{}, day time.Time) error {
 	reports, err := database.GetLatestReports([]string{"import", "update", "generate"}, day)
 	if err != nil {
 		return fmt.Errorf("load daily reports: %w", err)
 	}
 
-	generateEventCounts, err := database.CountRepositoryJobEvents("generate", day)
-	if err != nil {
-		return fmt.Errorf("load generate event counts: %w", err)
-	}
-
-	generateErrorMessages, err := database.ListRepositoryJobEventMessages("generate", "error", day, 5)
-	if err != nil {
-		return fmt.Errorf("load generate event messages: %w", err)
-	}
-
-	message := buildDailyJobSummary(day, reports, publishResult, generateEventCounts, generateErrorMessages, frontendURL)
+	message := buildDailyJobSummary(day, reports, publishResult, frontendURL)
 
 	if err := notify.PostMessage(ctx, message); err != nil {
 		return fmt.Errorf("send job summary notification: %w", err)
@@ -146,44 +139,64 @@ func sendDailyJobSummary(ctx context.Context, publishResult map[string]interface
 	return nil
 }
 
-func buildDailyJobSummary(day time.Time, reports map[string]database.JobReport, publishResult map[string]interface{}, generateEventCounts map[string]int, generateErrorMessages []string, frontendURL string) notify.Message {
+func buildDailyJobSummary(day time.Time, reports map[string]database.JobReport, publishResult map[string]interface{}, frontendURL string) notify.Message {
 	subtitle := day.Format("Monday, January 2, 2006")
 	if frontendURL != "" {
 		subtitle += fmt.Sprintf("  ·  <%s|%s>", frontendURL, strings.TrimPrefix(frontendURL, "https://"))
 	}
 
+	unhealthy := 0
+	for _, job := range publishRequiredJobs {
+		if sectionStatus(reports[job]) != "success" {
+			unhealthy++
+		}
+	}
+
+	added := reportInt(reports["import"].Data, "repositoryAddedCount")
+	pruned := reportInt(reports["update"].Data, "repositoryDeletedCount")
+	errorCount := reportInt(reports["update"].Data, "repositoryErrorCount") + reportInt(reports["generate"].Data, "repositoryErrorCount")
+
+	emoji, status := ":white_check_mark:", "all green"
+	if unhealthy > 0 {
+		emoji, status = ":x:", fmt.Sprintf("%d of %d jobs need attention", unhealthy, len(publishRequiredJobs))
+	} else if errorCount > 0 {
+		emoji, status = ":warning:", "needs attention"
+	}
+
+	netChange := fmt.Sprintf("%s %s  ·  %s pruned  ·  %s %s",
+		signedCount(added, "+"), plural(added, "repo"),
+		signedCount(pruned, "-"),
+		formatInt(errorCount), plural(errorCount, "error"))
+
 	blocks := []notify.Block{
 		notify.Header("vimcolorschemes daily summary"),
 		notify.Context(subtitle),
+		notify.Section(fmt.Sprintf("%s *%s*  ·  %s", emoji, status, netChange), nil),
 	}
 
-	unhealthy := 0
 	for _, job := range publishRequiredJobs {
-		report := reports[job]
-		if sectionStatus(report) != "success" {
-			unhealthy++
-		}
 		blocks = append(blocks, notify.Divider())
-		blocks = append(blocks, jobSectionBlocks(job, report, job == "generate", generateEventCounts, generateErrorMessages)...)
+		blocks = append(blocks, jobSectionBlocks(job, reports[job])...)
 	}
 
-	blocks = append(blocks, notify.Divider())
-	blocks = append(blocks, jobSectionBlocks("publish", database.JobReport{
-		Job:    "publish",
-		Status: "success",
-		Date:   day,
-		Data:   publishResult,
-	}, false, nil, nil)...)
+	blocks = append(blocks, notify.Divider(), publishSectionBlock(publishResult))
 
-	text := fmt.Sprintf("vimcolorschemes daily summary %s: all jobs succeeded", day.Format("2006-01-02"))
-	if unhealthy > 0 {
-		text = fmt.Sprintf("vimcolorschemes daily summary %s: %d of %d jobs need attention", day.Format("2006-01-02"), unhealthy, len(publishRequiredJobs))
+	if footer := runTimesFooter(reports); footer != "" {
+		blocks = append(blocks, notify.Context(footer))
 	}
+
+	text := fmt.Sprintf("vimcolorschemes daily summary %s: %s  ·  %s", day.Format("2006-01-02"), status, netChange)
 
 	return notify.Message{Text: text, Blocks: blocks}
 }
 
-func jobSectionBlocks(job string, report database.JobReport, includeGenerateEvents bool, generateEventCounts map[string]int, generateErrorMessages []string) []notify.Block {
+type summaryCount struct {
+	label  string
+	value  int64
+	prefix string
+}
+
+func jobSectionBlocks(job string, report database.JobReport) []notify.Block {
 	status := sectionStatus(report)
 	heading := fmt.Sprintf("%s *%s*", statusEmoji(status), titleCase(job))
 
@@ -194,66 +207,86 @@ func jobSectionBlocks(job string, report database.JobReport, includeGenerateEven
 	if status != "success" {
 		heading += "  ·  " + status
 	}
-	if job != "publish" {
-		heading += fmt.Sprintf("  ·  %s  ·  ran at %s", formatDuration(report.ElapsedTime), report.Date.UTC().Format("15:04 UTC"))
-	}
 
-	keyLabels := map[string]string{
-		"repositoryCount":        "Repositories",
-		"repositoryCheckedCount": "Checked",
-		"repositoryDroppedCount": "Dropped",
-		"repositoryErrorCount":   "Errors",
-		"repositoryDeletedCount": "Pruned",
-		"responseStatusCode":     "Status code",
-		"webhookTriggered":       "Webhook",
-		"notificationStatus":     "Notification",
+	data := report.Data
+	var counts []summaryCount
+	var lists []notify.Block
+
+	switch job {
+	case "import":
+		counts = []summaryCount{
+			{"Candidates", reportInt(data, "repositoryCheckedCount"), ""},
+			{"New", reportInt(data, "repositoryAddedCount"), "+"},
+			{"Filtered out", reportInt(data, "repositoryDroppedCount"), ""},
+		}
+		lists = summaryListBlocks(report, "New", reportStrings(data["repositoryAddedNames"]), reportInt(data, "repositoryAddedCount"), repositoryLinks)
+	case "update":
+		counts = []summaryCount{
+			{"Total in DB", reportInt(data, "repositoryCount"), ""},
+			{"Errors", reportInt(data, "repositoryErrorCount"), ""},
+			{"Pruned (404)", reportInt(data, "repositoryDeletedCount"), ""},
+		}
+		lists = summaryListBlocks(report, "Pruned (404)", reportStrings(data["repositoryDeletedNames"]), reportInt(data, "repositoryDeletedCount"), repositoryLinks)
+	case "generate":
+		processed := reportInt(data, "repositoryCount")
+		errorCount := reportInt(data, "repositoryErrorCount")
+		counts = []summaryCount{
+			{"Processed", processed, ""},
+			{"OK", processed - errorCount, ""},
+			{"Colorschemes generated", reportInt(data, "colorschemeCount"), ""},
+			{"Errors", errorCount, ""},
+		}
+		lists = summaryListBlocks(report, "Errors", reportStrings(data["repositoryErrorSamples"]), errorCount, errorBullets)
 	}
 
 	var fields []string
-	for _, key := range []string{"repositoryCount", "repositoryCheckedCount", "repositoryDroppedCount", "repositoryErrorCount", "repositoryDeletedCount", "responseStatusCode", "webhookTriggered", "notificationStatus"} {
-		value, ok := report.Data[key]
-		if !ok {
-			continue
+	for _, count := range counts {
+		if count.value > 0 {
+			fields = append(fields, summaryField(count.label, count.prefix+formatInt(count.value)))
 		}
-		fields = append(fields, summaryField(keyLabels[key], formatSummaryValue(key, value)))
-	}
-	if includeGenerateEvents {
-		fields = append(fields, summaryField("Event errors", formatInt(int64(generateEventCounts["error"]))))
 	}
 
 	blocks := []notify.Block{notify.Section(heading, fields)}
 
-	if errValue, ok := report.Data["error"]; ok {
+	if errValue, ok := data["error"]; ok {
 		blocks = append(blocks, notify.Section("*Error*\n"+notify.Escape(fmt.Sprintf("%v", errValue)), nil))
 	}
-	if errValue, ok := report.Data["notificationError"]; ok {
-		blocks = append(blocks, notify.Section("*Notification error*\n"+notify.Escape(fmt.Sprintf("%v", errValue)), nil))
-	}
-	if links := repositoryLinks(report.Data["repositoryDeletedNames"]); links != "" {
-		blocks = append(blocks, notify.Section("*Pruned repositories*\n"+links, nil))
-	}
-	if links := repositoryLinks(report.Data["repositoryDroppedNames"]); links != "" {
-		blocks = append(blocks, notify.Section("*Dropped repositories*\n"+links, nil))
-	}
 
-	var errorSamples []string
-	if includeGenerateEvents {
-		errorSamples = append(errorSamples, generateErrorMessages...)
-	}
-	if samples, ok := report.Data["repositoryErrorSamples"].([]interface{}); ok {
-		for _, sample := range samples {
-			errorSamples = append(errorSamples, fmt.Sprintf("%v", sample))
-		}
-	}
-	if len(errorSamples) > 0 {
-		lines := make([]string, len(errorSamples))
-		for i, message := range errorSamples {
-			lines[i] = "• " + notify.Escape(message)
-		}
-		blocks = append(blocks, notify.Section("*Recent errors*\n"+strings.Join(lines, "\n"), nil))
-	}
+	return append(blocks, lists...)
+}
 
-	return blocks
+// summaryListBlocks never shows part of a list: a stored list shorter than its count is only counted.
+func summaryListBlocks(report database.JobReport, label string, items []string, total int64, render func([]string) string) []notify.Block {
+	switch {
+	case total == 0:
+		return nil
+	case total <= summaryListLimit && int64(len(items)) == total:
+		return []notify.Block{notify.Section(fmt.Sprintf("*%s*\n%s", label, render(items)), nil)}
+	default:
+		return []notify.Block{notify.Section(fmt.Sprintf(
+			"*%s*\n%s, not listed here. Full list in the `reports` row for %s on %s and in the worker logs.",
+			label, formatInt(total), report.Job, report.Date.UTC().Format("2006-01-02"),
+		), nil)}
+	}
+}
+
+func publishSectionBlock(publishResult map[string]interface{}) notify.Block {
+	if triggered, _ := publishResult["webhookTriggered"].(bool); triggered {
+		return notify.Section(statusEmoji("success")+" *Publish*  ·  deployed", nil)
+	}
+	return notify.Section(statusEmoji("error")+" *Publish*  ·  blocked", nil)
+}
+
+func runTimesFooter(reports map[string]database.JobReport) string {
+	var parts []string
+	for _, job := range publishRequiredJobs {
+		report := reports[job]
+		if report.Job == "" {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s %s at %s", titleCase(job), formatDuration(report.ElapsedTime), report.Date.UTC().Format("15:04 UTC")))
+	}
+	return strings.Join(parts, "  ·  ")
 }
 
 func summaryField(label string, value string) string {
@@ -304,40 +337,31 @@ func formatDuration(seconds float64) string {
 	return fmt.Sprintf("%dm %ds", minutes, secs)
 }
 
-func formatSummaryValue(key string, value interface{}) string {
-	if v, ok := value.(bool); ok {
-		if key == "webhookTriggered" {
-			if v {
-				return "triggered"
-			}
-			return "not triggered"
-		}
-		return fmt.Sprintf("%t", v)
+func signedCount(n int64, sign string) string {
+	if n == 0 {
+		return "0"
 	}
+	return sign + formatInt(n)
+}
 
-	useThousands := key == "repositoryCount" || key == "repositoryErrorCount" || key == "repositoryDeletedCount"
+func plural(n int64, word string) string {
+	if n == 1 {
+		return word
+	}
+	return word + "s"
+}
 
-	switch v := value.(type) {
+// reportInt reads a count from report data, which holds float64 once it has been through JSON.
+func reportInt(data map[string]interface{}, key string) int64 {
+	switch v := data[key].(type) {
 	case float64:
-		if v == float64(int64(v)) {
-			if useThousands {
-				return formatInt(int64(v))
-			}
-			return fmt.Sprintf("%d", int64(v))
-		}
-		return fmt.Sprintf("%v", v)
+		return int64(v)
 	case int:
-		if useThousands {
-			return formatInt(int64(v))
-		}
-		return fmt.Sprintf("%d", v)
+		return int64(v)
 	case int64:
-		if useThousands {
-			return formatInt(v)
-		}
-		return fmt.Sprintf("%d", v)
+		return v
 	default:
-		return fmt.Sprintf("%v", v)
+		return 0
 	}
 }
 
@@ -360,21 +384,34 @@ func formatInt(n int64) string {
 	return sign + strings.Join(parts, ",")
 }
 
-func repositoryLinks(value interface{}) string {
-	var names []string
+func reportStrings(value interface{}) []string {
 	switch typed := value.(type) {
 	case []interface{}:
-		for _, name := range typed {
-			names = append(names, fmt.Sprintf("%v", name))
+		names := make([]string, len(typed))
+		for i, name := range typed {
+			names[i] = fmt.Sprintf("%v", name)
 		}
+		return names
 	case []string:
-		names = typed
+		return typed
+	default:
+		return nil
 	}
+}
 
+func repositoryLinks(names []string) string {
 	links := make([]string, len(names))
 	for i, name := range names {
 		escaped := notify.Escape(name)
 		links[i] = fmt.Sprintf("<https://github.com/%s|%s>", escaped, escaped)
 	}
 	return strings.Join(links, "  ·  ")
+}
+
+func errorBullets(messages []string) string {
+	lines := make([]string, len(messages))
+	for i, message := range messages {
+		lines[i] = "• " + notify.Escape(message)
+	}
+	return strings.Join(lines, "\n")
 }

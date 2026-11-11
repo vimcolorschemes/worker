@@ -90,7 +90,7 @@ func updateRepository(repository repoHelper.Repository) (repoHelper.Repository, 
 				return repository, true, false
 			}
 			log.Printf("Deleted repository %s/%s (404 from Github)", repository.Owner.Name, repository.Name)
-			return repository, true, true
+			return repository, false, true
 		}
 		repository.IsEligible = false
 		return repository, true, false

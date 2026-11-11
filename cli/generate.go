@@ -66,6 +66,7 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 	log.Printf("Generating previews for %d repositories", len(repositories))
 	repositoryErrorCount := 0
 	repositoryErrorSamples := []string{}
+	colorschemeCount := 0
 
 	for index, repository := range repositories {
 		log.Print("\nGenerating previews for ", repository.Owner.Name, "/", repository.Name, " (", index+1, "/", len(repositories), ")")
@@ -107,6 +108,8 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 			}
 			continue
 		}
+
+		colorschemeCount += len(repository.Colorschemes)
 	}
 
 	cleanUp()
@@ -115,6 +118,7 @@ func Generate(force bool, debug bool, repoKey string) map[string]interface{} {
 		"repositoryCount":        len(repositories),
 		"repositoryErrorCount":   repositoryErrorCount,
 		"repositoryErrorSamples": repositoryErrorSamples,
+		"colorschemeCount":       colorschemeCount,
 	}
 }
 
@@ -498,9 +502,5 @@ func isDefaultColorscheme(name string) bool {
 }
 
 func appendRepositoryErrorSample(samples []string, repository repoHelper.Repository, err error) []string {
-	if len(samples) >= 5 {
-		return samples
-	}
-
 	return append(samples, fmt.Sprintf("%s/%s: %s", repository.Owner.Name, repository.Name, err))
 }

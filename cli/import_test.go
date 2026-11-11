@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	gogithub "github.com/google/go-github/v68/github"
@@ -40,7 +41,7 @@ func TestFilterColorschemeRepositories(t *testing.T) {
 			return 0, nil
 		}
 
-		kept, checkedCount, droppedNames := filterColorschemeRepositories([]*gogithub.Repository{
+		kept, checkedCount, addedNames, droppedNames := filterColorschemeRepositories([]*gogithub.Repository{
 			githubRepository(1, "owner", "known"),
 		})
 
@@ -53,6 +54,9 @@ func TestFilterColorschemeRepositories(t *testing.T) {
 		if len(kept) != 1 {
 			t.Fatalf("kept = %v, want [known]", repositoryNames(kept))
 		}
+		if got := strings.Join(addedNames, ","); got != "" {
+			t.Fatalf("addedNames = %v, want []", addedNames)
+		}
 		if len(droppedNames) != 0 {
 			t.Fatalf("droppedNames = %v, want []", droppedNames)
 		}
@@ -62,7 +66,7 @@ func TestFilterColorschemeRepositories(t *testing.T) {
 		getRepositoryIDs = func() (map[int64]bool, error) { return map[int64]bool{}, nil }
 		countColorschemeFiles = func(ownerName string, name string) (int, error) { return 0, nil }
 
-		kept, checkedCount, droppedNames := filterColorschemeRepositories([]*gogithub.Repository{
+		kept, checkedCount, addedNames, droppedNames := filterColorschemeRepositories([]*gogithub.Repository{
 			githubRepository(1, "owner", "dotfiles"),
 		})
 
@@ -71,6 +75,9 @@ func TestFilterColorschemeRepositories(t *testing.T) {
 		}
 		if len(kept) != 0 {
 			t.Fatalf("kept = %v, want []", repositoryNames(kept))
+		}
+		if got := strings.Join(addedNames, ","); got != "" {
+			t.Fatalf("addedNames = %v, want []", addedNames)
 		}
 		if len(droppedNames) != 1 || droppedNames[0] != "owner/dotfiles" {
 			t.Fatalf("droppedNames = %v, want [owner/dotfiles]", droppedNames)
@@ -81,7 +88,7 @@ func TestFilterColorschemeRepositories(t *testing.T) {
 		getRepositoryIDs = func() (map[int64]bool, error) { return map[int64]bool{}, nil }
 		countColorschemeFiles = func(ownerName string, name string) (int, error) { return 5, nil }
 
-		kept, checkedCount, droppedNames := filterColorschemeRepositories([]*gogithub.Repository{
+		kept, checkedCount, addedNames, droppedNames := filterColorschemeRepositories([]*gogithub.Repository{
 			githubRepository(1, "folke", "tokyonight.nvim"),
 		})
 
@@ -90,6 +97,9 @@ func TestFilterColorschemeRepositories(t *testing.T) {
 		}
 		if len(kept) != 1 {
 			t.Fatalf("kept = %v, want [tokyonight.nvim]", repositoryNames(kept))
+		}
+		if got := strings.Join(addedNames, ","); got != "folke/tokyonight.nvim" {
+			t.Fatalf("addedNames = %v, want [folke/tokyonight.nvim]", addedNames)
 		}
 		if len(droppedNames) != 0 {
 			t.Fatalf("droppedNames = %v, want []", droppedNames)
@@ -102,12 +112,15 @@ func TestFilterColorschemeRepositories(t *testing.T) {
 			return 0, errors.New("boom")
 		}
 
-		kept, _, droppedNames := filterColorschemeRepositories([]*gogithub.Repository{
+		kept, _, addedNames, droppedNames := filterColorschemeRepositories([]*gogithub.Repository{
 			githubRepository(1, "owner", "flaky"),
 		})
 
 		if len(kept) != 1 {
 			t.Fatalf("kept = %v, want [flaky]", repositoryNames(kept))
+		}
+		if got := strings.Join(addedNames, ","); got != "owner/flaky" {
+			t.Fatalf("addedNames = %v, want [owner/flaky]", addedNames)
 		}
 		if len(droppedNames) != 0 {
 			t.Fatalf("droppedNames = %v, want []", droppedNames)
@@ -120,12 +133,15 @@ func TestFilterColorschemeRepositories(t *testing.T) {
 			return 0, github.ErrTreeTruncated
 		}
 
-		kept, _, droppedNames := filterColorschemeRepositories([]*gogithub.Repository{
+		kept, _, addedNames, droppedNames := filterColorschemeRepositories([]*gogithub.Repository{
 			githubRepository(1, "owner", "huge"),
 		})
 
 		if len(kept) != 1 {
 			t.Fatalf("kept = %v, want [huge]", repositoryNames(kept))
+		}
+		if got := strings.Join(addedNames, ","); got != "owner/huge" {
+			t.Fatalf("addedNames = %v, want [owner/huge]", addedNames)
 		}
 		if len(droppedNames) != 0 {
 			t.Fatalf("droppedNames = %v, want []", droppedNames)
@@ -143,7 +159,7 @@ func TestFilterColorschemeRepositories(t *testing.T) {
 			return 0, nil
 		}
 
-		kept, checkedCount, droppedNames := filterColorschemeRepositories([]*gogithub.Repository{
+		kept, checkedCount, addedNames, droppedNames := filterColorschemeRepositories([]*gogithub.Repository{
 			githubRepository(1, "owner", "known-one"),
 			githubRepository(2, "owner", "new-colorscheme"),
 			githubRepository(3, "owner", "known-two"),
@@ -159,24 +175,11 @@ func TestFilterColorschemeRepositories(t *testing.T) {
 		if got := repositoryNames(kept); len(got) != 3 {
 			t.Fatalf("kept = %v, want 3 repositories", got)
 		}
+		if got := strings.Join(addedNames, ","); got != "owner/new-colorscheme" {
+			t.Fatalf("addedNames = %v, want [owner/new-colorscheme]", addedNames)
+		}
 		if len(droppedNames) != 1 || droppedNames[0] != "owner/new-dotfiles" {
 			t.Fatalf("droppedNames = %v, want [owner/new-dotfiles]", droppedNames)
-		}
-	})
-}
-
-func TestSampleDroppedNames(t *testing.T) {
-	t.Run("returns every name when under the sample size", func(t *testing.T) {
-		names := []string{"a/one", "a/two"}
-		if got := sampleDroppedNames(names); len(got) != 2 {
-			t.Fatalf("sampleDroppedNames() = %v, want %v", got, names)
-		}
-	})
-
-	t.Run("caps the names at the sample size", func(t *testing.T) {
-		names := []string{"a/one", "a/two", "a/three", "a/four", "a/five", "a/six"}
-		if got := sampleDroppedNames(names); len(got) != repositoryDroppedNameSampleSize {
-			t.Fatalf("len(sampleDroppedNames()) = %d, want %d", len(got), repositoryDroppedNameSampleSize)
 		}
 	})
 }

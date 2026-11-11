@@ -19,9 +19,6 @@ var repositoryCountLimitPerPage int
 var countColorschemeFiles = github.CountColorschemeFiles
 var getRepositoryIDs = database.GetRepositoryIDs
 
-// Keep the job report small enough to travel in a Slack notification.
-const repositoryDroppedNameSampleSize = 5
-
 var queries = []string{
 	"vim theme",
 	"vim color scheme",
@@ -60,6 +57,7 @@ func Import(_force bool, _debug bool, repoKey string) map[string]interface{} {
 
 	var repositories []*gogithub.Repository
 	checkedCount := 0
+	addedNames := []string{}
 	droppedNames := []string{}
 
 	if repoKey != "" {
@@ -75,7 +73,7 @@ func Import(_force bool, _debug bool, repoKey string) map[string]interface{} {
 		repositories = []*gogithub.Repository{repository}
 	} else {
 		repositories = github.SearchRepositories(queries, repositoryCountLimit, repositoryCountLimitPerPage)
-		repositories, checkedCount, droppedNames = filterColorschemeRepositories(repositories)
+		repositories, checkedCount, addedNames, droppedNames = filterColorschemeRepositories(repositories)
 	}
 
 	log.Print("Preparing import data for ", len(repositories), " repositories")
@@ -89,15 +87,17 @@ func Import(_force bool, _debug bool, repoKey string) map[string]interface{} {
 	return map[string]interface{}{
 		"repositoryCount":        len(repositories),
 		"repositoryCheckedCount": checkedCount,
+		"repositoryAddedCount":   len(addedNames),
+		"repositoryAddedNames":   addedNames,
 		"repositoryDroppedCount": len(droppedNames),
-		"repositoryDroppedNames": sampleDroppedNames(droppedNames),
+		"repositoryDroppedNames": droppedNames,
 	}
 }
 
 // filterColorschemeRepositories drops candidates that do not ship a colorscheme.
 // Github search only matches name, description and topics, so it happily returns
 // dotfiles and tutorials.
-func filterColorschemeRepositories(repositories []*gogithub.Repository) ([]*gogithub.Repository, int, []string) {
+func filterColorschemeRepositories(repositories []*gogithub.Repository) ([]*gogithub.Repository, int, []string, []string) {
 	existingIDs, err := getRepositoryIDs()
 	if err != nil {
 		log.Panic(err)
@@ -105,6 +105,7 @@ func filterColorschemeRepositories(repositories []*gogithub.Repository) ([]*gogi
 
 	kept := make([]*gogithub.Repository, 0, len(repositories))
 	checkedCount := 0
+	addedNames := []string{}
 	droppedNames := []string{}
 
 	for _, repository := range repositories {
@@ -117,33 +118,29 @@ func filterColorschemeRepositories(repositories []*gogithub.Repository) ([]*gogi
 		name := repository.GetName()
 
 		checkedCount++
+		fullName := fmt.Sprintf("%s/%s", ownerName, name)
 		count, err := countColorschemeFiles(ownerName, name)
 		if err != nil {
-			log.Printf("Error counting colorscheme files for %s/%s, keeping it: %s", ownerName, name, err)
+			log.Printf("Error counting colorscheme files for %s, keeping it: %s", fullName, err)
 			kept = append(kept, repository)
+			addedNames = append(addedNames, fullName)
 			continue
 		}
 
 		if count == 0 {
-			log.Printf("Dropping %s/%s, no root colors/ or after/colors/ *.{vim,lua} file", ownerName, name)
-			droppedNames = append(droppedNames, fmt.Sprintf("%s/%s", ownerName, name))
+			log.Printf("Dropping %s, no root colors/ or after/colors/ *.{vim,lua} file", fullName)
+			droppedNames = append(droppedNames, fullName)
 			continue
 		}
 
-		log.Printf("Keeping new repository %s/%s with %d colorscheme files", ownerName, name, count)
+		log.Printf("Keeping new repository %s with %d colorscheme files", fullName, count)
 		kept = append(kept, repository)
+		addedNames = append(addedNames, fullName)
 	}
 
-	log.Printf("Checked %d new candidates, dropped %d", checkedCount, len(droppedNames))
+	log.Printf("Checked %d new candidates, added %d, dropped %d", checkedCount, len(addedNames), len(droppedNames))
 
-	return kept, checkedCount, droppedNames
-}
-
-func sampleDroppedNames(names []string) []string {
-	if len(names) <= repositoryDroppedNameSampleSize {
-		return names
-	}
-	return names[:repositoryDroppedNameSampleSize]
+	return kept, checkedCount, addedNames, droppedNames
 }
 
 func getImportData(repository *gogithub.Repository) database.ImportData {

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -125,6 +126,10 @@ func TestTriggerPublishWebhook(t *testing.T) {
 
 func TestBuildDailyJobSummary(t *testing.T) {
 	day := time.Date(2026, time.March, 29, 0, 0, 0, 0, time.UTC)
+	prunedNames := []interface{}{}
+	for i := 1; i <= 11; i++ {
+		prunedNames = append(prunedNames, fmt.Sprintf("owner%d/repo%d", i, i))
+	}
 	reports := map[string]database.JobReport{
 		"import": {
 			Job:         "import",
@@ -134,20 +139,22 @@ func TestBuildDailyJobSummary(t *testing.T) {
 			Data: map[string]interface{}{
 				"repositoryCount":        float64(2934),
 				"repositoryCheckedCount": float64(40),
-				"repositoryDroppedCount": float64(2),
-				"repositoryDroppedNames": []string{"owner4/dotfiles", "owner5/tutorial"},
+				"repositoryAddedCount":   float64(2),
+				"repositoryAddedNames":   []interface{}{"alice/moss", "bob/ember"},
+				"repositoryDroppedCount": float64(38),
+				"repositoryDroppedNames": []interface{}{"owner4/dotfiles"},
 			},
 		},
 		"update": {
 			Job:         "update",
 			Date:        day.Add(2 * time.Hour),
-			ElapsedTime: 18.2,
+			ElapsedTime: 918.2,
 			Status:      "success",
 			Data: map[string]interface{}{
 				"repositoryCount":        float64(2934),
-				"repositoryErrorCount":   float64(2),
-				"repositoryDeletedCount": float64(3),
-				"repositoryDeletedNames": []interface{}{"owner1/repo1", "owner2/repo2", "owner3/repo3"},
+				"repositoryErrorCount":   float64(0),
+				"repositoryDeletedCount": float64(11),
+				"repositoryDeletedNames": prunedNames,
 			},
 		},
 		"generate": {
@@ -159,23 +166,18 @@ func TestBuildDailyJobSummary(t *testing.T) {
 				"repositoryCount":        float64(120),
 				"repositoryErrorCount":   float64(1),
 				"repositoryErrorSamples": []interface{}{"owner/repo: boom"},
+				"colorschemeCount":       float64(1043),
 			},
 		},
 	}
 	publishResult := map[string]interface{}{
 		"responseStatusCode": float64(201),
 		"webhookTriggered":   true,
-		"notificationStatus": "sent",
-		"jobStatuses": map[string]interface{}{
-			"import":   "success",
-			"update":   "success",
-			"generate": "success",
-		},
 	}
 
-	message := buildDailyJobSummary(day, reports, publishResult, map[string]int{"error": 1}, []string{"clone failed"}, frontendURL)
+	message := buildDailyJobSummary(day, reports, publishResult, frontendURL)
 
-	if message.Text != "vimcolorschemes daily summary 2026-03-29: all jobs succeeded" {
+	if message.Text != "vimcolorschemes daily summary 2026-03-29: needs attention  ·  +2 repos  ·  -11 pruned  ·  1 error" {
 		t.Fatalf("Text = %q", message.Text)
 	}
 	if message.Blocks[0]["type"] != "header" {
@@ -184,36 +186,75 @@ func TestBuildDailyJobSummary(t *testing.T) {
 
 	body := strings.Join(blockTexts(message.Blocks), "\n")
 	for _, want := range []string{
-		"vimcolorschemes daily summary",
 		"Sunday, March 29, 2026  ·  <https://vimcolorschemes.com|vimcolorschemes.com>",
-		":white_check_mark: *Import*  ·  12.5s  ·  ran at 01:00 UTC",
-		"*Repositories*\n2,934",
-		"*Checked*\n40",
-		"*Dropped*\n2",
-		"*Dropped repositories*\n<https://github.com/owner4/dotfiles|owner4/dotfiles>  ·  <https://github.com/owner5/tutorial|owner5/tutorial>",
-		":white_check_mark: *Update*  ·  18.2s  ·  ran at 02:00 UTC",
-		"*Errors*\n2",
-		"*Pruned*\n3",
-		"*Pruned repositories*\n<https://github.com/owner1/repo1|owner1/repo1>",
+		":warning: *needs attention*  ·  +2 repos  ·  -11 pruned  ·  1 error",
+		":white_check_mark: *Import*",
+		"*Candidates*\n40",
+		"*New*\n+2",
+		"*Filtered out*\n38",
+		"*New*\n<https://github.com/alice/moss|alice/moss>  ·  <https://github.com/bob/ember|bob/ember>",
+		":white_check_mark: *Update*",
+		"*Total in DB*\n2,934",
+		"*Pruned (404)*\n11",
+		"*Pruned (404)*\n11, not listed here. Full list in the `reports` row for update on 2026-03-29 and in the worker logs.",
 		":white_check_mark: *Generate*",
-		"*Event errors*\n1",
-		"*Recent errors*\n• clone failed\n• owner/repo: boom",
-		":white_check_mark: *Publish*",
-		"*Status code*\n201",
-		"*Webhook*\ntriggered",
-		"*Notification*\nsent",
+		"*Processed*\n120",
+		"*OK*\n119",
+		"*Colorschemes generated*\n1,043",
+		"*Errors*\n• owner/repo: boom",
+		":white_check_mark: *Publish*  ·  deployed",
+		"Import 12.5s at 01:00 UTC  ·  Update 15m 18s at 02:00 UTC  ·  Generate 25.4s at 03:00 UTC",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("summary = %q, want it to contain %q", body, want)
 		}
 	}
 
+	for _, unwanted := range []string{"*Errors*\n0", "owner4/dotfiles", "owner1/repo1", "Status code"} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("summary = %q, want it not to contain %q", body, unwanted)
+		}
+	}
+
+	t.Run("shows a quiet day as all green", func(t *testing.T) {
+		quiet := map[string]database.JobReport{
+			"import":   {Job: "import", Date: day, Status: "success", Data: map[string]interface{}{"repositoryCheckedCount": float64(3), "repositoryDroppedCount": float64(3)}},
+			"update":   {Job: "update", Date: day, Status: "success", Data: map[string]interface{}{"repositoryCount": float64(10)}},
+			"generate": {Job: "generate", Date: day, Status: "success", Data: map[string]interface{}{}},
+		}
+
+		message := buildDailyJobSummary(day, quiet, publishResult, frontendURL)
+
+		if message.Text != "vimcolorschemes daily summary 2026-03-29: all green  ·  0 repos  ·  0 pruned  ·  0 errors" {
+			t.Fatalf("Text = %q", message.Text)
+		}
+	})
+
+	t.Run("counts a capped list instead of showing part of it", func(t *testing.T) {
+		capped := map[string]database.JobReport{
+			"generate": {Job: "generate", Date: day, Status: "success", Data: map[string]interface{}{
+				"repositoryCount":        float64(10),
+				"repositoryErrorCount":   float64(7),
+				"repositoryErrorSamples": []interface{}{"a/one: boom", "a/two: boom", "a/three: boom", "a/four: boom", "a/five: boom"},
+			}},
+		}
+
+		body := strings.Join(blockTexts(buildDailyJobSummary(day, capped, publishResult, frontendURL).Blocks), "\n")
+
+		if strings.Contains(body, "a/one: boom") {
+			t.Fatalf("summary = %q, want no partial error list", body)
+		}
+		if !strings.Contains(body, "*Errors*\n7, not listed here.") {
+			t.Fatalf("summary = %q, want the error count with a pointer", body)
+		}
+	})
+
 	t.Run("flags missing reports", func(t *testing.T) {
 		delete(reports, "update")
 
-		message := buildDailyJobSummary(day, reports, publishResult, nil, nil, frontendURL)
+		message := buildDailyJobSummary(day, reports, publishResult, frontendURL)
 
-		if message.Text != "vimcolorschemes daily summary 2026-03-29: 1 of 3 jobs need attention" {
+		if message.Text != "vimcolorschemes daily summary 2026-03-29: 1 of 3 jobs need attention  ·  +2 repos  ·  0 pruned  ·  1 error" {
 			t.Fatalf("Text = %q", message.Text)
 		}
 		if body := strings.Join(blockTexts(message.Blocks), "\n"); !strings.Contains(body, ":warning: *Update*  ·  no report recorded today") {
