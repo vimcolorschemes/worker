@@ -269,7 +269,7 @@ func installPlugin(gitRepositoryURL string, path string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), previewGenerationTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "git", "clone", gitRepositoryURL, target)
+	cmd := exec.CommandContext(ctx, "git", "clone", "--depth=1", gitRepositoryURL, target)
 
 	log.Printf("Running %s (timeout: %s)", cmd, previewGenerationTimeout)
 
